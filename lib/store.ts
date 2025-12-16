@@ -6,25 +6,32 @@ import {
   CharacterAppearance,
   CharacterPersonality,
   PersonalityTraits,
+  CharacterGeneration,
+  CharacterStyle,
+  AIModel,
 } from './types';
 
 interface CharacterBuilderStore {
   draft: CharacterDraft;
   setCurrentStep: (step: number) => void;
+  setName: (name: string) => void;
   setIdentity: (identity: Partial<CharacterIdentity>) => void;
   setBody: (body: Partial<CharacterBody>) => void;
   setAppearance: (appearance: Partial<CharacterAppearance>) => void;
   setPersonality: (personality: Partial<CharacterPersonality>) => void;
   setPersonalityTraits: (traits: Partial<PersonalityTraits>) => void;
+  setGeneration: (generation: Partial<CharacterGeneration>) => void;
+  updateCharacter: (updates: Partial<CharacterDraft>) => void;
   resetDraft: () => void;
   loadDraft: (draft: CharacterDraft) => void;
   getDraft: () => CharacterDraft;
 }
 
 const initialDraft: CharacterDraft = {
-  currentStep: 1,
+  currentStep: 0,
+  name: '',
   identity: {
-    ageGroup: null,
+    age: null,
     ethnicity: null,
   },
   body: {
@@ -37,6 +44,8 @@ const initialDraft: CharacterDraft = {
     hairStyle: null,
     hairColor: null,
     eyeColor: null,
+    eyeType: null,
+    clothing: null,
   },
   personality: {
     archetype: null,
@@ -49,10 +58,20 @@ const initialDraft: CharacterDraft = {
       seriousPlayful: 50,
     },
   },
+  generation: {
+    style: null as CharacterStyle | null,
+    model: null as AIModel | null,
+    generationStatus: 'pending',
+  },
 };
 
 export const useCharacterBuilder = create<CharacterBuilderStore>((set, get) => ({
   draft: initialDraft,
+
+  setName: (name: string) =>
+    set((state) => ({
+      draft: { ...state.draft, name },
+    })),
 
   setCurrentStep: (step: number) =>
     set((state) => ({
@@ -100,6 +119,19 @@ export const useCharacterBuilder = create<CharacterBuilderStore>((set, get) => (
           traits: { ...state.draft.personality.traits, ...traits },
         },
       },
+    })),
+
+  setGeneration: (generation: Partial<CharacterGeneration>) =>
+    set((state) => ({
+      draft: {
+        ...state.draft,
+        generation: { ...state.draft.generation, ...generation },
+      },
+    })),
+
+  updateCharacter: (updates: Partial<CharacterDraft>) =>
+    set((state) => ({
+      draft: { ...state.draft, ...updates },
     })),
 
   resetDraft: () => set({ draft: initialDraft }),

@@ -35,8 +35,8 @@ export const Step5Confirmation: React.FC<{ onConfirm: () => void; isLoading?: bo
           <h3 className="text-xl font-semibold text-purple-400 mb-4">Identity</h3>
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <p className="text-dark-400">Age Group</p>
-              <p className="text-white font-medium">{formatValue(draft.identity.ageGroup)}</p>
+              <p className="text-dark-400">Age</p>
+              <p className="text-white font-medium">{draft.identity.age ? `${draft.identity.age} years old` : 'Not specified'}</p>
             </div>
             <div>
               <p className="text-dark-400">Ethnicity</p>
@@ -153,7 +153,7 @@ export const Step5Confirmation: React.FC<{ onConfirm: () => void; isLoading?: bo
         transition={{ delay: 0.5 }}
       >
         <PrimaryCTAButton
-          label="Create Character"
+          label="Continue to AI Model Selection"
           onClick={onConfirm}
           loading={isLoading}
         />

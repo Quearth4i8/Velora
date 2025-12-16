@@ -11,12 +11,12 @@ export const CHARACTER_CONFIG = {
   ],
 
   ethnicities: [
-    { label: 'Caucasian', value: Ethnicity.CAUCASIAN, image: '/images/ethnicity-caucasian.jpg' },
-    { label: 'African', value: Ethnicity.AFRICAN, image: '/images/ethnicity-african.jpg' },
-    { label: 'Asian', value: Ethnicity.ASIAN, image: '/images/ethnicity-asian.jpg' },
-    { label: 'Middle Eastern', value: Ethnicity.MIDDLE_EASTERN, image: '/images/ethnicity-middle-eastern.jpg' },
-    { label: 'Latin', value: Ethnicity.LATIN, image: '/images/ethnicity-latin.jpg' },
-    { label: 'Mixed', value: Ethnicity.MIXED, image: '/images/ethnicity-mixed.jpg' },
+    { label: 'Caucasian', value: Ethnicity.CAUCASIAN },
+    { label: 'African', value: Ethnicity.AFRICAN },
+    { label: 'Asian', value: Ethnicity.ASIAN },
+    { label: 'Middle Eastern', value: Ethnicity.MIDDLE_EASTERN },
+    { label: 'Latin', value: Ethnicity.LATIN },
+    { label: 'Mixed', value: Ethnicity.MIXED },
   ],
 
   heights: [
@@ -28,37 +28,37 @@ export const CHARACTER_CONFIG = {
   ],
 
   physiques: [
-    { label: 'Slim', value: Physique.SLIM, image: '/images/physique-slim.jpg' },
-    { label: 'Athletic', value: Physique.ATHLETIC, image: '/images/physique-athletic.jpg' },
-    { label: 'Average', value: Physique.AVERAGE, image: '/images/physique-average.jpg' },
-    { label: 'Curvy', value: Physique.CURVY, image: '/images/physique-curvy.jpg' },
-    { label: 'BBW', value: Physique.BBW, image: '/images/physique-bbw.jpg' },
+    { label: 'Slim', value: Physique.SLIM },
+    { label: 'Athletic', value: Physique.ATHLETIC },
+    { label: 'Average', value: Physique.AVERAGE },
+    { label: 'Curvy', value: Physique.CURVY },
+    { label: 'BBW', value: Physique.BBW },
   ],
 
   chestSizes: [
-    { label: 'Flat', value: ChestSize.FLAT, image: '/images/chest-flat.jpg' },
-    { label: 'Small', value: ChestSize.SMALL, image: '/images/chest-small.jpg' },
-    { label: 'Average', value: ChestSize.AVERAGE, image: '/images/chest-average.jpg' },
-    { label: 'Big', value: ChestSize.BIG, image: '/images/chest-big.jpg' },
-    { label: 'Huge', value: ChestSize.HUGE, image: '/images/chest-huge.jpg' },
+    { label: 'Flat', value: ChestSize.FLAT },
+    { label: 'Small', value: ChestSize.SMALL },
+    { label: 'Average', value: ChestSize.AVERAGE },
+    { label: 'Big', value: ChestSize.BIG },
+    { label: 'Huge', value: ChestSize.HUGE },
   ],
 
   buttSizes: [
-    { label: 'Flat', value: ButtSize.FLAT, image: '/images/butt-flat.jpg' },
-    { label: 'Small', value: ButtSize.SMALL, image: '/images/butt-small.jpg' },
-    { label: 'Average', value: ButtSize.AVERAGE, image: '/images/butt-average.jpg' },
-    { label: 'Big', value: ButtSize.BIG, image: '/images/butt-big.jpg' },
-    { label: 'Huge', value: ButtSize.HUGE, image: '/images/butt-huge.jpg' },
+    { label: 'Flat', value: ButtSize.FLAT },
+    { label: 'Small', value: ButtSize.SMALL },
+    { label: 'Average', value: ButtSize.AVERAGE },
+    { label: 'Big', value: ButtSize.BIG },
+    { label: 'Huge', value: ButtSize.HUGE },
   ],
 
   hairStyles: [
-    { label: 'Straight', value: HairStyle.STRAIGHT, image: '/images/hair-straight.jpg' },
-    { label: 'Bangs', value: HairStyle.BANGS, image: '/images/hair-bangs.jpg' },
-    { label: 'Braids', value: HairStyle.BRAIDS, image: '/images/hair-braids.jpg' },
-    { label: 'Curly', value: HairStyle.CURLY, image: '/images/hair-curly.jpg' },
-    { label: 'Bun', value: HairStyle.BUN, image: '/images/hair-bun.jpg' },
-    { label: 'Ponytail', value: HairStyle.PONYTAIL, image: '/images/hair-ponytail.jpg' },
-    { label: 'Bob', value: HairStyle.BOB, image: '/images/hair-bob.jpg' },
+    { label: 'Straight', value: HairStyle.STRAIGHT },
+    { label: 'Bangs', value: HairStyle.BANGS },
+    { label: 'Braids', value: HairStyle.BRAIDS },
+    { label: 'Curly', value: HairStyle.CURLY },
+    { label: 'Bun', value: HairStyle.BUN },
+    { label: 'Ponytail', value: HairStyle.PONYTAIL },
+    { label: 'Bob', value: HairStyle.BOB },
   ],
 
   hairColors: [
@@ -74,13 +74,13 @@ export const CHARACTER_CONFIG = {
   ],
 
   eyeColors: [
-    { label: 'Brown', value: EyeColor.BROWN, image: '/images/eyes-brown.jpg' },
-    { label: 'Blue', value: EyeColor.BLUE, image: '/images/eyes-blue.jpg' },
-    { label: 'Green', value: EyeColor.GREEN, image: '/images/eyes-green.jpg' },
-    { label: 'Hazel', value: EyeColor.HAZEL, image: '/images/eyes-hazel.jpg' },
-    { label: 'Gray', value: EyeColor.GRAY, image: '/images/eyes-gray.jpg' },
-    { label: 'Amber', value: EyeColor.AMBER, image: '/images/eyes-amber.jpg' },
-    { label: 'Violet', value: EyeColor.VIOLET, image: '/images/eyes-violet.jpg' },
+    { label: 'Brown', value: EyeColor.BROWN },
+    { label: 'Blue', value: EyeColor.BLUE },
+    { label: 'Green', value: EyeColor.GREEN },
+    { label: 'Hazel', value: EyeColor.HAZEL },
+    { label: 'Gray', value: EyeColor.GRAY },
+    { label: 'Amber', value: EyeColor.AMBER },
+    { label: 'Violet', value: EyeColor.VIOLET },
   ],
 
   personalityArchetypes: [

@@ -16,7 +16,7 @@ export const characterAPI = {
 
   async getCharacter(id: string) {
     try {
-      const result = await characterService.getCharacter(id);
+      const result = await characterService.getCharacterCached(id);
       const deserialized = deserializeCharacter(result);
       return { success: true, data: deserialized };
     } catch (error) {
@@ -25,9 +25,20 @@ export const characterAPI = {
     }
   },
 
+  async getCharacters() {
+    try {
+      const results = await characterService.listCharactersCached(50);
+      const deserialized = results.map(deserializeCharacter);
+      return { success: true, data: deserialized };
+    } catch (error) {
+      console.error('Failed to get characters:', error);
+      return { success: false, error };
+    }
+  },
+
   async listCharacters(limit = 10) {
     try {
-      const results = await characterService.listCharacters(limit);
+      const results = await characterService.listCharactersCached(limit);
       const deserialized = results.map(deserializeCharacter);
       return { success: true, data: deserialized };
     } catch (error) {
@@ -38,11 +49,25 @@ export const characterAPI = {
 
   async updateCharacter(id: string, draft: Partial<CharacterDraft>) {
     try {
-      const serialized = serializeCharacter(draft as CharacterDraft);
-      const result = await characterService.updateCharacter(id, serialized as any);
+      const result = await characterService.updateCharacter(id, draft);
       return { success: true, data: result };
     } catch (error) {
       console.error('Failed to update character:', error);
+      return { success: false, error };
+    }
+  },
+
+  async updateCharacterImage(id: string, imageUrl: string) {
+    try {
+      // Direct database update to avoid type issues
+      const result = await characterService.updateCharacterDirect(id, {
+        generated_image: imageUrl,
+        generation_status: 'completed',
+        updated_at: new Date().toISOString(),
+      });
+      return { success: true, data: result };
+    } catch (error) {
+      console.error('Failed to update character image:', error);
       return { success: false, error };
     }
   },

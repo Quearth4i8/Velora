@@ -80,6 +80,28 @@ export enum EyeColor {
   VIOLET = 'violet',
 }
 
+export enum EyeType {
+  NORMAL = 'normal',
+  SIREN = 'siren',
+  FOX = 'fox',
+  CAT = 'cat',
+  DOE = 'doe',
+  WOLF = 'wolf',
+  EAGLE = 'eagle',
+  DRAGON = 'dragon',
+}
+
+export enum ClothingStyle {
+  CASUAL = 'casual',
+  FORMAL = 'formal',
+  SPORTY = 'sporty',
+  ELEGANT = 'elegant',
+  CUTE = 'cute',
+  EDGY = 'edgy',
+  TRADITIONAL = 'traditional',
+  FANTASY = 'fantasy',
+}
+
 export interface PersonalityTraits {
   submissiveDominant: number;
   insecureConfident: number;
@@ -89,9 +111,9 @@ export interface PersonalityTraits {
 }
 
 export interface CharacterIdentity {
-  ageGroup: AgeGroup | null;
-  customAge?: number;
+  age: number | null;
   ethnicity: Ethnicity | null;
+  skinTone?: string;
 }
 
 export interface CharacterBody {
@@ -105,6 +127,8 @@ export interface CharacterAppearance {
   hairStyle: HairStyle | null;
   hairColor: HairColor | null;
   eyeColor: EyeColor | null;
+  eyeType: EyeType | null;
+  clothing: ClothingStyle | null;
 }
 
 export interface CharacterPersonality {
@@ -115,18 +139,50 @@ export interface CharacterPersonality {
 
 export interface CharacterDraft {
   id?: string;
+  name?: string;
   currentStep: number;
   identity: CharacterIdentity;
   body: CharacterBody;
   appearance: CharacterAppearance;
   personality: CharacterPersonality;
+  generation: CharacterGeneration;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
-export interface PersonalityArchetype {
+export enum CharacterStyle {
+  ANIME = 'anime',
+  REALISTIC = 'realistic',
+  ARTISTIC = 'artistic',
+}
+
+export enum AIModel {
+  CYBERREALISTIC = 'cyberrealisticPony_v140.safetensors',
+  ONEOBSESSION = 'oneObsession_v18.safetensors',
+  PERFECTDELIBERATE = 'perfectdeliberate_v30.safetensors',
+}
+
+export interface CharacterGeneration {
+  style: CharacterStyle | null;
+  model: AIModel | null;
+  prompt?: string;
+  negativePrompt?: string;
+  generatedImage?: string;
+  generationStatus?: 'pending' | 'generating' | 'completed' | 'failed';
+}
+
+export interface ChatMessage {
   id: string;
-  name: string;
-  description: string;
-  traits: PersonalityTraits;
+  characterId: string;
+  content: string;
+  sender: 'user' | 'character';
+  timestamp: Date;
+}
+
+export interface Character {
+  id: string;
+  draft: CharacterDraft;
+  generation: CharacterGeneration;
+  createdAt: Date;
+  updatedAt: Date;
 }

@@ -3,7 +3,7 @@ import { CharacterDraft } from './types';
 export const validateStep = (step: number, draft: CharacterDraft): boolean => {
   switch (step) {
     case 1:
-      return !!(draft.identity.ageGroup && draft.identity.ethnicity);
+      return !!(draft.identity.age && draft.identity.ethnicity);
     case 2:
       return !!(
         draft.body.height &&
@@ -40,7 +40,7 @@ export const getValidationErrors = (step: number, draft: CharacterDraft): string
 
   switch (step) {
     case 1:
-      if (!draft.identity.ageGroup) errors.push('Age group is required');
+      if (!draft.identity.age) errors.push('Age is required');
       if (!draft.identity.ethnicity) errors.push('Ethnicity is required');
       break;
     case 2:

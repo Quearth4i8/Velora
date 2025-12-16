@@ -3,51 +3,42 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { useCharacterBuilder } from '@/lib/store';
-import { Height, Physique, ChestSize, ButtSize } from '@/lib/types';
+import { Ethnicity, Height } from '@/lib/types';
 import { ImageOptionCard } from '../ui/ImageOptionCard';
 import { OptionPill } from '../ui/OptionPill';
 
-const physiqueOptions = [
-  { id: Physique.SLIM, label: 'Slim', image: '/images/physique-slim.jpg' },
-  { id: Physique.ATHLETIC, label: 'Athletic', image: '/images/physique-athletic.jpg' },
-  { id: Physique.AVERAGE, label: 'Average', image: '/images/physique-average.jpg' },
-  { id: Physique.CURVY, label: 'Curvy', image: '/images/physique-curvy.jpg' },
-  { id: Physique.BBW, label: 'BBW', image: '/images/physique-bbw.jpg' },
+const ethnicityOptions = [
+  { id: Ethnicity.CAUCASIAN, label: 'Caucasian', image: '/images/ethnicity-caucasian.jpg' },
+  { id: Ethnicity.AFRICAN, label: 'African', image: '/images/ethnicity-african.jpg' },
+  { id: Ethnicity.ASIAN, label: 'Asian', image: '/images/ethnicity-asian.jpg' },
+  { id: Ethnicity.MIDDLE_EASTERN, label: 'Middle Eastern', image: '/images/ethnicity-middle-eastern.jpg' },
+  { id: Ethnicity.LATIN, label: 'Latin', image: '/images/ethnicity-latin.jpg' },
+  { id: Ethnicity.MIXED, label: 'Mixed', image: '/images/ethnicity-mixed.jpg' },
 ];
 
-const chestOptions = [
-  { id: ChestSize.FLAT, label: 'Flat', image: '/images/chest-flat.jpg' },
-  { id: ChestSize.SMALL, label: 'Small', image: '/images/chest-small.jpg' },
-  { id: ChestSize.AVERAGE, label: 'Average', image: '/images/chest-average.jpg' },
-  { id: ChestSize.BIG, label: 'Big', image: '/images/chest-big.jpg' },
-  { id: ChestSize.HUGE, label: 'Huge', image: '/images/chest-huge.jpg' },
-];
-
-const buttOptions = [
-  { id: ButtSize.FLAT, label: 'Flat', image: '/images/butt-flat.jpg' },
-  { id: ButtSize.SMALL, label: 'Small', image: '/images/butt-small.jpg' },
-  { id: ButtSize.AVERAGE, label: 'Average', image: '/images/butt-average.jpg' },
-  { id: ButtSize.BIG, label: 'Big', image: '/images/butt-big.jpg' },
-  { id: ButtSize.HUGE, label: 'Huge', image: '/images/butt-huge.jpg' },
+const skinToneOptions = [
+  { label: 'Very Light', value: '#FFE0BD' },
+  { label: 'Light', value: '#FFCD94' },
+  { label: 'Light Medium', value: '#EAC086' },
+  { label: 'Medium', value: '#D99E6C' },
+  { label: 'Medium Dark', value: '#C58C6B' },
+  { label: 'Dark', value: '#A57C5A' },
+  { label: 'Very Dark', value: '#8D5524' },
 ];
 
 export const Step2BodyProportions: React.FC = () => {
-  const { draft, setBody } = useCharacterBuilder();
+  const { draft, setIdentity, setBody } = useCharacterBuilder();
+
+  const handleEthnicitySelect = (ethnicity: Ethnicity) => {
+    setIdentity({ ethnicity });
+  };
+
+  const handleSkinToneSelect = (skinTone: string) => {
+    setIdentity({ skinTone });
+  };
 
   const handleHeightSelect = (height: Height) => {
     setBody({ height });
-  };
-
-  const handlePhysiqueSelect = (physique: Physique) => {
-    setBody({ physique });
-  };
-
-  const handleChestSelect = (chest: ChestSize) => {
-    setBody({ chestSize: chest });
-  };
-
-  const handleButtSelect = (butt: ButtSize) => {
-    setBody({ buttSize: butt });
   };
 
   return (
@@ -58,8 +49,51 @@ export const Step2BodyProportions: React.FC = () => {
       transition={{ duration: 0.5 }}
     >
       <div>
+        <h2 className="text-2xl font-bold text-white mb-2">Ethnic Background</h2>
+        <p className="text-dark-400 mb-6">Choose a background</p>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {ethnicityOptions.map((option) => (
+            <ImageOptionCard
+              key={option.id}
+              id={option.id}
+              label={option.label}
+              imageUrl={option.image}
+              isSelected={draft.identity.ethnicity === option.id}
+              onClick={() => handleEthnicitySelect(option.id as Ethnicity)}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="border-t border-dark-700 pt-8">
+        <h2 className="text-2xl font-bold text-white mb-2">Skin Tone</h2>
+        <p className="text-dark-400 mb-6">Choose your character's skin tone</p>
+        <div className="flex flex-wrap gap-4">
+          {skinToneOptions.map((tone) => (
+            <div
+              key={tone.value}
+              className={`relative cursor-pointer rounded-lg border-2 transition-all ${
+                draft.identity.skinTone === tone.value
+                  ? 'border-purple-500 shadow-lg shadow-purple-500/20'
+                  : 'border-dark-600 hover:border-dark-500'
+              }`}
+              onClick={() => handleSkinToneSelect(tone.value)}
+            >
+              <div
+                className="w-20 h-20 rounded-md"
+                style={{ backgroundColor: tone.value }}
+              />
+              <span className="absolute bottom-1 left-1/2 transform -translate-x-1/2 text-xs text-white bg-dark-900/80 px-2 py-1 rounded">
+                {tone.label}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="border-t border-dark-700 pt-8">
         <h2 className="text-2xl font-bold text-white mb-2">Height</h2>
-        <p className="text-dark-400 mb-6">Choose your height</p>
+        <p className="text-dark-400 mb-6">Choose your character's height</p>
         <div className="flex flex-wrap gap-3">
           {Object.values(Height).map((height) => (
             <OptionPill
@@ -67,57 +101,6 @@ export const Step2BodyProportions: React.FC = () => {
               label={height.charAt(0).toUpperCase() + height.slice(1).replace(/_/g, ' ')}
               isSelected={draft.body.height === height}
               onClick={() => handleHeightSelect(height)}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div className="border-t border-dark-700 pt-8">
-        <h2 className="text-2xl font-bold text-white mb-2">Physique</h2>
-        <p className="text-dark-400 mb-6">Select body type</p>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          {physiqueOptions.map((option) => (
-            <ImageOptionCard
-              key={option.id}
-              id={option.id}
-              label={option.label}
-              imageUrl={option.image}
-              isSelected={draft.body.physique === option.id}
-              onClick={() => handlePhysiqueSelect(option.id as Physique)}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div className="border-t border-dark-700 pt-8">
-        <h2 className="text-2xl font-bold text-white mb-2">Chest Size</h2>
-        <p className="text-dark-400 mb-6">Choose chest proportions</p>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          {chestOptions.map((option) => (
-            <ImageOptionCard
-              key={option.id}
-              id={option.id}
-              label={option.label}
-              imageUrl={option.image}
-              isSelected={draft.body.chestSize === option.id}
-              onClick={() => handleChestSelect(option.id as ChestSize)}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div className="border-t border-dark-700 pt-8">
-        <h2 className="text-2xl font-bold text-white mb-2">Butt Size</h2>
-        <p className="text-dark-400 mb-6">Choose butt proportions</p>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          {buttOptions.map((option) => (
-            <ImageOptionCard
-              key={option.id}
-              id={option.id}
-              label={option.label}
-              imageUrl={option.image}
-              isSelected={draft.body.buttSize === option.id}
-              onClick={() => handleButtSelect(option.id as ButtSize)}
             />
           ))}
         </div>
