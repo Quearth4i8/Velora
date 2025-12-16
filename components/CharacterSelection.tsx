@@ -15,7 +15,7 @@ interface CharacterSelectionProps {
 export function CharacterSelection({ onSelectCharacter, onCreateNew }: CharacterSelectionProps) {
   const [characters, setCharacters] = useState<CharacterDraft[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | Error | null>(null);
   const [generatingImages, setGeneratingImages] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -103,30 +103,9 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
     try {
       const imageUrl = await automatic1111API.generateCharacterImage(character);
       
-      // Update character in database
-      const result = await characterAPI.updateCharacterImage(character.id!, imageUrl);
-      if (result.success) {
-        // Update local state
-        setCharacters(prev => prev.map(char => 
-          char.id === character.id 
-            ? { ...char, generation: { ...char.generation, generatedImage: imageUrl, generationStatus: 'completed' as const } }
-            : char
-        ));
-        
-        // Clear cache after generating new image
-        try {
-          localStorage.removeItem('characters_selection');
-        } catch (cacheError) {
-          // Silently handle cache errors
-          if (cacheError instanceof DOMException && cacheError.name === 'QuotaExceededError') {
-            console.warn('Cache quota exceeded, skipping cache clear');
-          } else {
-            console.warn('Failed to clear cache:', cacheError);
-          }
-        }
-      } else {
-        throw new Error('Failed to update character with new image');
-      }
+      // The image is now automatically uploaded to storage and the database is updated
+      // So we just need to reload the characters to get the updated data
+      await loadCharacters();
     } catch (error) {
       console.error('Error generating image for existing character:', error);
       alert('Failed to generate image. Please try again.');
@@ -175,7 +154,7 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
       <div className="min-h-screen bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950 py-12 px-4">
         <div className="max-w-6xl mx-auto">
           <div className="text-center">
-            <p className="text-red-400 mb-4">{error}</p>
+            <p className="text-red-400 mb-4">{error instanceof Error ? error.message : String(error)}</p>
             <PrimaryCTAButton label="Retry" onClick={loadCharacters} />
           </div>
         </div>
@@ -220,7 +199,7 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
           </motion.div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
               {characters.map((character, index) => (
                 <motion.div
                   key={character.id}
@@ -230,8 +209,8 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
                   transition={{ delay: index * 0.1, duration: 0.5 }}
                   onClick={() => handleSelectCharacter(character)}
                 >
-                  {/* Character Image Section */}
-                  <div className="relative h-48 bg-gradient-to-br from-purple-600/10 to-purple-500/10 overflow-hidden">
+                  {/* Character Image Section - Full height card */}
+                  <div className="relative h-80 bg-gradient-to-br from-purple-600/10 to-purple-500/10 overflow-hidden">
                     {character.generation?.generatedImage ? (
                       <>
                         {/* Debug info - can be removed */}
@@ -258,7 +237,7 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
                       <div className="w-full h-full flex items-center justify-center">
                         <div className="w-16 h-16 bg-dark-700/50 rounded-full flex items-center justify-center border border-dark-600/50">
                           <svg className="w-8 h-8 text-dark-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                           </svg>
                         </div>
                       </div>
@@ -274,42 +253,37 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
                         {character.generation?.generationStatus || 'pending'}
                       </span>
                     </div>
+                  
+                  {/* Character Info Overlay at bottom */}
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/60 to-transparent p-4">
+                    <div className="text-white">
+                      <h3 className="text-lg font-semibold mb-1">
+                        {character.name || 'Character'}
+                      </h3>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-white/80">
+                          {character.identity.ethnicity} • {character.identity.age} years old
+                        </span>
+                        <span className="text-white/60 text-xs capitalize">
+                          {character.generation?.style || 'Unknown'}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                   
-                  {/* Character Info Section */}
-                  <div className="p-5">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <h3 className="text-lg font-semibold text-dark-200 mb-1">
-                          {character.name || 'Character'}
-                        </h3>
-                        <p className="text-sm text-dark-400">
-                          {character.identity.ethnicity} • {character.identity.age} years old
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2 mb-4">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-dark-500">Style</span>
-                        <span className="text-dark-300 capitalize font-medium">{character.generation?.style || 'Unknown'}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-dark-500">Model</span>
-                        <span className="text-dark-300 text-xs font-mono">{character.generation?.model ? character.generation.model.split('.')[0] : 'Unknown'}</span>
-                      </div>
-                    </div>
-                    
-                    {!character.generation?.generatedImage && character.generation?.style && character.generation?.model && (
-                      <div className="pt-3 border-t border-dark-700/50">
+                  {/* Generate Image Button for characters without images */}
+                  {!character.generation?.generatedImage && character.generation?.style && character.generation?.model && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                      <div onClick={(e) => e.stopPropagation()}>
                         <PrimaryCTAButton
                           label={generatingImages.has(character.id!) ? "Generating..." : "Generate Image"}
                           onClick={() => handleGenerateImage(character)}
                           disabled={generatingImages.has(character.id!)}
-                          className="w-full text-sm py-2.5"
+                          className="text-sm py-2.5"
                         />
                       </div>
-                    )}
+                    </div>
+                  )}
                   </div>
                   
                   {/* Hover Effect */}

@@ -1,5 +1,6 @@
-import { characterService } from './supabase';
-import { CharacterDraft } from './types';
+import { characterService, supabase } from './supabase';
+import { storageService } from './storage';
+import { CharacterDraft, CharacterImage } from './types';
 import { serializeCharacter, deserializeCharacter } from './db';
 
 export const characterAPI = {
@@ -70,6 +71,196 @@ export const characterAPI = {
       console.error('Failed to update character image:', error);
       return { success: false, error };
     }
+  },
+
+  async uploadCharacterImage(characterId: string, imageData: string): Promise<{ success: boolean; data?: any; error?: any }> {
+    try {
+      // Upload image to Supabase storage
+      const storageFile = await storageService.uploadImage(characterId, imageData);
+      
+      if (!storageFile) {
+        throw new Error('Failed to upload image to storage');
+      }
+
+      // Update character with the new image URL
+      const result = await this.updateCharacterImage(characterId, storageFile.url);
+      
+      if (!result.success) {
+        // If database update fails, try to clean up the uploaded image
+        await storageService.deleteImage(storageFile.name);
+        throw new Error('Failed to update character with image URL');
+      }
+
+      return { 
+        success: true, 
+        data: { 
+          imageUrl: storageFile.url,
+          fileName: storageFile.name,
+          size: storageFile.size
+        }
+      };
+    } catch (error) {
+      console.error('Failed to upload character image:', error);
+      return { success: false, error };
+    }
+  },
+
+  async deleteCharacterImage(characterId: string, imageUrl: string): Promise<{ success: boolean; error?: any }> {
+    try {
+      // Extract file name from URL
+      const urlParts = imageUrl.split('/');
+      const fileName = urlParts[urlParts.length - 1];
+      
+      // Delete from storage
+      const deleted = await storageService.deleteImage(fileName);
+      
+      if (!deleted) {
+        console.warn('Failed to delete image from storage, but continuing...');
+      }
+
+      // Update character to remove image URL
+      const result = await this.updateCharacterImage(characterId, '');
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to delete character image:', error);
+      return { success: false, error };
+    }
+  },
+
+  async addCharacterImage(characterId: string, imageData: string, prompt?: string, model?: string, style?: string): Promise<{ success: boolean; data?: CharacterImage; error?: any }> {
+    try {
+      // Upload image to storage
+      const storageFile = await storageService.uploadImage(characterId, imageData);
+      
+      if (!storageFile) {
+        throw new Error('Failed to upload image to storage');
+      }
+
+      // Save image record to database
+      const { data, error } = await supabase
+        .from('character_images')
+        .insert({
+          character_id: characterId,
+          image_url: storageFile.url,
+          file_name: storageFile.name,
+          file_size: storageFile.size,
+          is_primary: false, // New images are not primary by default
+          generation_prompt: prompt,
+          generation_model: model,
+          generation_style: style,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        // If database insert fails, try to clean up the uploaded image
+        await storageService.deleteImage(storageFile.name);
+        throw error;
+      }
+
+      return { success: true, data: this.mapDbImageToCharacterImage(data) };
+    } catch (error) {
+      console.error('Failed to add character image:', error);
+      return { success: false, error };
+    }
+  },
+
+  async getCharacterImages(characterId: string): Promise<{ success: boolean; data?: CharacterImage[]; error?: any }> {
+    try {
+      const { data, error } = await supabase
+        .from('character_images')
+        .select('*')
+        .eq('character_id', characterId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      const images = data?.map((img: any) => this.mapDbImageToCharacterImage(img)) || [];
+      return { success: true, data: images };
+    } catch (error) {
+      console.error('Failed to get character images:', error);
+      return { success: false, error };
+    }
+  },
+
+  async setPrimaryImage(characterId: string, imageId: string): Promise<{ success: boolean; error?: any }> {
+    try {
+      // First, set all images for this character to non-primary
+      await supabase
+        .from('character_images')
+        .update({ is_primary: false })
+        .eq('character_id', characterId);
+
+      // Then set the specified image as primary
+      const { error } = await supabase
+        .from('character_images')
+        .update({ is_primary: true })
+        .eq('id', imageId)
+        .eq('character_id', characterId);
+
+      if (error) {
+        throw error;
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to set primary image:', error);
+      return { success: false, error };
+    }
+  },
+
+  async deleteCharacterImageFromGallery(imageId: string): Promise<{ success: boolean; error?: any }> {
+    try {
+      // Get the image record to get the file name
+      const { data: imageData, error: fetchError } = await supabase
+        .from('character_images')
+        .select('file_name')
+        .eq('id', imageId)
+        .single();
+
+      if (fetchError) {
+        throw fetchError;
+      }
+
+      // Delete from storage
+      if (imageData?.file_name) {
+        await storageService.deleteImage(imageData.file_name);
+      }
+
+      // Delete from database
+      const { error } = await supabase
+        .from('character_images')
+        .delete()
+        .eq('id', imageId);
+
+      if (error) {
+        throw error;
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to delete character image:', error);
+      return { success: false, error };
+    }
+  },
+
+  mapDbImageToCharacterImage(dbImage: any): CharacterImage {
+    return {
+      id: dbImage.id,
+      characterId: dbImage.character_id,
+      imageUrl: dbImage.image_url,
+      fileName: dbImage.file_name,
+      fileSize: dbImage.file_size,
+      isPrimary: dbImage.is_primary,
+      generationPrompt: dbImage.generation_prompt,
+      generationModel: dbImage.generation_model,
+      generationStyle: dbImage.generation_style,
+      createdAt: new Date(dbImage.created_at),
+      updatedAt: new Date(dbImage.updated_at),
+    };
   },
 
   async deleteCharacter(id: string) {

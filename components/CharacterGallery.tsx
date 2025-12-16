@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CharacterDraft, ChatMessage } from '@/lib/types';
+import { CharacterDraft, ChatMessage, CharacterImage } from '@/lib/types';
 import { automatic1111API } from '@/lib/automatic1111';
 import { characterAPI } from '@/lib/api';
 import { PrimaryCTAButton } from '@/components/ui/PrimaryCTAButton';
@@ -16,18 +16,52 @@ interface CharacterGalleryProps {
 export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate }: CharacterGalleryProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [editedCharacter, setEditedCharacter] = useState<CharacterDraft>(character);
-  const [characterImages, setCharacterImages] = useState<string[]>([]);
+  const [characterImages, setCharacterImages] = useState<CharacterImage[]>([]);
   const [isZoomed, setIsZoomed] = useState(false);
-  const [showDropdown, setShowDropdown] = useState(false);
+  const [showImageDropdown, setShowImageDropdown] = useState<string | null>(null);
+  const [showNavbarDropdown, setShowNavbarDropdown] = useState(false);
   const [zoomedImageIndex, setZoomedImageIndex] = useState(0);
   const [showEditModal, setShowEditModal] = useState(false);
 
+  // Load character images from gallery
   useEffect(() => {
-    // Initialize with current image if exists
-    if (character.generation?.generatedImage) {
-      setCharacterImages([character.generation.generatedImage]);
+    if (character.id) {
+      loadCharacterImages();
     }
-  }, [character]);
+  }, [character.id]);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      
+      // Close navbar dropdown if clicking outside
+      if (showNavbarDropdown && !target.closest('.navbar-dropdown')) {
+        setShowNavbarDropdown(false);
+      }
+      
+      // Close image dropdowns if clicking outside
+      if (showImageDropdown && !target.closest('.image-dropdown')) {
+        setShowImageDropdown(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showNavbarDropdown, showImageDropdown]);
+
+  const loadCharacterImages = async () => {
+    if (!character.id) return;
+    
+    try {
+      const result = await characterAPI.getCharacterImages(character.id);
+      if (result.success && result.data) {
+        setCharacterImages(result.data);
+      }
+    } catch (error) {
+      console.error('Failed to load character images:', error);
+    }
+  };
 
   const handleGenerateNewImage = async () => {
     if (!editedCharacter.generation?.style || !editedCharacter.generation?.model) {
@@ -39,30 +73,20 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
     try {
       const imageUrl = await automatic1111API.generateCharacterImage(editedCharacter);
       
-      // Add to gallery
-      setCharacterImages(prev => [...prev, imageUrl]);
+      // Reload images from gallery to get the new image
+      await loadCharacterImages();
       
-      // Update character with new image
+      // Update character generation status
       const updatedCharacter = {
         ...editedCharacter,
         generation: {
           ...editedCharacter.generation,
-          generatedImage: imageUrl,
           generationStatus: 'completed' as const,
         }
       };
       
       setEditedCharacter(updatedCharacter);
-      
-      // Save to database
-      if (character.id) {
-        const result = await characterAPI.updateCharacterImage(character.id, imageUrl);
-        if (result.success) {
-          onCharacterUpdate(updatedCharacter);
-        } else {
-          throw new Error('Failed to save image to database');
-        }
-      }
+      onCharacterUpdate(updatedCharacter);
     } catch (error) {
       console.error('Error generating new image:', error);
       alert('Failed to generate new image. Please try again.');
@@ -72,27 +96,19 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
   };
 
   const handleSaveCharacter = async () => {
+    if (!character.id) return;
+    
     try {
-      // Check if character has an ID
-      if (!character.id) {
-        throw new Error('Character ID is missing. Cannot update character.');
-      }
-      
-      // Debug: Log the edited character data
-      console.log('Saving character with data:', editedCharacter);
-      console.log('Age value:', editedCharacter.identity?.age);
-      
-      // Update character in database
       const result = await characterAPI.updateCharacter(character.id, editedCharacter);
-      if (result.success) {
-        onCharacterUpdate(editedCharacter);
-        setShowEditModal(false);
+      if (result.success && result.data) {
+        onCharacterUpdate(result.data);
+        setEditedCharacter(result.data);
       } else {
-        throw new Error('Failed to update character');
+        throw new Error('Failed to save character');
       }
     } catch (error) {
       console.error('Error saving character:', error);
-      alert(`Failed to save character: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      alert('Failed to save character. Please try again.');
     }
   };
 
@@ -112,6 +128,38 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
 
   const handleNextImage = () => {
     setZoomedImageIndex((prev) => (prev === characterImages.length - 1 ? 0 : prev + 1));
+  };
+
+  const handleSetAsPrimary = async (imageId: string) => {
+    if (!character.id) return;
+    
+    try {
+      const result = await characterAPI.setPrimaryImage(character.id, imageId);
+      if (result.success) {
+        await loadCharacterImages(); // Reload to update UI
+      } else {
+        throw new Error('Failed to set primary image');
+      }
+    } catch (error) {
+      console.error('Error setting primary image:', error);
+      alert('Failed to set primary image. Please try again.');
+    }
+  };
+
+  const handleDeleteImage = async (imageId: string) => {
+    if (!confirm('Are you sure you want to delete this image?')) return;
+    
+    try {
+      const result = await characterAPI.deleteCharacterImageFromGallery(imageId);
+      if (result.success) {
+        await loadCharacterImages(); // Reload to update UI
+      } else {
+        throw new Error('Failed to delete image');
+      }
+    } catch (error) {
+      console.error('Error deleting image:', error);
+      alert('Failed to delete image. Please try again.');
+    }
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -149,9 +197,9 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
           </button>
           
           {/* 3 Dots Menu */}
-          <div className="relative">
+          <div className="relative navbar-dropdown">
             <button
-              onClick={() => setShowDropdown(!showDropdown)}
+              onClick={() => setShowNavbarDropdown(!showNavbarDropdown)}
               className="w-8 h-8 flex items-center justify-center text-dark-400 hover:text-dark-200 transition-colors"
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -159,12 +207,12 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
               </svg>
             </button>
             
-            {showDropdown && (
+            {showNavbarDropdown && (
               <div className="absolute right-0 mt-2 w-48 bg-dark-800 border border-dark-700 rounded-lg shadow-lg z-50">
                 <button
                   onClick={() => {
                     setShowEditModal(true);
-                    setShowDropdown(false);
+                    setShowNavbarDropdown(false);
                   }}
                   className="w-full px-4 py-2 text-left text-dark-200 hover:bg-dark-700 transition-colors text-sm"
                 >
@@ -173,7 +221,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
                 <button
                   onClick={() => {
                     handleGenerateNewImage();
-                    setShowDropdown(false);
+                    setShowNavbarDropdown(false);
                   }}
                   disabled={isGenerating || !editedCharacter.generation?.style}
                   className="w-full px-4 py-2 text-left text-dark-200 hover:bg-dark-700 transition-colors text-sm disabled:text-dark-500 disabled:cursor-not-allowed"
@@ -210,7 +258,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
               <AnimatePresence>
                 {characterImages.map((image, index) => (
                   <motion.div
-                    key={index}
+                    key={image.id}
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.8 }}
@@ -220,19 +268,65 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
                     <div className="relative overflow-hidden rounded-2xl border border-dark-700/50 bg-dark-800/30 cursor-pointer"
                      onClick={() => handleImageClick(index)}>
                       <img
-                        src={image}
+                        src={image.imageUrl}
                         alt={`Character image ${index + 1}`}
                         className="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-300 pointer-events-none"
                       />
+                      
+                      {/* 3-dot menu button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowImageDropdown(showImageDropdown === image.id ? null : image.id);
+                        }}
+                        className="absolute top-2 right-2 w-8 h-8 bg-black/60 backdrop-blur-sm rounded-full flex items-center justify-center text-white/80 hover:text-white hover:bg-black/80 transition-all duration-200 opacity-0 group-hover:opacity-100"
+                      >
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                          <circle cx="12" cy="5" r="2"/>
+                          <circle cx="12" cy="12" r="2"/>
+                          <circle cx="12" cy="19" r="2"/>
+                        </svg>
+                      </button>
+                      
+                      {/* Dropdown menu */}
+                      {showImageDropdown === image.id && (
+                        <div className="absolute top-10 right-2 bg-dark-800 border border-dark-600 rounded-lg shadow-lg z-10 min-w-[120px] image-dropdown">
+                          <div className="py-1">
+                            {!image.isPrimary && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSetAsPrimary(image.id);
+                                  setShowImageDropdown(null);
+                                }}
+                                className="w-full px-3 py-2 text-left text-sm text-dark-200 hover:bg-dark-700 transition-colors"
+                              >
+                                Set as Primary
+                              </button>
+                            )}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteImage(image.id);
+                                setShowImageDropdown(null);
+                              }}
+                              className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-dark-700 transition-colors"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
                         <div className="absolute bottom-3 left-3 right-3">
                           <div className="flex justify-between items-center">
                             <span className="text-white text-sm font-medium">
                               Image {index + 1}
                             </span>
-                            {index === 0 && (
+                            {image.isPrimary && (
                               <span className="px-2 py-1 bg-purple-500/20 text-purple-300 rounded-full text-xs border border-purple-500/30">
-                                Current
+                                Primary
                               </span>
                             )}
                           </div>
@@ -363,7 +457,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
                   animate={{ scale: 1 }}
                   exit={{ scale: 0.9 }}
                   transition={{ duration: 0.3 }}
-                  src={characterImages[zoomedImageIndex]}
+                  src={characterImages[zoomedImageIndex]?.imageUrl}
                   alt={`Zoomed character image ${zoomedImageIndex + 1}`}
                   className="max-w-full max-h-full object-contain rounded-lg"
                 />

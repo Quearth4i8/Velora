@@ -162,6 +162,20 @@ export enum AIModel {
   PERFECTDELIBERATE = 'perfectdeliberate_v30.safetensors',
 }
 
+export interface CharacterImage {
+  id: string;
+  characterId: string;
+  imageUrl: string;
+  fileName: string;
+  fileSize?: number;
+  isPrimary: boolean;
+  generationPrompt?: string;
+  generationModel?: string;
+  generationStyle?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface CharacterGeneration {
   style: CharacterStyle | null;
   model: AIModel | null;
@@ -169,6 +183,7 @@ export interface CharacterGeneration {
   negativePrompt?: string;
   generatedImage?: string;
   generationStatus?: 'pending' | 'generating' | 'completed' | 'failed';
+  images?: CharacterImage[]; // Gallery of images
 }
 
 export interface ChatMessage {

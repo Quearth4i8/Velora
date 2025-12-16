@@ -28,23 +28,14 @@ export const Navbar: React.FC = () => {
 
           {/* Navigation Links */}
           <div className="hidden md:flex items-center space-x-8">
-            <Link
-              href="/"
-              className="text-dark-300 hover:text-white transition-colors duration-200"
-            >
-              Characters
+            <Link href="/create" className="text-dark-300 hover:text-white transition-colors duration-200 font-medium">
+              Create Character
             </Link>
-            <Link
-              href="/gallery"
-              className="text-dark-300 hover:text-white transition-colors duration-200"
-            >
-              Gallery
+            <Link href="/gallery" className="text-dark-300 hover:text-white transition-colors duration-200 font-medium">
+              Shared Gallery
             </Link>
-            <Link
-              href="/settings"
-              className="text-dark-300 hover:text-white transition-colors duration-200"
-            >
-              Settings
+            <Link href="/community" className="text-dark-300 hover:text-white transition-colors duration-200 font-medium">
+              Community
             </Link>
           </div>
 
@@ -54,7 +45,6 @@ export const Navbar: React.FC = () => {
               className="text-dark-300 hover:text-white p-2"
               onClick={() => {
                 // TODO: Implement mobile menu
-                console.log('Mobile menu clicked');
               }}
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

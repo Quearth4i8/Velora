@@ -1,4 +1,5 @@
 import { CharacterDraft, CharacterStyle, AIModel } from './types';
+import { characterAPI } from './api';
 
 const AUTOMATIC1111_URL = process.env.AUTOMATIC1111_URL || 'http://127.0.0.1:7860';
 
@@ -182,8 +183,23 @@ export const automatic1111API = {
         throw new Error('No images returned from Automatic1111');
       }
 
-      // Return the base64 image as a data URL
-      return `data:image/png;base64,${result.images[0]}`;
+      // Upload the generated image to Supabase storage and add to gallery
+      const base64Image = result.images[0];
+      const prompt = buildPrompt(draft, style);
+      const uploadResult = await characterAPI.addCharacterImage(
+        draft.id!, 
+        base64Image,
+        prompt,
+        model,
+        style
+      );
+      
+      if (!uploadResult.success) {
+        throw new Error('Failed to add generated image to gallery');
+      }
+
+      // Return the new image URL
+      return uploadResult.data?.imageUrl || '';
     } catch (error) {
       console.error('Error generating character image:', error);
       throw error;

@@ -11,7 +11,7 @@ export default function CharacterGallery() {
   const router = useRouter();
   const [character, setCharacter] = useState<CharacterDraft | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | Error | null>(null);
 
   useEffect(() => {
     const fetchCharacter = async () => {
@@ -27,7 +27,7 @@ export default function CharacterGallery() {
         if (result.success && result.data) {
           setCharacter(result.data);
         } else {
-          setError(typeof result.error === 'string' ? result.error : 'Failed to fetch character');
+          setError(result.error instanceof Error ? result.error : new Error(String(result.error)) || 'Failed to fetch character');
         }
       } catch (err) {
         setError(typeof err === 'string' ? err : 'An error occurred while fetching the character');
@@ -63,7 +63,7 @@ export default function CharacterGallery() {
       <div className="flex h-screen bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950 items-center justify-center">
         <div className="text-center">
           <h2 className="text-xl font-semibold text-dark-200 mb-4">Character Not Found</h2>
-          <p className="text-dark-400 mb-6">{error || 'This character could not be found.'}</p>
+          <p className="text-dark-400 mb-6">{error instanceof Error ? error.message : String(error) || 'This character could not be found.'}</p>
           <button
             onClick={handleBack}
             className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"

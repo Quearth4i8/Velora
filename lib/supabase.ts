@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { CharacterDraft } from './types';
-import { serializeCharacter } from './db';
+import { serializeCharacter, deserializeCharacter } from './db';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -12,16 +12,20 @@ if (!supabaseUrl || !supabaseAnonKey) {
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export const characterService = {
-  async createCharacter(serializedData: Record<string, any>) {
-    console.log('Supabase createCharacter called with serialized data:', serializedData);
-    
+  async createCharacter(character: CharacterDraft): Promise<CharacterDraft> {
+    const serializedData = serializeCharacter(character);
     const { data, error } = await supabase
       .from('characters')
-      .insert([serializedData])
-      .select();
+      .insert(serializedData)
+      .select()
+      .single();
 
-    if (error) throw error;
-    return data?.[0];
+    if (error) {
+      console.error('Error creating character:', error);
+      throw error;
+    }
+
+    return deserializeCharacter(data);
   },
 
   async getCharacter(id: string) {
@@ -51,11 +55,20 @@ export const characterService = {
     // Fetch from database
     const data = await this.getCharacter(id);
     
-    // Cache the result
-    localStorage.setItem(cacheKey, JSON.stringify({
-      data,
-      timestamp: Date.now()
-    }));
+    // Cache the result with error handling
+    try {
+      localStorage.setItem(cacheKey, JSON.stringify({
+        data,
+        timestamp: Date.now()
+      }));
+    } catch (cacheError) {
+      // Silently handle cache quota exceeded error
+      if (cacheError instanceof DOMException && cacheError.name === 'QuotaExceededError') {
+        console.warn('Character cache quota exceeded, skipping cache for:', id);
+      } else {
+        console.warn('Failed to cache character:', cacheError);
+      }
+    }
     
     return data;
   },
@@ -143,8 +156,6 @@ export const characterService = {
     if (draft.identity?.age !== undefined) {
       updatePayload.age = draft.identity.age;
     }
-    
-    console.log('Updating character with payload:', updatePayload);
     
     const { data, error } = await supabase
       .from('characters')
