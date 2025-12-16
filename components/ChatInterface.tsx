@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CharacterDraft, ChatMessage } from '@/lib/types';
+import { CharacterDraft, ChatMessage, ClothingStyle } from '@/lib/types';
 import { CharacterGalleryComponent } from './CharacterGallery';
 import { useRouter } from 'next/navigation';
 
@@ -16,6 +16,7 @@ export function ChatInterface({ character, onBack }: ChatInterfaceProps) {
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
+  const [showWardrobe, setShowWardrobe] = useState(false);
   const [currentCharacter, setCurrentCharacter] = useState(character);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -60,6 +61,31 @@ export function ChatInterface({ character, onBack }: ChatInterfaceProps) {
 
   const handleCharacterUpdate = (updatedCharacter: CharacterDraft) => {
     setCurrentCharacter(updatedCharacter);
+  };
+
+  const handleOutfitChange = async (clothing: ClothingStyle) => {
+    // Update character's clothing
+    const updatedCharacter = {
+      ...currentCharacter,
+      appearance: {
+        ...currentCharacter.appearance,
+        clothing: clothing
+      }
+    };
+    
+    setCurrentCharacter(updatedCharacter);
+    setShowWardrobe(false);
+    
+    // Add a message about the outfit change
+    const outfitMessage: ChatMessage = {
+      id: Date.now().toString(),
+      characterId: currentCharacter.id || 'temp',
+      content: `*${currentCharacter.name || 'The character'} changes into a ${clothing} outfit*`,
+      sender: 'character',
+      timestamp: new Date(),
+    };
+    
+    setMessages(prev => [...prev, outfitMessage]);
   };
 
   const generateCharacterResponse = (userMessage: string, character: CharacterDraft): string => {
@@ -206,6 +232,17 @@ export function ChatInterface({ character, onBack }: ChatInterfaceProps) {
                     </svg>
                   </button>
                   
+                  {/* Wardrobe Button */}
+                  <button
+                    onClick={() => setShowWardrobe(true)}
+                    className="px-4 py-3 bg-dark-800/50 text-pink-300 rounded-2xl border border-pink-500/30 hover:bg-pink-600/20 transition-all duration-200 flex items-center justify-center"
+                    title="Change Outfit"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                    </svg>
+                  </button>
+                  
                   <button
                     onClick={handleSendMessage}
                     disabled={!inputMessage.trim()}
@@ -219,6 +256,60 @@ export function ChatInterface({ character, onBack }: ChatInterfaceProps) {
           </div>
         </div>
       )}
+      
+      {/* Wardrobe Modal */}
+      <AnimatePresence>
+        {showWardrobe && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setShowWardrobe(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-dark-800 border border-dark-600 rounded-2xl p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-white">Choose Outfit</h2>
+                <button
+                  onClick={() => setShowWardrobe(false)}
+                  className="w-8 h-8 flex items-center justify-center text-dark-400 hover:text-white transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {Object.values(ClothingStyle).map((style) => (
+                  <button
+                    key={style}
+                    onClick={() => handleOutfitChange(style)}
+                    className={`p-4 rounded-xl border-2 transition-all duration-200 ${
+                      currentCharacter.appearance?.clothing === style
+                        ? 'border-pink-500 bg-pink-500/20 text-pink-300'
+                        : 'border-dark-600 bg-dark-700/50 text-dark-200 hover:border-pink-500/50 hover:bg-pink-500/10'
+                    }`}
+                  >
+                    <div className="text-lg font-medium capitalize mb-2">
+                      {style.replace('_', ' ')}
+                    </div>
+                    <div className="text-sm opacity-75">
+                      {currentCharacter.appearance?.clothing === style ? 'Current' : 'Select'}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }
