@@ -8,6 +8,7 @@ interface ImageOptionCardProps {
   id: string;
   label: string;
   imageUrl: string;
+  description?: string;
   isSelected: boolean;
   onClick: () => void;
   className?: string;
@@ -17,10 +18,13 @@ export const ImageOptionCard: React.FC<ImageOptionCardProps> = ({
   id,
   label,
   imageUrl,
+  description,
   isSelected,
   onClick,
   className = '',
 }) => {
+  const [imageError, setImageError] = React.useState(false);
+
   return (
     <motion.button
       onClick={onClick}
@@ -37,11 +41,18 @@ export const ImageOptionCard: React.FC<ImageOptionCardProps> = ({
             : 'border-dark-600 hover:border-purple-400'
         }`}
       >
-        <img
-          src={imageUrl}
-          alt={label}
-          className="w-full h-full object-cover"
-        />
+        {!imageError ? (
+          <img
+            src={imageUrl}
+            alt={label}
+            className="w-full h-full object-cover"
+            onError={() => setImageError(true)}
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-dark-700 to-dark-800 flex items-center justify-center">
+            <span className="text-dark-400 text-sm text-center px-2">{label}</span>
+          </div>
+        )}
 
         {isSelected && (
           <motion.div
@@ -67,6 +78,11 @@ export const ImageOptionCard: React.FC<ImageOptionCardProps> = ({
       <p className="mt-2 text-sm font-medium text-dark-300 text-center truncate">
         {label}
       </p>
+      {description && (
+        <p className="mt-1 text-xs text-dark-400 text-center px-2">
+          {description}
+        </p>
+      )}
     </motion.button>
   );
 };

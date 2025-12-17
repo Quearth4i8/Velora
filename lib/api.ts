@@ -1,13 +1,12 @@
 import { characterService, supabase } from './supabase';
 import { storageService } from './storage';
 import { CharacterDraft, CharacterImage } from './types';
-import { serializeCharacter, deserializeCharacter } from './db';
+import { deserializeCharacter } from './db';
 
 export const characterAPI = {
   async createCharacter(draft: CharacterDraft) {
     try {
-      const serialized = serializeCharacter(draft);
-      const result = await characterService.createCharacter(serialized as any);
+      const result = await characterService.createCharacter(draft);
       return { success: true, data: result };
     } catch (error) {
       console.error('Failed to create character:', error);
@@ -186,7 +185,7 @@ export const characterAPI = {
     }
   },
 
-  async setPrimaryImage(characterId: string, imageId: string): Promise<{ success: boolean; error?: any }> {
+  async setPrimaryImage(characterId: string, imageId: string): Promise<{ success: boolean; data?: CharacterImage; error?: any }> {
     try {
       // First, set all images for this character to non-primary
       await supabase
@@ -195,19 +194,27 @@ export const characterAPI = {
         .eq('character_id', characterId);
 
       // Then set the specified image as primary
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('character_images')
         .update({ is_primary: true })
         .eq('id', imageId)
-        .eq('character_id', characterId);
+        .eq('character_id', characterId)
+        .select()
+        .single();
 
       if (error) {
         throw error;
       }
 
-      return { success: true };
+      // Also update the generated_image column in the characters table
+      await supabase
+        .from('characters')
+        .update({ generated_image: data.image_url })
+        .eq('id', characterId);
+
+      return { success: true, data: this.mapDbImageToCharacterImage(data) };
     } catch (error) {
-      console.error('Failed to set primary image:', error);
+      console.error('Error setting primary image:', error);
       return { success: false, error };
     }
   },
@@ -217,29 +224,58 @@ export const characterAPI = {
       // Get the image record to get the file name
       const { data: imageData, error: fetchError } = await supabase
         .from('character_images')
-        .select('file_name')
+        .select('file_name, image_url')
         .eq('id', imageId)
         .single();
 
       if (fetchError) {
-        throw fetchError;
+        throw new Error(`Failed to fetch image record: ${fetchError.message}`);
       }
 
-      // Delete from storage
-      if (imageData?.file_name) {
-        await storageService.deleteImage(imageData.file_name);
+      let fileName = imageData?.file_name;
+      
+      // If file_name is not available, try to extract from URL
+      if (!fileName && imageData?.image_url) {
+        console.log('Original image URL:', imageData.image_url);
+        
+        // Extract file name from Supabase URL
+        const urlParts = imageData.image_url.split('/');
+        fileName = urlParts[urlParts.length - 1];
+        
+        // If the URL contains encoded characters, decode them
+        try {
+          fileName = decodeURIComponent(fileName);
+        } catch (decodeError) {
+          console.warn('Failed to decode filename, using original:', fileName);
+        }
+        
+        console.log('Extracted file name from URL:', fileName);
+      }
+
+      if (!fileName) {
+        throw new Error('No file name available for deletion');
+      }
+
+      // Delete from storage first
+      console.log('Attempting to delete file from storage:', fileName);
+      const storageDeleted = await storageService.deleteImage(fileName);
+      if (!storageDeleted) {
+        console.warn('Failed to delete file from storage, but continuing with database deletion...');
+      } else {
+        console.log('Successfully deleted file from storage:', fileName);
       }
 
       // Delete from database
-      const { error } = await supabase
+      const { error: dbError } = await supabase
         .from('character_images')
         .delete()
         .eq('id', imageId);
 
-      if (error) {
-        throw error;
+      if (dbError) {
+        throw new Error(`Failed to delete from database: ${dbError.message}`);
       }
 
+      console.log('Successfully deleted image from gallery:', imageId);
       return { success: true };
     } catch (error) {
       console.error('Failed to delete character image:', error);

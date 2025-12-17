@@ -57,13 +57,6 @@ export function Step6ModelSelection({ onGenerate, isLoading }: { onGenerate: () 
     });
   };
 
-  const handleModelSelect = (model: AIModel) => {
-    setGeneration({
-      model,
-      generationStatus: 'pending',
-    });
-  };
-
   const selectedStyle = draft.generation?.style;
   const selectedModel = draft.generation?.model;
 
@@ -100,31 +93,15 @@ export function Step6ModelSelection({ onGenerate, isLoading }: { onGenerate: () 
         </div>
       </div>
 
-      <div>
-        <h3 className="text-xl font-bold text-white mb-2">AI Model Selection</h3>
-        <p className="text-gray-400 mb-4">Choose the specific AI model (auto-selected based on style)</p>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {MODEL_OPTIONS.map((model) => (
-            <OptionPill
-              key={model.id}
-              label={model.label}
-              isSelected={selectedModel === model.id}
-              onClick={() => selectedStyle && handleModelSelect(model.id)}
-            />
-          ))}
-        </div>
-      </div>
-
       {selectedStyle && (
         <div className="p-4 bg-green-500/20 border border-green-500/30 rounded-lg">
           <p className="text-green-400 text-sm">
-            ✓ Style and model selected. Ready to generate your character!
+            ✓ Style selected. AI model automatically configured: {MODEL_OPTIONS.find(m => m.id === selectedModel)?.label}
           </p>
         </div>
       )}
 
-      {selectedStyle && selectedModel && (
+      {selectedStyle && (
         <div className="mt-8">
           <PrimaryCTAButton
             label="Generate Character"

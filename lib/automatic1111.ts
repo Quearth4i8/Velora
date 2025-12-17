@@ -9,13 +9,107 @@ const STYLE_TO_MODEL_MAP: Record<CharacterStyle, AIModel> = {
   [CharacterStyle.ARTISTIC]: AIModel.PERFECTDELIBERATE,
 };
 
+const hexToColorName = (hex: string): string => {
+  const colorMap: Record<string, string> = {
+    '#ffe0bd': 'light beige',
+    '#800080': 'purple',
+    '#c0c0c0': 'silver',
+    '#ffd700': 'gold',
+    '#000000': 'black',
+    '#ffffff': 'white',
+    '#ff0000': 'red',
+    '#00ff00': 'green',
+    '#0000ff': 'blue',
+    '#ffff00': 'yellow',
+    '#ff00ff': 'magenta',
+    '#00ffff': 'cyan',
+    '#ffa500': 'orange',
+    '#800000': 'maroon',
+    '#008000': 'dark green',
+    '#000080': 'navy',
+    '#808080': 'gray',
+    '#ffc0cb': 'pink',
+    '#a52a2a': 'brown',
+    '#808000': 'olive',
+    '#008080': 'teal',
+    '#dc143c': 'crimson red',
+    '#ff1493': 'deep pink',
+    '#ff6347': 'tomato red',
+    '#ff4500': 'orange red',
+    '#daa520': 'goldenrod',
+    '#b8860b': 'dark goldenrod',
+    '#d2691e': 'chocolate',
+    '#cd853f': 'peru',
+    '#8b4513': 'saddle brown',
+    '#a0522d': 'sienna',
+    '#708090': 'slate gray',
+    '#778899': 'light slate gray',
+    '#b0c4de': 'light steel blue',
+    '#4682b4': 'steel blue',
+    '#6495ed': 'cornflower blue',
+    '#191970': 'midnight blue',
+    '#4b0082': 'indigo',
+    '#8a2be2': 'blue violet',
+    '#9400d3': 'dark violet',
+    '#9932cc': 'dark orchid',
+    '#ba55d3': 'medium orchid',
+    '#da70d6': 'orchid',
+    '#ee82ee': 'violet',
+    '#d8bfd8': 'thistle',
+    '#c71585': 'medium violet red',
+    '#db7093': 'pale violet red',
+    '#ffb6c1': 'light pink',
+    '#ffdab9': 'peach puff',
+    '#ffe4b5': 'moccasin',
+    '#ffdead': 'navajo white',
+    '#f0e68c': 'khaki',
+    '#e6e6fa': 'lavender',
+    '#dcdcdc': 'light gray',
+    '#d3d3d3': 'light gray',
+    '#696969': 'dim gray',
+    '#2f4f4f': 'dark slate gray',
+  };
+  return colorMap[hex.toLowerCase()] || hex;
+};
+
+const getClothingDetails = (clothing: string, isCharacterGeneration: boolean = true): string => {
+  const regularClothingMap: Record<string, string> = {
+    'casual': 'jeans and t-shirt',
+    'formal': 'elegant dress and high heels',
+    'sporty': 'athletic shorts and sports bra',
+    'elegant': 'evening gown and jewelry',
+    'cute': 'colorful sundress and sandals',
+    'edgy': 'leather jacket and ripped jeans',
+    'traditional': 'cultural dress with traditional accessories',
+    'fantasy': 'magical robes and mystical accessories',
+  };
+
+  const nsfwClothingMap: Record<string, string> = {
+    'lingerie': 'sexy lingerie set with lace details',
+    'naked': 'completely nude, no clothing',
+    'bikini': 'revealing bikini, beachwear',
+    'underwear': 'sexy underwear set, intimate apparel',
+    'revealing': 'revealing outfit, showing skin',
+    'bodysuit': 'tight bodysuit, form-fitting',
+  };
+
+  // For character generation, always use regular clothing
+  if (isCharacterGeneration) {
+    return regularClothingMap[clothing.toLowerCase()] || 'casual outfit';
+  }
+
+  // For wardrobe changes, use the appropriate mapping
+  const allClothingMap = { ...regularClothingMap, ...nsfwClothingMap };
+  return allClothingMap[clothing.toLowerCase()] || clothing;
+};
+
 const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
   const { identity, body, appearance, personality } = draft;
   
   const stylePrompts = {
-    [CharacterStyle.ANIME]: 'masterpiece, best quality, ultra-detailed, high quality anime art, illustration, clean lines, vibrant colors',
-    [CharacterStyle.REALISTIC]: 'masterpiece, best quality, ultra-realistic, photorealistic, professional photography, detailed, high resolution, 8k',
-    [CharacterStyle.ARTISTIC]: 'masterpiece, best quality, artistic, digital painting, concept art, detailed, stunning, high quality',
+    [CharacterStyle.ANIME]: 'masterpiece, best quality, ultra-detailed, high quality anime art, illustration, clean lines, vibrant colors, solo character, single person, only one character',
+    [CharacterStyle.REALISTIC]: 'masterpiece, best quality, ultra-realistic, photorealistic, professional photography, detailed, high resolution, 8k, solo character, single person, only one character',
+    [CharacterStyle.ARTISTIC]: 'masterpiece, best quality, artistic, digital painting, concept art, detailed, stunning, high quality, solo character, single person, only one character',
   };
 
   // Basic characteristics
@@ -35,6 +129,7 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
   const eyeColor = appearance.eyeColor?.toLowerCase() || '';
   const eyeType = appearance.eyeType?.toLowerCase() || '';
   const clothing = appearance.clothing?.toLowerCase() || '';
+  const environment = appearance.environment?.toLowerCase().replace('_', ' ') || '';
   
   // Personality characteristics
   const archetype = personality.archetype?.toLowerCase() || '';
@@ -68,33 +163,53 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
   // Add basic info
   if (age) prompt += `, ${age}`;
   if (ethnicity) prompt += ` ${ethnicity}`;
-  if (skinTone) prompt += `, ${skinTone} skin`;
+  if (skinTone) {
+    const colorName = hexToColorName(skinTone);
+    prompt += `, ${colorName} skin`;
+  }
   prompt += ` female`;
   
   // Add body characteristics
   if (height) prompt += `, ${height}`;
   if (physique) prompt += ` ${physique}`;
   if (chestSize) prompt += `, ${chestSize} breasts`;
-  if (buttSize) prompt += `, ${buttSize} butt`;
   
   // Add appearance characteristics
+  if (clothing) {
+    const detailedClothing = getClothingDetails(clothing, true); 
+    prompt += `, wearing detailed ${detailedClothing}`;
+  }
   if (hairStyle) prompt += `, ${hairStyle} hairstyle`;
-  if (hairColor) prompt += `, ${hairColor} hair`;
+  if (hairColor) {
+    const hairColorName = hexToColorName(hairColor);
+    prompt += `, ${hairColorName} hair`;
+  }
   if (eyeColor) prompt += `, ${eyeColor} eyes`;
-  if (eyeType && eyeType !== 'normal') prompt += `, ${eyeType} eyes`;
-  if (clothing) prompt += `, wearing ${clothing} clothing`;
+  if (eyeType) {
+    // Make eye type more prominent and descriptive
+    const eyeTypeDescriptions: Record<string, string> = {
+      'normal': 'normal eyes',
+      'siren': 'mesmerizing siren eyes with captivating gaze',
+      'fox': 'sharp fox eyes with clever expression',
+      'cat': 'alluring cat eyes with slanted pupils',
+      'doe': 'gentle doe eyes with innocent look',
+      'wolf': 'intense wolf eyes with piercing gaze',
+      'eagle': 'sharp eagle eyes with keen vision',
+      'dragon': 'mystical dragon eyes with power',
+    };
+    const description = eyeTypeDescriptions[eyeType] || `${eyeType} eyes`;
+    prompt += `, ${description}`;
+  }
+  if (environment) prompt += `, in ${environment} setting`;
   
   // Add personality
   if (personalityDescription) prompt += `, ${personalityDescription} personality`;
-  
-  // Add quality and composition details
-  prompt += `, beautiful, detailed face, front view, facing camera, full body portrait, high quality, detailed`;
 
   return prompt;
 };
 
 const buildNegativePrompt = (): string => {
-  return 'low quality, worst quality, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry, artist name, deformed, disfigured, malformed, mutated, ugly, disgusting, distorted, bad proportions, extra limbs, missing limbs, fused fingers, too many fingers, long neck';
+  return 'low quality, worst quality, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry, artist name, deformed, disfigured, malformed, mutated, ugly, disgusting, distorted, bad proportions, extra limbs, missing limbs, fused fingers, too many fingers, long neck, multiple characters, two characters, group, couple, duo, pair, more than one person, multiple people, crowd, friends';
 };
 
 export const automatic1111API = {
@@ -149,8 +264,18 @@ export const automatic1111API = {
     const style = draft.generation.style;
     const model = draft.generation.model;
 
+    console.log(`Generating image with style: ${style}, model: ${model}`);
+
+    // Switch to the correct model before generation
+    const modelSwitched = await this.switchModel(model);
+    if (!modelSwitched) {
+      console.warn(`Failed to switch to model: ${model}, using current model`);
+    }
+
     const prompt = buildPrompt(draft, style);
     const negativePrompt = buildNegativePrompt();
+
+    console.log('Generated prompt:', prompt);
 
     const payload = {
       prompt,
@@ -196,6 +321,14 @@ export const automatic1111API = {
       
       if (!uploadResult.success) {
         throw new Error('Failed to add generated image to gallery');
+      }
+
+      // Set this image as primary since it's the first generated image
+      if (uploadResult.data?.id) {
+        const primaryResult = await characterAPI.setPrimaryImage(draft.id!, uploadResult.data.id);
+        if (!primaryResult.success) {
+          console.warn('Failed to set image as primary, but image was uploaded successfully');
+        }
       }
 
       // Return the new image URL

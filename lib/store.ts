@@ -33,6 +33,7 @@ const initialDraft: CharacterDraft = {
   identity: {
     age: null,
     ethnicity: null,
+    skinTone: undefined,
   },
   body: {
     height: null,
@@ -46,6 +47,7 @@ const initialDraft: CharacterDraft = {
     eyeColor: null,
     eyeType: null,
     clothing: null,
+    environment: null,
   },
   personality: {
     archetype: null,

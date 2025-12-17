@@ -243,18 +243,7 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
                       </div>
                     )}
                     
-                    {/* Status Badge */}
-                    <div className="absolute top-3 right-3">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        character.generation?.generationStatus === 'completed' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 
-                        character.generation?.generationStatus === 'failed' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 
-                        'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
-                      }`}>
-                        {character.generation?.generationStatus || 'pending'}
-                      </span>
-                    </div>
-                  
-                  {/* Character Info Overlay at bottom */}
+                    {/* Character Info Overlay at bottom */}
                   <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/60 to-transparent p-4">
                     <div className="text-white">
                       <h3 className="text-lg font-semibold mb-1">
@@ -265,7 +254,10 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
                           {character.identity.ethnicity} • {character.identity.age} years old
                         </span>
                         <span className="text-white/60 text-xs capitalize">
-                          {character.generation?.style || 'Unknown'}
+                          {character.generation?.style === 'anime' ? 'Anime' : 
+                           character.generation?.style === 'realistic' ? 'Realistic' : 
+                           character.generation?.style === 'artistic' ? 'Artistic' : 
+                           'Unknown'}
                         </span>
                       </div>
                     </div>
@@ -292,19 +284,7 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
               ))}
             </div>
 
-            <motion.div
-              className="text-center pt-4"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.6, duration: 0.5 }}
-            >
-              <PrimaryCTAButton 
-                label="Create New Character" 
-                onClick={onCreateNew}
-                className="bg-dark-800/50 text-dark-300 hover:bg-dark-700/50 border border-dark-600/50 backdrop-blur-sm"
-              />
-            </motion.div>
-          </>
+            </>
         )}
       </div>
     </div>

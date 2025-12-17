@@ -117,18 +117,56 @@ export class StorageService {
    */
   async deleteImage(fileName: string): Promise<boolean> {
     try {
+      console.log('Attempting to delete image from storage:', fileName);
+      console.log('Bucket name:', this.bucketName);
+      
+      // First check if file exists by trying to get public URL
+      try {
+        const { data: fileData } = await this.supabase.storage
+          .from(this.bucketName)
+          .getPublicUrl(fileName);
+        
+        console.log('File URL check:', fileData.publicUrl);
+      } catch (checkError) {
+        console.warn('File may not exist or access error:', checkError);
+      }
+      
+      // Attempt deletion
       const { error } = await this.supabase.storage
         .from(this.bucketName)
         .remove([fileName]);
 
       if (error) {
         console.error('Storage delete error:', error);
+        console.error('Error details:', {
+          message: error.message,
+          bucket: this.bucketName,
+          fileName: fileName
+        });
         return false;
       }
 
+      console.log('Successfully deleted image from storage:', fileName);
+      
+      // Verify deletion by trying to access the file again
+      try {
+        const { data: verifyData } = await this.supabase.storage
+          .from(this.bucketName)
+          .getPublicUrl(fileName);
+        
+        console.warn('File might still exist after deletion attempt:', verifyData.publicUrl);
+      } catch (verifyError) {
+        console.log('Verified file is no longer accessible');
+      }
+      
       return true;
     } catch (error) {
-      console.error('Failed to delete image:', error);
+      console.error('Failed to delete image from storage:', error);
+      console.error('Error details:', {
+        fileName: fileName,
+        bucket: this.bucketName,
+        error: error
+      });
       return false;
     }
   }

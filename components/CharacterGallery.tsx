@@ -135,8 +135,18 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
     
     try {
       const result = await characterAPI.setPrimaryImage(character.id, imageId);
-      if (result.success) {
+      if (result.success && result.data) {
         await loadCharacterImages(); // Reload to update UI
+        
+        // Update the character's generatedImage with the primary image URL
+        const updatedCharacter = {
+          ...character,
+          generation: {
+            ...character.generation,
+            generatedImage: result.data.imageUrl
+          }
+        };
+        onCharacterUpdate(updatedCharacter); // Update parent component
       } else {
         throw new Error('Failed to set primary image');
       }

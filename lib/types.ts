@@ -18,6 +18,8 @@ export enum Ethnicity {
 
 export enum Height {
   TINY = 'tiny',
+  CHILDLIKE = 'childlike',
+  PETITE = 'petite',
   BELOW_AVERAGE = 'below_average',
   AVERAGE = 'average',
   TALL = 'tall',
@@ -30,6 +32,8 @@ export enum Physique {
   AVERAGE = 'average',
   CURVY = 'curvy',
   BBW = 'bbw',
+  CHILDLIKE = 'childlike',
+  PETITE = 'petite',
 }
 
 export enum ChestSize {
@@ -100,6 +104,35 @@ export enum ClothingStyle {
   EDGY = 'edgy',
   TRADITIONAL = 'traditional',
   FANTASY = 'fantasy',
+  LINGERIE = 'lingerie',
+  NAKED = 'naked',
+  BIKINI = 'bikini',
+  UNDERWEAR = 'underwear',
+  REVEALING = 'revealing',
+  BODYSUIT = 'bodysuit',
+}
+
+export enum Environment {
+  BEDROOM = 'bedroom',
+  LIVING_ROOM = 'living_room',
+  KITCHEN = 'kitchen',
+  GARDEN = 'garden',
+  BEACH = 'beach',
+  FOREST = 'forest',
+  CITY_STREET = 'city_street',
+  PARK = 'park',
+  CAFE = 'cafe',
+  LIBRARY = 'library',
+  ROOFTOP = 'rooftop',
+  BALCONY = 'balcony',
+  MOUNTAIN = 'mountain',
+  LAKE = 'lake',
+  CLUB = 'club',
+  RESTAURANT = 'restaurant',
+  MALL = 'mall',
+  OFFICE = 'office',
+  GYM = 'gym',
+  POOL = 'pool',
 }
 
 export interface PersonalityTraits {
@@ -129,6 +162,7 @@ export interface CharacterAppearance {
   eyeColor: EyeColor | null;
   eyeType: EyeType | null;
   clothing: ClothingStyle | null;
+  environment: Environment | null;
 }
 
 export interface CharacterPersonality {

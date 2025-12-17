@@ -1,15 +1,33 @@
 import { CharacterDraft } from './types';
 
 export const serializeCharacter = (draft: CharacterDraft): Record<string, any> => {
-  // Check if identity exists
+  // Debug logging
+  console.log('Serializing character draft:', draft);
+  console.log('Identity:', draft.identity);
+  console.log('Identity age:', draft.identity?.age);
+  console.log('Identity ethnicity:', draft.identity?.ethnicity);
+  
+  // Check if required identity fields exist
   if (!draft.identity) {
+    console.error('Identity object is completely missing');
     throw new Error('Identity is missing from character draft');
+  }
+  
+  if (!draft.identity.age) {
+    console.error('Age is missing from identity');
+    throw new Error('Age is missing from character draft');
+  }
+  
+  if (!draft.identity.ethnicity) {
+    console.error('Ethnicity is missing from identity');
+    throw new Error('Ethnicity is missing from character draft');
   }
   
   const serialized = {
     name: draft.name,
     age: draft.identity.age,
     ethnicity: draft.identity.ethnicity,
+    skin_tone: draft.identity.skinTone || null,
     height: draft.body.height,
     physique: draft.body.physique,
     chest_size: draft.body.chestSize,
@@ -19,11 +37,11 @@ export const serializeCharacter = (draft: CharacterDraft): Record<string, any> =
     eye_color: draft.appearance.eyeColor,
     eye_type: draft.appearance.eyeType,
     clothing: draft.appearance.clothing,
+    environment: draft.appearance.environment,
     personality_archetype: draft.personality.archetype,
     personality_traits: draft.personality.traits,
     style: draft.generation?.style,
     model: draft.generation?.model,
-    generation_status: draft.generation?.generationStatus,
     generated_image: draft.generation?.generatedImage,
   };
   
@@ -51,6 +69,7 @@ export const deserializeCharacter = (data: Record<string, any>): CharacterDraft 
       eyeColor: data.eye_color,
       eyeType: data.eye_type,
       clothing: data.clothing,
+      environment: data.environment,
     },
     personality: {
       archetype: data.personality_archetype,
@@ -60,7 +79,7 @@ export const deserializeCharacter = (data: Record<string, any>): CharacterDraft 
     generation: {
       style: data.style,
       model: data.model,
-      generationStatus: data.generation_status || 'pending',
+      generationStatus: 'pending',
       generatedImage: data.generated_image,
     },
   };

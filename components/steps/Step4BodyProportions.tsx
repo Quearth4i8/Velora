@@ -12,6 +12,8 @@ const physiqueOptions = [
   { id: Physique.AVERAGE, label: 'Average', image: '/images/physique-average.jpg' },
   { id: Physique.CURVY, label: 'Curvy', image: '/images/physique-curvy.jpg' },
   { id: Physique.BBW, label: 'BBW', image: '/images/physique-bbw.jpg' },
+  { id: Physique.CHILDLIKE, label: 'Childlike', image: '/images/physique-childlike.jpg' },
+  { id: Physique.PETITE, label: 'Petite', image: '/images/physique-petite.jpg' },
 ];
 
 const chestOptions = [
@@ -55,7 +57,7 @@ export const Step4BodyProportions: React.FC = () => {
       <div>
         <h2 className="text-2xl font-bold text-white mb-2">Physique</h2>
         <p className="text-dark-400 mb-6">Select body type</p>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
           {physiqueOptions.map((option) => (
             <ImageOptionCard
               key={option.id}
