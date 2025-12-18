@@ -273,15 +273,11 @@ export const automatic1111API = {
       await new Promise(resolve => setTimeout(resolve, 3000));
       return true;
     } catch (error) {
-      console.error('Error switching model:', error);
       return false;
     }
   },
 
   async generateCharacterImage(draft: CharacterDraft, settings?: any): Promise<string> {
-    console.log('=== generateCharacterImage called ===');
-    console.log('Settings parameter:', settings);
-    
     if (!draft.generation?.style || !draft.generation?.model) {
       throw new Error('Character style and model must be selected before generation');
     }
@@ -289,9 +285,6 @@ export const automatic1111API = {
     const style = draft.generation.style;
     const model = draft.generation.model;
 
-    console.log(`Generating image with style: ${style}, model: ${model}`);
-
-    // Switch to the correct model before generation
     const modelSwitched = await this.switchModel(model);
     if (!modelSwitched) {
       console.warn(`Failed to switch to model: ${model}, using current model`);
@@ -299,9 +292,6 @@ export const automatic1111API = {
 
     const prompt = buildPrompt(draft, style);
     const negativePrompt = buildNegativePrompt();
-
-    console.log('Generated prompt:', prompt);
-    console.log('Settings received:', settings);
 
     const payload = {
       prompt,
@@ -314,8 +304,6 @@ export const automatic1111API = {
       model_name: model,
       seed: settings?.seed || -1,
     };
-
-    console.log('Final payload:', payload);
 
     try {
       const response = await fetch(`${AUTOMATIC1111_URL}/sdapi/v1/txt2img`, {

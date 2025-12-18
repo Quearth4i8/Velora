@@ -53,8 +53,15 @@ export default function GalleryPage() {
   useEffect(() => {
     if (isZoomed) {
       setIsZoomed(false);
+      setZoomedImageIndex(0);
     }
   }, [filter]);
+
+  useEffect(() => {
+    if (zoomedImageIndex >= filteredImages.length && filteredImages.length > 0) {
+      setZoomedImageIndex(0);
+    }
+  }, [filteredImages, zoomedImageIndex]);
 
   const fetchAllCharacterImages = async () => {
     try {
@@ -76,8 +83,10 @@ export default function GalleryPage() {
   };
 
   const handleImageClick = (index: number) => {
-    setZoomedImageIndex(index);
-    setIsZoomed(true);
+    if (index >= 0 && index < filteredImages.length) {
+      setZoomedImageIndex(index);
+      setIsZoomed(true);
+    }
   };
 
   const handlePreviousImage = () => {
@@ -158,7 +167,6 @@ export default function GalleryPage() {
       }
     };
 
-      // Build generation payload from settings with quality improvements to match character generation
       const dimensions = getDimensionsFromAspectRatio(generationSettings.aspectRatio || 'portrait');
       const payload = {
         prompt: getEnhancedPrompt(prompt, generationSettings.style),
@@ -173,10 +181,7 @@ export default function GalleryPage() {
       };
 
       console.log('Generating image with prompt:', prompt);
-      console.log('Generation settings:', generationSettings);
-      console.log('Final payload being sent:', payload);
 
-      // Call Automatic1111 API
       const AUTOMATIC1111_URL = process.env.AUTOMATIC1111_URL || 'http://127.0.0.1:7860';
       const response = await fetch(`${AUTOMATIC1111_URL}/sdapi/v1/txt2img`, {
         method: 'POST',
@@ -196,14 +201,11 @@ export default function GalleryPage() {
         throw new Error('No images returned from Automatic1111');
       }
 
-      // Get the generated image (base64)
       const base64Image = result.images[0];
       
-      // Always use the same dedicated gallery character for all gallery images
       let targetCharacterId = null;
       
       try {
-        // First try to find existing gallery character
         const charactersResult = await characterAPI.getCharacters();
         if (charactersResult.success && charactersResult.data) {
           const existingGalleryChar = charactersResult.data.find((char: any) => 
@@ -213,10 +215,9 @@ export default function GalleryPage() {
           if (existingGalleryChar) {
             targetCharacterId = existingGalleryChar.id;
           } else {
-            // Create the single gallery character if it doesn't exist
             const galleryCharacter = {
               name: 'Gallery Generated',
-              currentStep: 7, // All steps completed
+              currentStep: 7,
               identity: {
                 age: 25,
                 ethnicity: Ethnicity.MIXED,
@@ -251,7 +252,6 @@ export default function GalleryPage() {
                 style: generationSettings.style as any,
                 model: generationSettings.model as any
               },
-              // Add flag to exclude from chat
               isGalleryOnly: true
             };
             
@@ -269,7 +269,6 @@ export default function GalleryPage() {
         throw new Error('Could not create or find gallery character for image generation');
       }
       
-      // Upload the generated image to Supabase storage and add to gallery
       const uploadResult = await characterAPI.addCharacterImage(
         targetCharacterId,
         base64Image,
@@ -282,16 +281,12 @@ export default function GalleryPage() {
         throw new Error('Failed to add generated image to gallery');
       }
 
-      // Refresh the gallery to show the new image
       await fetchAllCharacterImages();
-      
-      // Clear the prompt
       setPrompt('');
       
       console.log('Image generated and added to gallery successfully');
     } catch (error) {
       console.error('Failed to generate image:', error);
-      // You might want to show an error message to the user here
     } finally {
       setIsGenerating(false);
     }

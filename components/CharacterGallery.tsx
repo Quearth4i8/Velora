@@ -93,10 +93,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
 
     setIsGenerating(true);
     try {
-      console.log('Gallery generation settings:', generationSettings);
-      console.log('About to call API with settings...');
       const imageUrl = await automatic1111API.generateCharacterImage(editedCharacter, generationSettings);
-      console.log('API call completed');
       
       // Reload images from gallery to get the new image
       await loadCharacterImages();
