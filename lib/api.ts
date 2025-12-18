@@ -194,8 +194,7 @@ export const characterAPI = {
           characters!inner(
             name
           )
-        `)
-        .order('created_at', { ascending: false });
+        `);
 
       if (error) {
         throw error;
@@ -275,21 +274,38 @@ export const characterAPI = {
         } catch (decodeError) {
           console.warn('Failed to decode filename, using original:', fileName);
         }
-        
-        console.log('Extracted file name from URL:', fileName);
       }
 
       if (!fileName) {
         throw new Error('No file name available for deletion');
       }
 
-      // Delete from storage first
-      console.log('Attempting to delete file from storage:', fileName);
-      const storageDeleted = await storageService.deleteImage(fileName);
+      // Delete from storage first (following Supabase AI recommendations)
+      let storageDeleted = false;
+      let storageRetries = 0;
+      const maxStorageRetries = 3;
+      
+      while (!storageDeleted && storageRetries < maxStorageRetries) {
+        try {
+          storageDeleted = await storageService.deleteImage(fileName);
+          if (storageDeleted) {
+            storageRetries = maxStorageRetries; // Exit loop
+          } else {
+            storageRetries++;
+            if (storageRetries < maxStorageRetries) {
+              await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+            }
+          }
+        } catch (storageError) {
+          storageRetries++;
+          if (storageRetries < maxStorageRetries) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
+      }
+      
       if (!storageDeleted) {
-        console.warn('Failed to delete file from storage, but continuing with database deletion...');
-      } else {
-        console.log('Successfully deleted file from storage:', fileName);
+        throw new Error('Failed to delete image from storage. Please check storage permissions and bucket access.');
       }
 
       // Delete from database
@@ -302,7 +318,6 @@ export const characterAPI = {
         throw new Error(`Failed to delete from database: ${dbError.message}`);
       }
 
-      console.log('Successfully deleted image from gallery:', imageId);
       return { success: true };
     } catch (error) {
       console.error('Failed to delete character image:', error);

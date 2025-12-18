@@ -3,8 +3,15 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useCharacterBuilder } from '@/lib/store';
-import { PersonalityArchetype, PersonalityTraits } from '@/lib/types';
+import { PersonalityTraits } from '@/lib/types';
 import { Slider } from '@radix-ui/react-slider';
+
+interface PersonalityArchetype {
+  id: string;
+  name: string;
+  description: string;
+  traits: PersonalityTraits;
+}
 
 const archetypes: PersonalityArchetype[] = [
   {

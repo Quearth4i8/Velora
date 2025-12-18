@@ -43,6 +43,7 @@ export const serializeCharacter = (draft: CharacterDraft): Record<string, any> =
     style: draft.generation?.style,
     model: draft.generation?.model,
     generated_image: draft.generation?.generatedImage,
+    is_gallery_only: draft.isGalleryOnly || false,
   };
   
   return serialized;
@@ -56,6 +57,7 @@ export const deserializeCharacter = (data: Record<string, any>): CharacterDraft 
     identity: {
       age: data.age,
       ethnicity: data.ethnicity,
+      skinTone: data.skin_tone,
     },
     body: {
       height: data.height,
@@ -82,5 +84,8 @@ export const deserializeCharacter = (data: Record<string, any>): CharacterDraft 
       generationStatus: 'pending',
       generatedImage: data.generated_image,
     },
+    isGalleryOnly: data.is_gallery_only || false,
+    createdAt: data.created_at ? new Date(data.created_at) : undefined,
+    updatedAt: data.updated_at ? new Date(data.updated_at) : undefined,
   };
 };

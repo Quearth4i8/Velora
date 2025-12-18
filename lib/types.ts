@@ -180,6 +180,7 @@ export interface CharacterDraft {
   appearance: CharacterAppearance;
   personality: CharacterPersonality;
   generation: CharacterGeneration;
+  isGalleryOnly?: boolean; // Flag to exclude from chat
   createdAt?: Date;
   updatedAt?: Date;
 }

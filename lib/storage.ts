@@ -120,56 +120,80 @@ export class StorageService {
    */
   async deleteImage(fileName: string): Promise<boolean> {
     try {
-      console.log('Attempting to delete image from storage:', fileName);
-      console.log('Bucket name:', this.bucketName);
+      // Try multiple deletion methods since Supabase sometimes returns success without actually deleting
+      let deletionSuccess = false;
       
-      // First check if file exists by trying to get public URL
-      try {
-        const { data: fileData } = await this.supabase.storage
-          .from(this.bucketName)
-          .getPublicUrl(fileName);
-        
-        console.log('File URL check:', fileData.publicUrl);
-      } catch (checkError) {
-        console.warn('File may not exist or access error:', checkError);
-      }
-      
-      // Attempt deletion
+      // Method 1: Standard deletion
       const { error } = await this.supabase.storage
         .from(this.bucketName)
         .remove([fileName]);
 
       if (error) {
         console.error('Storage delete error:', error);
-        console.error('Error details:', {
-          message: error.message,
-          bucket: this.bucketName,
-          fileName: fileName
-        });
         return false;
       }
 
-      console.log('Successfully deleted image from storage:', fileName);
-      
-      // Verify deletion by trying to access the file again
+      // Method 2: Try emptying and recreating the file (workaround)
       try {
-        const { data: verifyData } = await this.supabase.storage
+        const emptyBlob = new Blob([''], { type: 'text/plain' });
+        const { error: uploadError } = await this.supabase.storage
           .from(this.bucketName)
-          .getPublicUrl(fileName);
-        
-        console.warn('File might still exist after deletion attempt:', verifyData.publicUrl);
-      } catch (verifyError) {
-        console.log('Verified file is no longer accessible');
+          .upload(fileName, emptyBlob, { 
+            contentType: 'text/plain',
+            upsert: true 
+          });
+          
+        if (!uploadError) {
+          // Now try to delete the empty file
+          const { error: deleteError } = await this.supabase.storage
+            .from(this.bucketName)
+            .remove([fileName]);
+            
+          if (!deleteError) {
+            deletionSuccess = true;
+          }
+        }
+      } catch (workaroundError) {
+        // Workaround method failed, continue to next method
+      }
+
+      // Method 3: Try with different file path
+      if (!deletionSuccess) {
+        try {
+          const { error: pathError } = await this.supabase.storage
+            .from(this.bucketName)
+            .remove([`/${fileName}`]);
+            
+          if (!pathError) {
+            deletionSuccess = true;
+          }
+        } catch (pathError) {
+          // Path-based deletion failed
+        }
       }
       
-      return true;
+      // Verify file actually doesn't exist anymore
+      try {
+        const { data: fileData } = await this.supabase.storage
+          .from(this.bucketName)
+          .list('', { search: fileName });
+        
+        const fileStillExists = fileData && fileData.some(file => file.name === fileName);
+        
+        if (fileStillExists) {
+          console.error('File still exists after deletion attempts - may need manual cleanup');
+          return false;
+        } else {
+          deletionSuccess = true;
+        }
+      } catch (verifyError) {
+        // Verification error likely means file was deleted
+        deletionSuccess = true;
+      }
+
+      return deletionSuccess;
     } catch (error) {
       console.error('Failed to delete image from storage:', error);
-      console.error('Error details:', {
-        fileName: fileName,
-        bucket: this.bucketName,
-        error: error
-      });
       return false;
     }
   }

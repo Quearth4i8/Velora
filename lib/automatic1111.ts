@@ -72,6 +72,28 @@ const hexToColorName = (hex: string): string => {
   return colorMap[hex.toLowerCase()] || hex;
 };
 
+const getDimensionsFromAspectRatio = (aspectRatio: string) => {
+  switch (aspectRatio) {
+    case 'portrait':
+    case '9:16':
+      return { width: 768, height: 1024 };
+    case 'landscape':
+    case '16:9':
+      return { width: 1024, height: 768 };
+    case 'square':
+    case '1:1':
+      return { width: 896, height: 896 };
+    case 'cinematic':
+    case '21:9':
+      return { width: 832, height: 1216 };
+    case 'mobile':
+    case '9:19':
+      return { width: 720, height: 1280 };
+    default:
+      return { width: 768, height: 1024 };
+  }
+};
+
 const getClothingDetails = (clothing: string, isCharacterGeneration: boolean = true): string => {
   const regularClothingMap: Record<string, string> = {
     'casual': 'jeans and t-shirt',
@@ -107,9 +129,9 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
   const { identity, body, appearance, personality } = draft;
   
   const stylePrompts = {
-    [CharacterStyle.ANIME]: 'masterpiece, best quality, ultra-detailed, high quality anime art, illustration, clean lines, vibrant colors, solo character, single person, only one character',
-    [CharacterStyle.REALISTIC]: 'masterpiece, best quality, ultra-realistic, photorealistic, professional photography, detailed, high resolution, 8k, solo character, single person, only one character',
-    [CharacterStyle.ARTISTIC]: 'masterpiece, best quality, artistic, digital painting, concept art, detailed, stunning, high quality, solo character, single person, only one character',
+    [CharacterStyle.ANIME]: 'lazypos, masterpiece, best quality, ultra-detailed, high quality anime art, illustration, clean lines, vibrant colors, solo character, single person, only one character',
+    [CharacterStyle.REALISTIC]: 'lazypos, masterpiece, best quality, ultra-realistic, photorealistic, professional photography, detailed, high resolution, 8k, solo character, single person, only one character',
+    [CharacterStyle.ARTISTIC]: 'lazypos, masterpiece, best quality, artistic, digital painting, concept art, detailed, stunning, high quality, solo character, single person, only one character',
   };
 
   // Basic characteristics
@@ -209,7 +231,7 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
 };
 
 const buildNegativePrompt = (): string => {
-  return 'low quality, worst quality, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry, artist name, deformed, disfigured, malformed, mutated, ugly, disgusting, distorted, bad proportions, extra limbs, missing limbs, fused fingers, too many fingers, long neck, multiple characters, two characters, group, couple, duo, pair, more than one person, multiple people, crowd, friends';
+  return 'lazyneg, low quality, worst quality, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry, artist name, deformed, disfigured, malformed, mutated, ugly, disgusting, distorted, bad proportions, extra limbs, missing limbs, fused fingers, too many fingers, long neck, multiple characters, two characters, group, couple, duo, pair, more than one person, multiple people, crowd, friends';
 };
 
 export const automatic1111API = {
@@ -256,7 +278,10 @@ export const automatic1111API = {
     }
   },
 
-  async generateCharacterImage(draft: CharacterDraft): Promise<string> {
+  async generateCharacterImage(draft: CharacterDraft, settings?: any): Promise<string> {
+    console.log('=== generateCharacterImage called ===');
+    console.log('Settings parameter:', settings);
+    
     if (!draft.generation?.style || !draft.generation?.model) {
       throw new Error('Character style and model must be selected before generation');
     }
@@ -276,18 +301,21 @@ export const automatic1111API = {
     const negativePrompt = buildNegativePrompt();
 
     console.log('Generated prompt:', prompt);
+    console.log('Settings received:', settings);
 
     const payload = {
       prompt,
       negative_prompt: negativePrompt,
-      width: 768,
-      height: 1024,
-      steps: 30,
-      cfg_scale: 8,
-      sampler_name: 'DPM++ 2M Karras',
+      width: settings?.width || getDimensionsFromAspectRatio(settings?.aspectRatio || 'portrait').width,
+      height: settings?.height || getDimensionsFromAspectRatio(settings?.aspectRatio || 'portrait').height,
+      steps: settings?.steps || 30,
+      cfg_scale: settings?.cfgScale || 8,
+      sampler_name: settings?.sampler || 'DPM++ 2M Karras',
       model_name: model,
-      seed: -1,
+      seed: settings?.seed || -1,
     };
+
+    console.log('Final payload:', payload);
 
     try {
       const response = await fetch(`${AUTOMATIC1111_URL}/sdapi/v1/txt2img`, {

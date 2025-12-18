@@ -17,6 +17,7 @@ interface CharacterGalleryProps {
 export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate }: CharacterGalleryProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [editedCharacter, setEditedCharacter] = useState<CharacterDraft>(character);
+  const { blurNSFW, setBlurNSFW, toggleBlurNSFW } = useBlurNSFW();
   const [characterImages, setCharacterImages] = useState<CharacterImage[]>([]);
   const [isZoomed, setIsZoomed] = useState(false);
   const [showImageDropdown, setShowImageDropdown] = useState<string | null>(null);
@@ -24,7 +25,15 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
   const [zoomedImageIndex, setZoomedImageIndex] = useState(0);
   const [showEditModal, setShowEditModal] = useState(false);
   const [filter, setFilter] = useState<'all' | 'sfw' | 'nsfw'>('all');
-  const { blurNSFW, setBlurNSFW, toggleBlurNSFW } = useBlurNSFW();
+  
+  // Local generation settings
+  const [generationSettings, setGenerationSettings] = useState({
+    steps: 30,
+    cfgScale: 8,
+    aspectRatio: 'portrait',
+    sampler: 'DPM++ 2M Karras',
+    seed: -1
+  });
 
   // Function to detect if an image is NSFW based on generation prompt
   const isNSFWImage = (image: CharacterImage): boolean => {
@@ -84,7 +93,10 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
 
     setIsGenerating(true);
     try {
-      const imageUrl = await automatic1111API.generateCharacterImage(editedCharacter);
+      console.log('Gallery generation settings:', generationSettings);
+      console.log('About to call API with settings...');
+      const imageUrl = await automatic1111API.generateCharacterImage(editedCharacter, generationSettings);
+      console.log('API call completed');
       
       // Reload images from gallery to get the new image
       await loadCharacterImages();
@@ -136,11 +148,11 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
   };
 
   const handlePreviousImage = () => {
-    setZoomedImageIndex((prev) => (prev === 0 ? characterImages.length - 1 : prev - 1));
+    setZoomedImageIndex((prev: number) => (prev === 0 ? characterImages.length - 1 : prev - 1));
   };
 
   const handleNextImage = () => {
-    setZoomedImageIndex((prev) => (prev === characterImages.length - 1 ? 0 : prev + 1));
+    setZoomedImageIndex((prev: number) => (prev === characterImages.length - 1 ? 0 : prev + 1));
   };
 
   const handleSetAsPrimary = async (imageId: string) => {
@@ -186,7 +198,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
   };
 
   const handleInputChange = (field: string, value: string) => {
-    setEditedCharacter(prev => {
+    setEditedCharacter((prev: CharacterDraft) => {
       const updated = { ...prev };
       
       // Handle nested fields
@@ -305,6 +317,92 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
                     }`}
                   />
                 </button>
+              </div>
+            </div>
+            
+            {/* Generation Settings Panel */}
+            <div className="mt-6 p-4 bg-dark-800/50 border border-dark-700 rounded-xl">
+              <h3 className="text-white font-medium mb-4 text-sm">Generation Settings</h3>
+              
+              <div className="space-y-4">
+                {/* Steps */}
+                <div>
+                  <label className="text-dark-300 text-xs block mb-1">Steps: {generationSettings.steps}</label>
+                  <input
+                    type="range"
+                    min="10"
+                    max="100"
+                    value={generationSettings.steps}
+                    onChange={(e) => setGenerationSettings({...generationSettings, steps: parseInt(e.target.value)})}
+                    className="w-full h-2 bg-dark-700 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+                
+                {/* CFG Scale */}
+                <div>
+                  <label className="text-dark-300 text-xs block mb-1">CFG Scale: {generationSettings.cfgScale}</label>
+                  <input
+                    type="range"
+                    min="1"
+                    max="20"
+                    step="0.5"
+                    value={generationSettings.cfgScale}
+                    onChange={(e) => setGenerationSettings({...generationSettings, cfgScale: parseFloat(e.target.value)})}
+                    className="w-full h-2 bg-dark-700 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+                
+                {/* Aspect Ratio */}
+                <div>
+                  <label className="text-dark-300 text-xs block mb-1">Aspect Ratio</label>
+                  <select
+                    value={generationSettings.aspectRatio}
+                    onChange={(e) => setGenerationSettings({...generationSettings, aspectRatio: e.target.value})}
+                    className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white text-sm"
+                  >
+                    <option value="portrait">Portrait (768x1024)</option>
+                    <option value="landscape">Landscape (1024x768)</option>
+                    <option value="square">Square (896x896)</option>
+                    <option value="cinematic">Cinematic (832x1216)</option>
+                    <option value="mobile">Mobile (720x1280)</option>
+                  </select>
+                </div>
+                
+                {/* Sampler */}
+                <div>
+                  <label className="text-dark-300 text-xs block mb-1">Sampler</label>
+                  <select
+                    value={generationSettings.sampler}
+                    onChange={(e) => setGenerationSettings({...generationSettings, sampler: e.target.value})}
+                    className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white text-sm"
+                  >
+                    <option value="DPM++ 2M Karras">DPM++ 2M Karras</option>
+                    <option value="DPM++ SDE Karras">DPM++ SDE Karras</option>
+                    <option value="Euler a">Euler a</option>
+                    <option value="Euler">Euler</option>
+                    <option value="DDIM">DDIM</option>
+                  </select>
+                </div>
+                
+                {/* Seed */}
+                <div>
+                  <label className="text-dark-300 text-xs block mb-1">Seed</label>
+                  <div className="flex space-x-2">
+                    <input
+                      type="number"
+                      value={generationSettings.seed}
+                      onChange={(e) => setGenerationSettings({...generationSettings, seed: parseInt(e.target.value) || -1})}
+                      className="flex-1 px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white text-sm"
+                      placeholder="-1 for random"
+                    />
+                    <button
+                      onClick={() => setGenerationSettings({...generationSettings, seed: Math.floor(Math.random() * 1000000)})}
+                      className="px-3 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-lg text-sm transition-colors"
+                    >
+                      Random
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
             

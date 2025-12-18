@@ -20,7 +20,7 @@ export function ChatInterface({ character, onBack }: ChatInterfaceProps) {
   const [showGallery, setShowGallery] = useState(false);
   const [showWardrobe, setShowWardrobe] = useState(false);
   const [showEnvironment, setShowEnvironment] = useState(false);
-  const [currentCharacter, setCurrentCharacter] = useState(character);
+  const [currentCharacter, setCurrentCharacter] = useState<CharacterDraft>(character);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 

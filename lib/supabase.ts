@@ -80,6 +80,7 @@ export const characterService = {
     const { data, error } = await supabase
       .from('characters')
       .select('*')
+      .neq('name', 'Gallery Generated') // Exclude gallery-only character by name
       .order('created_at', { ascending: false })
       .limit(limit);
 

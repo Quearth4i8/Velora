@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Navbar } from '@/components/Navbar';
 import { AnimatedBackground } from '@/components/AnimatedBackground';
 import { characterAPI } from '@/lib/api';
+import { Ethnicity, Height, Physique, ChestSize, ButtSize, HairStyle, EyeType, ClothingStyle, Environment, HairColor, EyeColor } from '@/lib/types';
 import { useBlurNSFW } from '@/lib/useBlurNSFW';
 
 export default function GalleryPage() {
@@ -39,7 +40,7 @@ export default function GalleryPage() {
     steps: 20,
     cfgScale: 7,
     sampler: 'DPM++ 2M Karras',
-    model: 'sd_xl_base_1.0',
+    model: 'cyberrealisticPony_v140.safetensors',
     negativePrompt: '',
     seed: -1
   });
@@ -79,10 +80,6 @@ export default function GalleryPage() {
     setIsZoomed(true);
   };
 
-  const handleCloseZoom = () => {
-    setIsZoomed(false);
-  };
-
   const handlePreviousImage = () => {
     setZoomedImageIndex((prev) => (prev === 0 ? filteredImages.length - 1 : prev - 1));
   };
@@ -91,19 +88,210 @@ export default function GalleryPage() {
     setZoomedImageIndex((prev) => (prev === filteredImages.length - 1 ? 0 : prev + 1));
   };
 
+  const handleDeleteImage = async (imageId: string) => {
+    if (!confirm('Are you sure you want to delete this image? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const result = await characterAPI.deleteCharacterImageFromGallery(imageId);
+      
+      if (result.success) {
+        // Refresh the gallery to remove the deleted image
+        await fetchAllCharacterImages();
+        alert('Image deleted successfully');
+      } else {
+        console.error('Failed to delete image:', result.error);
+        alert('Failed to delete image. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error deleting image:', error);
+      alert('An error occurred while deleting the image. Check console for details.');
+    }
+  };
+
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
     
     setIsGenerating(true);
     try {
-      // TODO: Implement image generation logic
+      // Import Automatic1111 API dynamically to avoid SSR issues
+      const { automatic1111API } = await import('@/lib/automatic1111');
+      
+      // Check if Automatic1111 is available
+      const isConnected = await automatic1111API.checkConnection();
+      if (!isConnected) {
+        throw new Error('Automatic1111 is not running or not accessible');
+      }
+
+      // Enhanced prompt function to match character generation quality
+      const getEnhancedPrompt = (userPrompt: string, style: string) => {
+        const stylePrompts = {
+          'anime': 'lazypos, masterpiece, best quality, ultra-detailed, high quality anime art, illustration, clean lines, vibrant colors, solo character, single person, only one character',
+          'realistic': 'lazypos, masterpiece, best quality, ultra-realistic, photorealistic, professional photography, detailed, high resolution, 8k, solo character, single person, only one character',
+          'artistic': 'lazypos, masterpiece, best quality, artistic, digital painting, concept art, detailed, stunning, high quality, solo character, single person, only one character',
+        };
+        
+        const stylePrefix = stylePrompts[style as keyof typeof stylePrompts] || stylePrompts.realistic;
+        return `${stylePrefix}, ${userPrompt}`;
+      };
+
+      const getDimensionsFromAspectRatio = (aspectRatio: string) => {
+      switch (aspectRatio) {
+        case 'portrait':
+        case '9:16':
+          return { width: 768, height: 1024 };
+        case 'landscape':
+        case '16:9':
+          return { width: 1024, height: 768 };
+        case 'square':
+        case '1:1':
+          return { width: 896, height: 896 };
+        case 'cinematic':
+        case '21:9':
+          return { width: 832, height: 1216 };
+        case 'mobile':
+        case '9:19':
+          return { width: 720, height: 1280 };
+        default:
+          return { width: 768, height: 1024 };
+      }
+    };
+
+      // Build generation payload from settings with quality improvements to match character generation
+      const dimensions = getDimensionsFromAspectRatio(generationSettings.aspectRatio || 'portrait');
+      const payload = {
+        prompt: getEnhancedPrompt(prompt, generationSettings.style),
+        negative_prompt: `lazyneg, ${generationSettings.negativePrompt || 'low quality, worst quality, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry, artist name, deformed, disfigured, malformed, mutated, ugly, disgusting, distorted, bad proportions, extra limbs, missing limbs, fused fingers, too many fingers, long neck'}`,
+        width: dimensions.width,
+        height: dimensions.height,
+        steps: generationSettings.steps || 30,
+        cfg_scale: generationSettings.cfgScale || 8,
+        sampler_name: generationSettings.sampler || 'DPM++ 2M Karras',
+        seed: generationSettings.seed === -1 ? -1 : generationSettings.seed,
+        model_name: generationSettings.model,
+      };
+
       console.log('Generating image with prompt:', prompt);
       console.log('Generation settings:', generationSettings);
-      // Simulate generation
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log('Final payload being sent:', payload);
+
+      // Call Automatic1111 API
+      const AUTOMATIC1111_URL = process.env.AUTOMATIC1111_URL || 'http://127.0.0.1:7860';
+      const response = await fetch(`${AUTOMATIC1111_URL}/sdapi/v1/txt2img`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Automatic1111 API error: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (!result.images || result.images.length === 0) {
+        throw new Error('No images returned from Automatic1111');
+      }
+
+      // Get the generated image (base64)
+      const base64Image = result.images[0];
+      
+      // Always use the same dedicated gallery character for all gallery images
+      let targetCharacterId = null;
+      
+      try {
+        // First try to find existing gallery character
+        const charactersResult = await characterAPI.getCharacters();
+        if (charactersResult.success && charactersResult.data) {
+          const existingGalleryChar = charactersResult.data.find((char: any) => 
+            char.name === 'Gallery Generated'
+          );
+          
+          if (existingGalleryChar) {
+            targetCharacterId = existingGalleryChar.id;
+          } else {
+            // Create the single gallery character if it doesn't exist
+            const galleryCharacter = {
+              name: 'Gallery Generated',
+              currentStep: 7, // All steps completed
+              identity: {
+                age: 25,
+                ethnicity: Ethnicity.MIXED,
+                skinTone: '#ffe0bd'
+              },
+              body: {
+                height: Height.AVERAGE,
+                physique: Physique.ATHLETIC,
+                chestSize: ChestSize.AVERAGE,
+                buttSize: ButtSize.AVERAGE
+              },
+              appearance: {
+                hairStyle: HairStyle.STRAIGHT,
+                hairColor: HairColor.BLACK,
+                eyeColor: EyeColor.BLUE,
+                eyeType: EyeType.NORMAL,
+                clothing: ClothingStyle.CASUAL,
+                environment: Environment.LIBRARY
+              },
+              personality: {
+                archetype: 'balanced',
+                isCustom: false,
+                traits: {
+                  submissiveDominant: 5,
+                  insecureConfident: 5,
+                  coldPassionate: 5,
+                  reservedOutgoing: 5,
+                  seriousPlayful: 5
+                }
+              },
+              generation: {
+                style: generationSettings.style as any,
+                model: generationSettings.model as any
+              },
+              // Add flag to exclude from chat
+              isGalleryOnly: true
+            };
+            
+            const createResult = await characterAPI.createCharacter(galleryCharacter);
+            if (createResult.success && createResult.data) {
+              targetCharacterId = createResult.data.id;
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error with gallery character:', error);
+      }
+      
+      if (!targetCharacterId) {
+        throw new Error('Could not create or find gallery character for image generation');
+      }
+      
+      // Upload the generated image to Supabase storage and add to gallery
+      const uploadResult = await characterAPI.addCharacterImage(
+        targetCharacterId,
+        base64Image,
+        prompt,
+        generationSettings.model,
+        generationSettings.style
+      );
+      
+      if (!uploadResult.success) {
+        throw new Error('Failed to add generated image to gallery');
+      }
+
+      // Refresh the gallery to show the new image
+      await fetchAllCharacterImages();
+      
+      // Clear the prompt
       setPrompt('');
+      
+      console.log('Image generated and added to gallery successfully');
     } catch (error) {
       console.error('Failed to generate image:', error);
+      // You might want to show an error message to the user here
     } finally {
       setIsGenerating(false);
     }
@@ -182,9 +370,9 @@ export default function GalleryPage() {
               onChange={(e) => setGenerationSettings(prev => ({ ...prev, model: e.target.value }))}
               className="w-full p-2 text-sm bg-dark-900 text-white rounded-lg border border-dark-700 focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
             >
-              <option value="sd_xl_base_1.0">SDXL Base 1.0</option>
-              <option value="sd_1_5">SD 1.5</option>
-              <option value="sd_2_1">SD 2.1</option>
+              <option value="cyberrealisticPony_v140.safetensors">CyberRealistic</option>
+              <option value="oneObsession_v18.safetensors">OneObsession</option>
+              <option value="perfectdeliberate_v30.safetensors">PerfectDeliberate</option>
             </select>
           </div>
 
@@ -270,7 +458,7 @@ export default function GalleryPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <div className="w-full">
+          <div className="w-full max-w-6xl mx-auto">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
               <div className="text-center sm:text-left">
                 <h1 className="text-3xl md:text-4xl font-bold text-white">Gallery</h1>
@@ -329,31 +517,31 @@ export default function GalleryPage() {
               <SidebarContent />
             </div>
 
-            <div className="bg-dark-800/30 backdrop-blur-sm border border-dark-700 rounded-xl p-5 sm:p-6">
-              <h2 className="text-xl font-semibold text-white mb-5">Community Images</h2>
+            <div className="bg-dark-800/30 backdrop-blur-sm border border-dark-700 rounded-xl p-6 sm:p-8">
+              <h2 className="text-2xl font-bold text-white mb-8">Community Images</h2>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 sm:gap-5">
+              <div className="masonry-grid">
                   {isLoadingImages ? (
-                    <div className="col-span-full text-center py-12">
-                      <div className="w-16 h-16 mx-auto bg-gradient-to-br from-blue-600/20 to-blue-500/20 rounded-full flex items-center justify-center mb-4 border border-blue-500/30">
-                        <svg className="animate-spin h-8 w-8 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <div className="col-span-full text-center py-16">
+                      <div className="w-20 h-20 mx-auto bg-gradient-to-br from-blue-600/20 to-blue-500/20 rounded-full flex items-center justify-center mb-6 border border-blue-500/30">
+                        <svg className="animate-spin h-10 w-10 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
                       </div>
-                      <h3 className="text-lg font-medium text-dark-200 mb-2">Loading Images...</h3>
+                      <h3 className="text-xl font-medium text-dark-200 mb-3">Loading Images...</h3>
                       <p className="text-dark-400 max-w-md mx-auto">
                         Fetching images from all characters...
                       </p>
                     </div>
                   ) : communityImages.length === 0 ? (
-                    <div className="col-span-full text-center py-12">
-                      <div className="w-16 h-16 mx-auto bg-gradient-to-br from-purple-600/20 to-purple-500/20 rounded-full flex items-center justify-center mb-4 border border-purple-500/30">
-                        <svg className="w-8 h-8 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="col-span-full text-center py-16">
+                      <div className="w-20 h-20 mx-auto bg-gradient-to-br from-purple-600/20 to-purple-500/20 rounded-full flex items-center justify-center mb-6 border border-purple-500/30">
+                        <svg className="w-10 h-10 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
                       </div>
-                      <h3 className="text-lg font-medium text-dark-200 mb-2">No Images Yet</h3>
+                      <h3 className="text-xl font-medium text-dark-200 mb-3">No Images Yet</h3>
                       <p className="text-dark-400 max-w-md mx-auto">
                         No character images found. Generate some images or create characters to see them here.
                       </p>
@@ -362,18 +550,32 @@ export default function GalleryPage() {
                     filteredImages.map((image, index) => (
                       <div
                         key={image.id || index}
-                        className="relative group bg-dark-800/50 backdrop-blur-sm border border-dark-700 rounded-xl overflow-hidden hover:border-pink-500/50 transition-all duration-300 cursor-pointer"
+                        className="masonry-item group relative overflow-hidden rounded-xl bg-dark-900/50 border border-dark-600/50 hover:border-pink-500/50 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-pink-500/10 cursor-pointer"
                         onClick={() => handleImageClick(index)}
                       >
-                        <img
-                          src={image.imageUrl}
-                          alt={`Generated image ${index + 1}`}
-                          className={`w-full h-auto object-contain ${blurNSFW && isNSFWImage(image) ? 'blur-md' : ''}`}
-                          loading="lazy"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                          <div className="absolute bottom-2 left-2 right-2">
-                            <p className="text-white text-xs truncate">{image.characterName || 'Unknown'}</p>
+                        <div className="relative overflow-hidden">
+                          <img
+                            src={image.imageUrl}
+                            alt={`Generated image ${index + 1}`}
+                            className={`w-full h-auto object-cover transition-transform duration-500 group-hover:scale-105 ${blurNSFW && isNSFWImage(image) ? 'blur-md' : ''}`}
+                            loading="lazy"
+                          />
+                        </div>
+                        
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300">
+                          <div className="absolute bottom-0 left-0 right-0 p-3 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
+                            <p className="text-white text-sm font-medium truncate mb-2">{image.characterName || 'Unknown'}</p>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteImage(image.id);
+                                }}
+                                className="flex-1 bg-red-500/80 hover:bg-red-600/90 text-white text-xs py-1 px-2 rounded transition-colors duration-200"
+                              >
+                                Delete
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -381,6 +583,70 @@ export default function GalleryPage() {
                   )}
               </div>
             </div>
+
+            <style jsx>{`
+              .masonry-grid {
+                column-count: 1;
+                column-gap: 1rem;
+                width: 100%;
+              }
+              
+              .masonry-item {
+                break-inside: avoid;
+                margin-bottom: 1rem;
+                width: 100%;
+              }
+              
+              @media (min-width: 640px) {
+                .masonry-grid {
+                  column-count: 2;
+                  column-gap: 1rem;
+                }
+                .masonry-item {
+                  margin-bottom: 1rem;
+                }
+              }
+              
+              @media (min-width: 768px) {
+                .masonry-grid {
+                  column-count: 3;
+                  column-gap: 1.25rem;
+                }
+                .masonry-item {
+                  margin-bottom: 1.25rem;
+                }
+              }
+              
+              @media (min-width: 1024px) {
+                .masonry-grid {
+                  column-count: 4;
+                  column-gap: 1.5rem;
+                }
+                .masonry-item {
+                  margin-bottom: 1.5rem;
+                }
+              }
+              
+              @media (min-width: 1280px) {
+                .masonry-grid {
+                  column-count: 4;
+                  column-gap: 1.5rem;
+                }
+                .masonry-item {
+                  margin-bottom: 1.5rem;
+                }
+              }
+              
+              @media (min-width: 1536px) {
+                .masonry-grid {
+                  column-count: 4;
+                  column-gap: 1.75rem;
+                }
+                .masonry-item {
+                  margin-bottom: 1.75rem;
+                }
+              }
+            `}</style>
           </div>
         </motion.div>
 
@@ -392,7 +658,7 @@ export default function GalleryPage() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.3 }}
               className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center"
-              onClick={handleCloseZoom}
+              onClick={() => setIsZoomed(false)}
             >
               <motion.div
                 initial={{ scale: 0.8, opacity: 0 }}
@@ -402,29 +668,19 @@ export default function GalleryPage() {
                 className="relative h-full flex items-center justify-center p-4"
               >
                 <div
-                  className="relative max-w-4xl max-h-[90vh] w-full h-full flex items-center justify-center"
+                  className="relative max-w-6xl max-h-[95vh] w-full h-full flex items-center justify-center"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <motion.img
                     initial={{ scale: 0.9 }}
                     animate={{ scale: 1 }}
                     exit={{ scale: 0.9 }}
-                    transition={{ duration: 0.3 }}
                     src={filteredImages[zoomedImageIndex]?.imageUrl}
                     alt={`Zoomed image ${zoomedImageIndex + 1}`}
                     className={`max-w-full max-h-full object-contain rounded-lg ${
                       blurNSFW && filteredImages[zoomedImageIndex] && isNSFWImage(filteredImages[zoomedImageIndex]) ? 'blur-lg' : ''
                     }`}
                   />
-
-                  <button
-                    onClick={handleCloseZoom}
-                    className="absolute top-4 right-4 w-10 h-10 bg-pink-500/80 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-pink-600/90 transition-all duration-200 hover:scale-110"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
 
                   {filteredImages.length > 1 && (
                     <>
@@ -433,7 +689,7 @@ export default function GalleryPage() {
                           e.stopPropagation();
                           handlePreviousImage();
                         }}
-                        className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-pink-500/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-pink-500/30 transition-colors"
+                        className="fixed left-8 top-1/2 -translate-y-1/2 w-12 h-12 bg-pink-500/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-pink-500/30 transition-colors z-50"
                       >
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -445,16 +701,12 @@ export default function GalleryPage() {
                           e.stopPropagation();
                           handleNextImage();
                         }}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-pink-500/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-pink-500/30 transition-colors"
+                        className="fixed right-8 top-1/2 -translate-y-1/2 w-12 h-12 bg-pink-500/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-pink-500/30 transition-colors z-50"
                       >
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                         </svg>
                       </button>
-
-                      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full text-white text-sm">
-                        {zoomedImageIndex + 1} / {filteredImages.length}
-                      </div>
                     </>
                   )}
                 </div>
