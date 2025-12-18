@@ -1,25 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { Navbar } from '@/components/Navbar';
+import { useBlurNSFW } from '@/lib/useBlurNSFW';
 
 export default function SettingsPage() {
-  const [blurNSFW, setBlurNSFW] = useState(false);
-
-  // Load settings from localStorage on mount
-  useEffect(() => {
-    const savedBlurNSFW = localStorage.getItem('blurNSFW');
-    if (savedBlurNSFW !== null) {
-      setBlurNSFW(JSON.parse(savedBlurNSFW));
-    }
-  }, []);
-
-  // Save settings to localStorage when changed
-  useEffect(() => {
-    localStorage.setItem('blurNSFW', JSON.stringify(blurNSFW));
-  }, [blurNSFW]);
+  const { blurNSFW, setBlurNSFW, toggleBlurNSFW } = useBlurNSFW();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950">
@@ -64,7 +52,7 @@ export default function SettingsPage() {
                   
                   {/* Toggle Switch */}
                   <button
-                    onClick={() => setBlurNSFW(!blurNSFW)}
+                    onClick={toggleBlurNSFW}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ${
                       blurNSFW ? 'bg-pink-600' : 'bg-dark-600'
                     }`}

@@ -185,6 +185,33 @@ export const characterAPI = {
     }
   },
 
+  async getAllCharacterImages(): Promise<{ success: boolean; data?: CharacterImage[]; error?: any }> {
+    try {
+      const { data, error } = await supabase
+        .from('character_images')
+        .select(`
+          *,
+          characters!inner(
+            name
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      const images = data?.map((img: any) => ({
+        ...this.mapDbImageToCharacterImage(img),
+        characterName: img.characters?.name || 'Unknown'
+      })) || [];
+      return { success: true, data: images };
+    } catch (error) {
+      console.error('Failed to get all character images:', error);
+      return { success: false, error };
+    }
+  },
+
   async setPrimaryImage(characterId: string, imageId: string): Promise<{ success: boolean; data?: CharacterImage; error?: any }> {
     try {
       // First, set all images for this character to non-primary

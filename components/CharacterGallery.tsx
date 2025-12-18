@@ -6,6 +6,7 @@ import { CharacterDraft, ChatMessage, CharacterImage } from '@/lib/types';
 import { automatic1111API } from '@/lib/automatic1111';
 import { characterAPI } from '@/lib/api';
 import { PrimaryCTAButton } from '@/components/ui/PrimaryCTAButton';
+import { useBlurNSFW } from '@/lib/useBlurNSFW';
 
 interface CharacterGalleryProps {
   character: CharacterDraft;
@@ -22,16 +23,8 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
   const [showNavbarDropdown, setShowNavbarDropdown] = useState(false);
   const [zoomedImageIndex, setZoomedImageIndex] = useState(0);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [blurNSFW, setBlurNSFW] = useState(false);
   const [filter, setFilter] = useState<'all' | 'sfw' | 'nsfw'>('all');
-
-  // Load blur setting from localStorage
-  useEffect(() => {
-    const savedBlurNSFW = localStorage.getItem('blurNSFW');
-    if (savedBlurNSFW !== null) {
-      setBlurNSFW(JSON.parse(savedBlurNSFW));
-    }
-  }, []);
+  const { blurNSFW, setBlurNSFW, toggleBlurNSFW } = useBlurNSFW();
 
   // Function to detect if an image is NSFW based on generation prompt
   const isNSFWImage = (image: CharacterImage): boolean => {
@@ -215,10 +208,10 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
     <div className="h-screen bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950">
       {/* Gallery Header */}
       <div className="px-8 py-6 border-b border-dark-700/50 backdrop-blur-sm">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center">
           <button
             onClick={onBack}
-            className="flex items-center text-pink-400 hover:text-pink-300 transition-colors group"
+            className="flex items-center text-pink-300 hover:text-pink-200 transition-colors group"
           >
             <svg className="w-4 h-4 mr-2 group-hover:-translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -226,7 +219,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
             <span className="text-sm font-medium">Back to Chat</span>
           </button>
           
-          {/* Character Name - Center - Simple */}
+          {/* Character Name - Center */}
           <div className="flex-1 flex justify-center">
             <div className="flex items-center space-x-3">              
               {/* Character Info */}
@@ -299,7 +292,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
               {/* NSFW Blur Toggle - Consistent Size */}
               <div className="flex items-center space-x-3">
                 <button
-                  onClick={() => setBlurNSFW(!blurNSFW)}
+                  onClick={toggleBlurNSFW}
                   className={`relative inline-flex h-8 w-11 items-center rounded-full transition-colors duration-200 ${
                     blurNSFW 
                       ? 'bg-pink-600' 

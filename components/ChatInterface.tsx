@@ -241,6 +241,20 @@ export function ChatInterface({ character, onBack }: ChatInterfaceProps) {
                   </svg>
                   <span className="text-sm font-medium">Back to Selection</span>
                 </button>
+                
+                {/* Character Name - Center */}
+                <div className="flex-1 flex justify-center">
+                  <div className="flex items-center space-x-3">              
+                    {/* Character Info */}
+                    <div className="flex flex-col items-center">
+                      <h1 className="text-xl font-semibold text-white">{currentCharacter.name || 'Character'}</h1>
+                      <div className="text-sm text-pink-400 capitalize">{currentCharacter.personality?.archetype || 'Mysterious'}</div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Empty space to match gallery layout */}
+                <div className="w-8 h-8"></div>
               </div>
             </div>
 

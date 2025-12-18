@@ -17,110 +17,109 @@ export default function Home() {
         <Navbar />
       
       {/* Hero Section */}
-      <motion.div
-        className="container mx-auto px-4 py-24 relative"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
+      <div className="container mx-auto px-4 pt-16 pb-12 relative">
         {/* Left Image - Positioned Absolutely */}
-        <div className="hidden lg:block absolute left-8 top-8">
+        <motion.div 
+          className="hidden lg:block absolute left-8 top-8"
+          initial={{ opacity: 0, x: -50 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.8, delay: 0.2 }}
+        >
           <div className="relative">
             <img 
               src="/images/left.png" 
               alt="Left decoration" 
-              className="w-48 h-auto opacity-80 neon-glow"
+              className="w-56 h-auto opacity-90 neon-glow hover:scale-105 transition-transform duration-500"
             />
             {/* Shining dots overlay */}
             <div className="absolute inset-0 pointer-events-none">
-              <div className="absolute top-4 left-4 star-pulse">
-                <svg className="w-3 h-3 text-pink-400" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                </svg>
-              </div>
-              <div className="absolute top-12 left-8 star-pulse" style={{animationDelay: '0.3s'}}>
-                <svg className="w-2 h-2 text-pink-300" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                </svg>
-              </div>
-              <div className="absolute bottom-8 left-6 star-pulse" style={{animationDelay: '0.7s'}}>
-                <svg className="w-3 h-3 text-pink-400" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                </svg>
-              </div>
-              <div className="absolute bottom-4 left-12 star-pulse" style={{animationDelay: '1.1s'}}>
-                <svg className="w-2 h-2 text-pink-300" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                </svg>
-              </div>
-              <div className="absolute top-8 left-16 star-pulse" style={{animationDelay: '1.5s'}}>
-                <svg className="w-1.5 h-1.5 text-pink-200" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                </svg>
-              </div>
+              {[
+                { top: '16px', left: '16px', size: 'w-3 h-3', delay: '0s' },
+                { top: '48px', left: '32px', size: 'w-2 h-2', delay: '0.3s' },
+                { bottom: '32px', left: '24px', size: 'w-3 h-3', delay: '0.7s' },
+                { bottom: '16px', left: '48px', size: 'w-2 h-2', delay: '1.1s' },
+                { top: '32px', left: '64px', size: 'w-1.5 h-1.5', delay: '1.5s' },
+              ].map((star, i) => (
+                <div key={i} className="absolute star-pulse" style={{ ...star, animationDelay: star.delay }}>
+                  <svg className={`${star.size} text-pink-400`} fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                  </svg>
+                </div>
+              ))}
             </div>
           </div>
-        </div>
+        </motion.div>
         
         {/* Right Image - Positioned Absolutely */}
-        <div className="hidden lg:block absolute right-8 top-12">
+        <motion.div 
+          className="hidden lg:block absolute right-8 top-12"
+          initial={{ opacity: 0, x: 50 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.8, delay: 0.2 }}
+        >
           <div className="relative">
             <img 
               src="/images/right.png" 
               alt="Right decoration" 
-              className="w-48 h-auto opacity-80 neon-glow"
+              className="w-56 h-auto opacity-90 neon-glow hover:scale-105 transition-transform duration-500"
             />
             {/* Shining dots overlay */}
             <div className="absolute inset-0 pointer-events-none">
-              <div className="absolute top-4 right-4 star-pulse">
-                <svg className="w-3 h-3 text-pink-400" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                </svg>
-              </div>
-              <div className="absolute top-12 right-8 star-pulse" style={{animationDelay: '0.3s'}}>
-                <svg className="w-2 h-2 text-pink-300" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                </svg>
-              </div>
-              <div className="absolute bottom-8 right-6 star-pulse" style={{animationDelay: '0.7s'}}>
-                <svg className="w-3 h-3 text-pink-400" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                </svg>
-              </div>
-              <div className="absolute bottom-4 right-12 star-pulse" style={{animationDelay: '1.1s'}}>
-                <svg className="w-2 h-2 text-pink-300" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                </svg>
-              </div>
-              <div className="absolute top-8 right-16 star-pulse" style={{animationDelay: '1.5s'}}>
-                <svg className="w-1.5 h-1.5 text-pink-200" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                </svg>
-              </div>
+              {[
+                { top: '16px', right: '16px', size: 'w-3 h-3', delay: '0s' },
+                { top: '48px', right: '32px', size: 'w-2 h-2', delay: '0.3s' },
+                { bottom: '32px', right: '24px', size: 'w-3 h-3', delay: '0.7s' },
+                { bottom: '16px', right: '48px', size: 'w-2 h-2', delay: '1.1s' },
+                { top: '32px', right: '64px', size: 'w-1.5 h-1.5', delay: '1.5s' },
+              ].map((star, i) => (
+                <div key={i} className="absolute star-pulse" style={{ ...star, animationDelay: star.delay }}>
+                  <svg className={`${star.size} text-pink-400`} fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                  </svg>
+                </div>
+              ))}
             </div>
           </div>
-        </div>
+        </motion.div>
         
-        {/* Center Content - Full Width */}
-        <div className="text-center max-w-4xl mx-auto mb-12 relative z-10">
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
-            <span className="gradient-text title-shine">Welcome to Velora</span>
-          </h1>
-          <p className="text-dark-400 text-lg max-w-2xl mx-auto mb-8">
-            Create and chat to your perfect WAIFU
-          </p>
-        </div>
-        
-        {/* Search Bar - Full Width */}
-        <div className="relative z-10">
-          <SearchBar 
-            onSearch={(query) => {
-              // TODO: Implement search functionality
-              console.log('Searching for:', query);
-            }}
-          />
-        </div>
-      </motion.div>
+        {/* Center Content */}
+        <div className="text-center max-w-5xl mx-auto relative z-10">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            <h1 className="text-5xl md:text-7xl font-extrabold text-white mb-6 leading-tight">
+              <span className="gradient-text title-shine text-6xl md:text-8xl">Velora</span>
+            </h1>
+          </motion.div>
+          
+          <motion.p 
+            className="text-dark-300 text-xl md:text-2xl max-w-3xl mx-auto mb-12 leading-relaxed"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+          >
+            Create and chat with your <span className="text-pink-400 font-semibold">perfect AI companion</span>
+            <br />
+            <span className="text-dark-400 text-lg">Powered by advanced AI technology</span>
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.4 }}
+            className="mb-16"
+          >
+            <SearchBar 
+              onSearch={(query) => {
+                console.log('Searching for:', query);
+              }}
+            />
+          </motion.div>
+
+                  </div>
+      </div>
 
       {/* Character Gallery Section */}
       <div className="container mx-auto px-4 pb-16">

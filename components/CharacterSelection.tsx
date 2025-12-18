@@ -6,6 +6,20 @@ import { characterAPI } from '@/lib/api';
 import { automatic1111API } from '@/lib/automatic1111';
 import { CharacterDraft, AgeGroup, Ethnicity, Height, Physique, ChestSize, ButtSize, HairStyle, HairColor, EyeColor, CharacterStyle, AIModel } from '@/lib/types';
 import { PrimaryCTAButton } from '@/components/ui/PrimaryCTAButton';
+import { TraitFilter } from '@/components/ui/TraitFilter';
+
+interface CharacterTraits {
+  ethnicity?: string | null;
+  generation?: {
+    style?: string | null;
+  } | null;
+  appearance?: {
+    hairColor?: string | null;
+  } | null;
+  personality?: {
+    archetype?: string | null;
+  } | null;
+}
 
 interface CharacterSelectionProps {
   onSelectCharacter: (character: CharacterDraft) => void;
@@ -14,14 +28,25 @@ interface CharacterSelectionProps {
 
 export function CharacterSelection({ onSelectCharacter, onCreateNew }: CharacterSelectionProps) {
   const [characters, setCharacters] = useState<CharacterDraft[]>([]);
+  const [filteredCharacters, setFilteredCharacters] = useState<CharacterDraft[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | Error | null>(null);
   const [generatingImages, setGeneratingImages] = useState<Set<string>>(new Set());
+  const [activeFilters, setActiveFilters] = useState<CharacterTraits>({});
 
   useEffect(() => {
     // Start loading immediately
     loadCharacters();
   }, []);
+
+  // Initialize filteredCharacters when characters are loaded
+  useEffect(() => {
+    if (characters.length > 0) {
+      // Apply current filters to the loaded characters
+      // Since activeFilters starts as {}, this will show all characters initially
+      handleFilterChange(activeFilters);
+    }
+  }, [characters]);
 
   const loadCharacters = async () => {
     try {
@@ -61,12 +86,13 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
       
       const result = await characterAPI.getCharacters();
       if (result.success) {
-        setCharacters(result.data || []);
+        const characterData = result.data || [];
+        setCharacters(characterData);
         
         // Cache the result with error handling
         try {
           localStorage.setItem(cacheKey, JSON.stringify({
-            data: result.data || [],
+            data: characterData,
             timestamp: Date.now()
           }));
         } catch (cacheError) {
@@ -86,6 +112,24 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleFilterChange = (filters: CharacterTraits) => {
+    setActiveFilters(filters);
+    
+    let filtered = characters;
+    
+    // Filter by hair color
+    if (filters.appearance?.hairColor) {
+      filtered = filtered.filter(char => char.appearance?.hairColor === filters.appearance?.hairColor);
+    }
+    
+    // Filter by personality archetype
+    if (filters.personality?.archetype) {
+      filtered = filtered.filter(char => char.personality?.archetype === filters.personality?.archetype);
+    }
+    
+    setFilteredCharacters(filtered);
   };
 
   const handleSelectCharacter = (character: CharacterDraft) => {
@@ -165,42 +209,47 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
   return (
     <div className="py-8 px-4">
       <div className="max-w-7xl mx-auto">
-        <motion.div
-          className="mb-8"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <h1 className="text-3xl md:text-4xl font-bold text-center mb-3">
-            <span className="gradient-text">Your Characters</span>
-          </h1>
-          <p className="text-center text-dark-400 text-base max-w-2xl mx-auto">
-            Choose a companion to chat with or create your perfect AI character
-          </p>
-        </motion.div>
-
-        {characters.length === 0 ? (
+        <TraitFilter onFilterChange={handleFilterChange} />
+        
+        {filteredCharacters.length === 0 ? (
           <motion.div
             className="text-center py-16"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3, duration: 0.5 }}
           >
-            <div className="mb-8">
-              <div className="w-20 h-20 mx-auto bg-gradient-to-br from-purple-600/20 to-purple-500/20 rounded-full flex items-center justify-center mb-4 border border-purple-500/30">
-                <svg className="w-10 h-10 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-dark-200 mb-2">No Characters Yet</h3>
-              <p className="text-dark-400 mb-6 max-w-md mx-auto">Start your journey by creating your first AI companion</p>
-            </div>
-            <PrimaryCTAButton label="Create Your First Character" onClick={onCreateNew} />
+            {characters.length === 0 ? (
+              <>
+                <div className="mb-8">
+                  <div className="w-20 h-20 mx-auto bg-gradient-to-br from-purple-600/20 to-purple-500/20 rounded-full flex items-center justify-center mb-4 border border-purple-500/30">
+                    <svg className="w-10 h-10 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-semibold text-dark-200 mb-2">No Characters Yet</h3>
+                  <p className="text-dark-400 mb-6 max-w-md mx-auto">Start your journey by creating your first AI companion</p>
+                </div>
+                <PrimaryCTAButton label="Create Your First Character" onClick={onCreateNew} />
+              </>
+            ) : (
+              <>
+                <div className="mb-8">
+                  <div className="w-20 h-20 mx-auto bg-gradient-to-br from-orange-600/20 to-yellow-500/20 rounded-full flex items-center justify-center mb-4 border border-orange-500/30">
+                    <svg className="w-10 h-10 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-semibold text-dark-200 mb-2">No Characters Match Your Filters</h3>
+                  <p className="text-dark-400 mb-6 max-w-md mx-auto">Try adjusting your filter criteria or clear all filters to see more characters</p>
+                </div>
+                <PrimaryCTAButton label="Clear Filters" onClick={() => handleFilterChange({})} />
+              </>
+            )}
           </motion.div>
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
-              {characters.map((character, index) => (
+              {filteredCharacters.map((character, index) => (
                 <motion.div
                   key={character.id}
                   className="group relative bg-gradient-to-br from-dark-800/50 to-dark-900/50 backdrop-blur-sm border border-dark-700/50 rounded-2xl overflow-hidden hover:border-purple-500/50 transition-all duration-300 cursor-pointer character-card"
@@ -213,12 +262,6 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
                   <div className="relative h-80 bg-gradient-to-br from-purple-600/10 to-purple-500/10 overflow-hidden">
                     {character.generation?.generatedImage ? (
                       <>
-                        {/* Debug info - can be removed */}
-                          {false && character.generation.generatedImage && (
-                            <div className="text-xs text-gray-500 mt-1">
-                              Image loaded successfully
-                            </div>
-                          )}
                         <img 
                           src={character.generation.generatedImage} 
                           alt={character.name || 'Character'}
@@ -226,8 +269,7 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
                           loading="lazy"
                           decoding="async"
                           onError={(e) => {
-                            console.error('Image failed to load:', e);
-                            console.error('Image URL length:', character.generation?.generatedImage?.length);
+                            console.error('Image failed to load:', character.generation?.generatedImage);
                             // Fallback to placeholder
                             e.currentTarget.style.display = 'none';
                           }}
@@ -251,7 +293,7 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
                       </h3>
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-white/80">
-                          {character.identity.ethnicity} • {character.identity.age} years old
+                          {character.identity?.ethnicity || 'Unknown'} • {character.identity?.age ? `${character.identity.age} years old` : 'Age not set'}
                         </span>
                         <span className="text-white/60 text-xs capitalize">
                           {character.generation?.style === 'anime' ? 'Anime' : 
