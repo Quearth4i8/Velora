@@ -28,7 +28,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
             className={`w-12 h-12 rounded-full border-2 transition-all duration-300 ${
               selectedColor === color.value
                 ? 'border-white shadow-glow-lg'
-                : 'border-dark-600 hover:border-purple-400'
+                : 'border-dark-600 hover:border-pink-400'
             }`}
             style={{ backgroundColor: color.value }}
           />

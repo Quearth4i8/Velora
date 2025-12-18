@@ -32,7 +32,7 @@ export const PrimaryCTAButton: React.FC<PrimaryCTAButtonProps> = ({
         className={`relative px-4 py-3 rounded-lg transition-all duration-300 ${
           disabled
             ? 'bg-dark-700 text-dark-500 cursor-not-allowed'
-            : 'bg-gradient-to-r from-purple-600 to-purple-500 text-white shadow-glow hover:shadow-glow-lg'
+            : 'bg-gradient-to-r from-pink-600 to-pink-500 text-white shadow-glow hover:shadow-glow-lg'
         }`}
       >
         {loading ? (

@@ -176,7 +176,7 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
   
   // Add appearance characteristics
   if (clothing) {
-    const detailedClothing = getClothingDetails(clothing, true); 
+    const detailedClothing = getClothingDetails(clothing, false); 
     prompt += `, wearing detailed ${detailedClothing}`;
   }
   if (hairStyle) prompt += `, ${hairStyle} hairstyle`;

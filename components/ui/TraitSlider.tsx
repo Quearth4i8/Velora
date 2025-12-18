@@ -35,7 +35,7 @@ export const TraitSlider: React.FC<TraitSliderProps> = ({
       <div className="flex justify-between items-center">
         <label className="text-sm font-medium text-dark-300">{label}</label>
         <motion.span
-          className="text-xs font-semibold text-purple-400 bg-dark-800 px-3 py-1 rounded-full"
+          className="text-xs font-semibold text-pink-400 bg-dark-800 px-3 py-1 rounded-full"
           key={value}
           initial={{ scale: 0.8 }}
           animate={{ scale: 1 }}
@@ -53,10 +53,10 @@ export const TraitSlider: React.FC<TraitSliderProps> = ({
         className="relative flex items-center w-full h-6 select-none touch-none"
       >
         <Slider.Track className="relative flex-grow h-2 bg-dark-700 rounded-full">
-          <Slider.Range className="absolute h-full bg-gradient-to-r from-purple-500 to-purple-400 rounded-full" />
+          <Slider.Range className="absolute h-full bg-gradient-to-r from-pink-500 to-pink-400 rounded-full" />
         </Slider.Track>
         <Slider.Thumb
-          className="block w-5 h-5 bg-purple-500 rounded-full border-2 border-purple-400 shadow-lg hover:bg-purple-600 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2 focus:ring-offset-dark-900 transition-all"
+          className="block w-5 h-5 bg-pink-500 rounded-full border-2 border-pink-400 shadow-lg hover:bg-pink-600 focus:outline-none focus:ring-2 focus:ring-pink-400 focus:ring-offset-2 focus:ring-offset-dark-900 transition-all"
           aria-label={label}
         />
       </Slider.Root>

@@ -208,7 +208,7 @@ export function ChatInterface({ character, onBack }: ChatInterfaceProps) {
           {currentCharacter.generation?.generatedImage && (
             <div className="absolute right-0 top-0 w-[450px] h-full z-10 lg:opacity-100 lg:translate-x-0 opacity-0 translate-x-full transition-all duration-500 ease-in-out">
               <div className="relative group h-full p-4">
-                <div className="relative h-full overflow-hidden rounded-3xl border-2 border-purple-500/20 shadow-2xl shadow-purple-500/10">
+                <div className="relative h-full overflow-hidden rounded-3xl border-2 border-pink-500/20 shadow-2xl shadow-pink-500/10">
                   <img
                     src={currentCharacter.generation.generatedImage}
                     alt="Generated Character"
@@ -234,7 +234,7 @@ export function ChatInterface({ character, onBack }: ChatInterfaceProps) {
               <div className="flex items-center">
                 <button
                   onClick={onBack}
-                  className="flex items-center text-dark-400 hover:text-dark-200 transition-colors group"
+                  className="flex items-center text-pink-300 hover:text-pink-200 transition-colors group"
                 >
                   <svg className="w-4 h-4 mr-2 group-hover:-translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -260,13 +260,13 @@ export function ChatInterface({ character, onBack }: ChatInterfaceProps) {
                         <div
                           className={`px-5 py-3 rounded-2xl ${
                             message.sender === 'user'
-                              ? 'bg-gradient-to-r from-purple-600 to-purple-500 text-white shadow-lg shadow-purple-500/20'
+                              ? 'bg-gradient-to-r from-pink-600 to-pink-500 text-white shadow-lg shadow-pink-500/20'
                               : 'bg-dark-800/50 text-dark-200 border border-dark-700/50 backdrop-blur-sm'
                           }`}
                         >
                           <p className="text-sm leading-relaxed">{message.content}</p>
                         </div>
-                        <div className={`mt-1 text-xs text-dark-500 ${message.sender === 'user' ? 'text-right' : 'text-left'}`}>
+                        <div className={`mt-1 text-xs text-pink-300 ${message.sender === 'user' ? 'text-right' : 'text-left'}`}>
                           {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </div>
                       </div>
@@ -279,11 +279,11 @@ export function ChatInterface({ character, onBack }: ChatInterfaceProps) {
                       animate={{ opacity: 1, y: 0 }}
                       className="flex justify-start"
                     >
-                      <div className="bg-dark-800/50 text-dark-200 px-5 py-3 rounded-2xl border border-dark-700/50 backdrop-blur-sm">
+                      <div className="bg-dark-800/50 text-dark-200 px-5 py-3 rounded-2xl border border-pink-500/30 backdrop-blur-sm">
                         <div className="flex space-x-1">
-                          <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" />
-                          <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-                          <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                          <div className="w-2 h-2 bg-pink-500 rounded-full animate-bounce" />
+                          <div className="w-2 h-2 bg-pink-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                          <div className="w-2 h-2 bg-pink-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
                         </div>
                       </div>
                     </motion.div>
@@ -296,25 +296,12 @@ export function ChatInterface({ character, onBack }: ChatInterfaceProps) {
             {/* Message Input */}
             <div className="p-6 border-t border-dark-700/50 backdrop-blur-sm">
               <div className="max-w-4xl mx-auto">
-                <div className="flex space-x-3">
-                  <div className="flex-1 relative">
-                    <input
-                      type="text"
-                      value={inputMessage}
-                      onChange={(e) => setInputMessage(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                      placeholder="Type your message..."
-                      className="w-full px-5 py-3 bg-dark-800/50 text-dark-200 rounded-2xl border border-dark-700/50 focus:border-purple-500/50 focus:outline-none focus:ring-2 focus:ring-purple-500/20 backdrop-blur-sm placeholder-dark-500"
-                    />
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-dark-500">
-                      Press Enter to send
-                    </div>
-                  </div>
-                  
+                {/* Buttons Above Input */}
+                <div className="flex items-center justify-center space-x-3 mb-3">
                   {/* Gallery Button */}
                   <button
                     onClick={() => setShowGallery(true)}
-                    className="px-4 py-3 bg-dark-800/50 text-purple-300 rounded-2xl border border-purple-500/30 hover:bg-purple-600/20 transition-all duration-200 flex items-center justify-center"
+                    className="w-10 h-10 bg-dark-700/50 text-pink-300 rounded-xl border border-pink-500/30 hover:bg-pink-600/20 transition-all duration-200 flex items-center justify-center"
                     title="View Gallery"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -325,7 +312,7 @@ export function ChatInterface({ character, onBack }: ChatInterfaceProps) {
                   {/* Wardrobe Button */}
                   <button
                     onClick={() => setShowWardrobe(true)}
-                    className="px-4 py-3 bg-dark-800/50 text-pink-300 rounded-2xl border border-pink-500/30 hover:bg-pink-600/20 transition-all duration-200 flex items-center justify-center"
+                    className="w-10 h-10 bg-dark-700/50 text-pink-300 rounded-xl border border-pink-500/30 hover:bg-pink-600/20 transition-all duration-200 flex items-center justify-center"
                     title="Change Outfit"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -336,7 +323,7 @@ export function ChatInterface({ character, onBack }: ChatInterfaceProps) {
                   {/* Environment Button */}
                   <button
                     onClick={() => setShowEnvironment(true)}
-                    className="px-4 py-3 bg-dark-800/50 text-green-300 rounded-2xl border border-green-500/30 hover:bg-green-600/20 transition-all duration-200 flex items-center justify-center"
+                    className="w-10 h-10 bg-dark-700/50 text-green-300 rounded-xl border border-green-500/30 hover:bg-green-600/20 transition-all duration-200 flex items-center justify-center"
                     title="Change Location"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -344,11 +331,24 @@ export function ChatInterface({ character, onBack }: ChatInterfaceProps) {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
                   </button>
+                </div>
+                
+                {/* Input with Send Button */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={inputMessage}
+                    onChange={(e) => setInputMessage(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                    placeholder="Type your message..."
+                    className="w-full px-5 py-3 pr-16 bg-dark-800/50 text-dark-200 rounded-2xl border border-pink-500/50 focus:border-pink-500/50 focus:outline-none focus:ring-2 focus:ring-pink-500/20 backdrop-blur-sm placeholder-pink-400"
+                  />
                   
+                  {/* Send Button */}
                   <button
                     onClick={handleSendMessage}
                     disabled={!inputMessage.trim()}
-                    className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 text-white rounded-2xl hover:from-purple-500 hover:to-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 font-medium"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 bg-gradient-to-r from-pink-600 to-pink-500 text-white rounded-lg hover:from-pink-500 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg shadow-pink-500/20 hover:shadow-pink-500/30 px-3 py-1.5 flex items-center justify-center font-medium text-sm"
                   >
                     Send
                   </button>
@@ -378,12 +378,12 @@ export function ChatInterface({ character, onBack }: ChatInterfaceProps) {
             >
               <div className="flex items-center justify-between mb-8">
                 <div>
-                  <h2 className="text-3xl font-bold text-white mb-2">Wardrobe</h2>
-                  <p className="text-dark-400">Choose the perfect outfit for your character</p>
+                  <h2 className="text-3xl font-bold text-pink-300 mb-2">Wardrobe</h2>
+                  <p className="text-pink-400">Choose the perfect outfit for your character</p>
                 </div>
                 <button
                   onClick={() => setShowWardrobe(false)}
-                  className="w-10 h-10 flex items-center justify-center text-dark-400 hover:text-white hover:bg-dark-700 rounded-xl transition-all duration-200"
+                  className="w-10 h-10 flex items-center justify-center text-pink-400 hover:text-white hover:bg-pink-600 rounded-xl transition-all duration-200"
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -394,8 +394,8 @@ export function ChatInterface({ character, onBack }: ChatInterfaceProps) {
               {/* Regular Outfits Section */}
               <div className="mb-8">
                 <div className="flex items-center mb-4">
-                  <div className="w-2 h-2 bg-purple-500 rounded-full mr-3"></div>
-                  <h3 className="text-xl font-semibold text-white">Regular Outfits</h3>
+                  <div className="w-2 h-2 bg-pink-500 rounded-full mr-3"></div>
+                  <h3 className="text-xl font-semibold text-pink-300">Regular Outfits</h3>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {[
@@ -415,8 +415,8 @@ export function ChatInterface({ character, onBack }: ChatInterfaceProps) {
                       onClick={() => handleOutfitChange(outfit.id as ClothingStyle)}
                       className={`relative overflow-hidden rounded-2xl border-2 transition-all duration-200 ${
                         currentCharacter.appearance?.clothing === outfit.id
-                          ? 'border-purple-500 bg-purple-500/20 shadow-lg shadow-purple-500/30'
-                          : 'border-dark-600 bg-dark-700/50 hover:border-purple-500/50 hover:bg-purple-500/10'
+                          ? 'border-pink-500 bg-pink-500/20 shadow-lg shadow-pink-500/30'
+                          : 'border-dark-600 bg-dark-700/50 hover:border-pink-500/50 hover:bg-pink-500/10'
                       }`}
                     >
                       <div className="aspect-video bg-gradient-to-br from-dark-600 to-dark-700 relative">
@@ -454,7 +454,7 @@ export function ChatInterface({ character, onBack }: ChatInterfaceProps) {
               <div className="mb-8">
                 <div className="flex items-center mb-4">
                   <div className="w-2 h-2 bg-pink-500 rounded-full mr-3"></div>
-                  <h3 className="text-xl font-semibold text-white">Adult Outfits</h3>
+                  <h3 className="text-xl font-semibold text-pink-300">Adult Outfits</h3>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {[
@@ -511,15 +511,15 @@ export function ChatInterface({ character, onBack }: ChatInterfaceProps) {
               <div className="border-t border-dark-700 pt-6">
                 <div className="flex items-center mb-4">
                   <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-                  <h3 className="text-xl font-semibold text-white">Custom Outfit</h3>
+                  <h3 className="text-xl font-semibold text-pink-300">Custom Outfit</h3>
                 </div>
                 <div className="bg-dark-700/30 rounded-2xl p-4 border border-dark-600">
-                  <p className="text-dark-300 text-sm mb-3">Describe your custom outfit in detail:</p>
+                  <p className="text-pink-400 text-sm mb-3">Describe your custom outfit in detail:</p>
                   <div className="flex gap-3">
                     <input
                       type="text"
                       placeholder="e.g., Victorian gothic dress with lace trim and corset..."
-                      className="flex-1 px-4 py-3 bg-dark-800/50 text-white rounded-xl border border-dark-600 focus:border-green-500/50 focus:outline-none focus:ring-2 focus:ring-green-500/20 placeholder-dark-500"
+                      className="flex-1 px-4 py-3 bg-dark-800/50 text-white rounded-xl border border-pink-500/50 focus:border-green-500/50 focus:outline-none focus:ring-2 focus:ring-green-500/20 placeholder-pink-400"
                       id="customOutfitInput"
                     />
                     <motion.button

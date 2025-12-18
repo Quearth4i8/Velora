@@ -10,7 +10,7 @@ interface LoadingSpinnerProps {
 
 export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
   size = 40,
-  color = 'text-purple-500',
+  color = 'text-pink-500',
 }) => {
   return (
     <motion.div

@@ -39,7 +39,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           {/* Search Icon */}
           <div className="absolute left-4 top-1/2 transform -translate-y-1/2 pointer-events-none">
             <svg 
-              className="w-5 h-5 text-dark-400 group-focus-within:text-purple-400 transition-colors" 
+              className="w-5 h-5 text-dark-400 group-focus-within:text-pink-400 transition-colors" 
               fill="none" 
               stroke="currentColor" 
               viewBox="0 0 24 24"
@@ -60,7 +60,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             onChange={handleChange}
             placeholder={placeholder}
             className="w-full pl-12 pr-4 py-4 bg-dark-800/50 text-white rounded-xl border border-dark-600/50 
-                     focus:border-purple-500/50 focus:outline-none focus:ring-2 focus:ring-purple-500/20
+                     focus:border-pink-500/50 focus:outline-none focus:ring-2 focus:ring-pink-500/20
                      placeholder-dark-400 backdrop-blur-sm transition-all duration-300"
           />
           

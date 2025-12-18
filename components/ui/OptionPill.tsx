@@ -28,8 +28,8 @@ export const OptionPill: React.FC<OptionPillProps> = ({
       <div
         className={`relative px-4 py-2 rounded-full border-2 transition-all duration-300 ${
           isSelected
-            ? 'border-purple-500 bg-purple-500/10 text-purple-300 shadow-glow'
-            : 'border-dark-600 bg-dark-800 text-dark-300 hover:border-purple-400'
+            ? 'border-pink-500 bg-pink-500/10 text-pink-300 shadow-glow'
+            : 'border-dark-600 bg-dark-800 text-dark-300 hover:border-pink-400'
         }`}
       >
         {label}

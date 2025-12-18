@@ -37,8 +37,8 @@ export const ImageOptionCard: React.FC<ImageOptionCardProps> = ({
       <div
         className={`relative w-full h-40 rounded-lg overflow-hidden border-2 transition-all duration-300 ${
           isSelected
-            ? 'border-purple-500 shadow-glow-lg'
-            : 'border-dark-600 hover:border-purple-400'
+            ? 'border-pink-500 shadow-glow-lg'
+            : 'border-dark-600 hover:border-pink-400'
         }`}
       >
         {!imageError ? (
@@ -56,7 +56,7 @@ export const ImageOptionCard: React.FC<ImageOptionCardProps> = ({
 
         {isSelected && (
           <motion.div
-            className="absolute inset-0 bg-gradient-to-br from-purple-500/20 to-transparent"
+            className="absolute inset-0 bg-gradient-to-br from-pink-500/20 to-transparent"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.2 }}
@@ -65,7 +65,7 @@ export const ImageOptionCard: React.FC<ImageOptionCardProps> = ({
 
         {isSelected && (
           <motion.div
-            className="absolute top-2 right-2 bg-purple-500 rounded-full p-1.5 shadow-lg"
+            className="absolute top-2 right-2 bg-pink-500 rounded-full p-1.5 shadow-lg"
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ type: 'spring', stiffness: 200, damping: 15 }}

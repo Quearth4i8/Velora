@@ -22,6 +22,26 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
   const [showNavbarDropdown, setShowNavbarDropdown] = useState(false);
   const [zoomedImageIndex, setZoomedImageIndex] = useState(0);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [blurNSFW, setBlurNSFW] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'sfw' | 'nsfw'>('all');
+
+  // Load blur setting from localStorage
+  useEffect(() => {
+    const savedBlurNSFW = localStorage.getItem('blurNSFW');
+    if (savedBlurNSFW !== null) {
+      setBlurNSFW(JSON.parse(savedBlurNSFW));
+    }
+  }, []);
+
+  // Function to detect if an image is NSFW based on generation prompt
+  const isNSFWImage = (image: CharacterImage): boolean => {
+    if (!image.generationPrompt) return false;
+    
+    const nsfwKeywords = ['naked', 'nude', 'lingerie', 'bikini', 'underwear', 'revealing', 'bodysuit'];
+    const prompt = image.generationPrompt.toLowerCase();
+    
+    return nsfwKeywords.some(keyword => prompt.includes(keyword));
+  };
 
   // Load character images from gallery
   useEffect(() => {
@@ -198,7 +218,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
         <div className="flex items-center justify-between">
           <button
             onClick={onBack}
-            className="flex items-center text-dark-400 hover:text-dark-200 transition-colors group"
+            className="flex items-center text-pink-400 hover:text-pink-300 transition-colors group"
           >
             <svg className="w-4 h-4 mr-2 group-hover:-translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -206,40 +226,29 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
             <span className="text-sm font-medium">Back to Chat</span>
           </button>
           
-          {/* 3 Dots Menu */}
+          {/* Character Name - Center - Simple */}
+          <div className="flex-1 flex justify-center">
+            <div className="flex items-center space-x-3">              
+              {/* Character Info */}
+              <div className="flex flex-col items-center">
+                <h1 className="text-xl font-semibold text-white">{character.name || 'Character'}</h1>
+                <div className="text-sm text-pink-400 capitalize">{character.personality?.archetype || 'Mysterious'}</div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Edit Button */}
           <div className="relative navbar-dropdown">
             <button
-              onClick={() => setShowNavbarDropdown(!showNavbarDropdown)}
-              className="w-8 h-8 flex items-center justify-center text-dark-400 hover:text-dark-200 transition-colors"
+              onClick={() => {
+                setShowEditModal(true);
+              }}
+              className="w-8 h-8 flex items-center justify-center text-pink-400 hover:text-pink-300 transition-colors"
             >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-4h-4v4zm0 0l4-4m4 4v11a2 2 0 002-2h6a2 2 0 002-2v-4h-4v4z" />
               </svg>
             </button>
-            
-            {showNavbarDropdown && (
-              <div className="absolute right-0 mt-2 w-48 bg-dark-800 border border-dark-700 rounded-lg shadow-lg z-50">
-                <button
-                  onClick={() => {
-                    setShowEditModal(true);
-                    setShowNavbarDropdown(false);
-                  }}
-                  className="w-full px-4 py-2 text-left text-dark-200 hover:bg-dark-700 transition-colors text-sm"
-                >
-                  Edit Character
-                </button>
-                <button
-                  onClick={() => {
-                    handleGenerateNewImage();
-                    setShowNavbarDropdown(false);
-                  }}
-                  disabled={isGenerating || !editedCharacter.generation?.style}
-                  className="w-full px-4 py-2 text-left text-dark-200 hover:bg-dark-700 transition-colors text-sm disabled:text-dark-500 disabled:cursor-not-allowed"
-                >
-                  {isGenerating ? 'Generating...' : 'Generate New Image'}
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -247,6 +256,94 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
 
       {/* Images Grid - Full Height */}
       <div className="h-[calc(100vh-140px)] overflow-hidden">
+        {/* Filter Section - Premium Design */}
+        <div className="px-8 py-6 border-b border-dark-700/20 backdrop-blur-sm bg-gradient-to-r from-dark-800/30 to-dark-900/30">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-8">
+              {/* Filter Pills - Simple */}
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setFilter('all')}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
+                    filter === 'all' 
+                      ? 'bg-gradient-to-r from-pink-600 to-pink-500 text-white shadow-lg shadow-pink-500/30 scale-105' 
+                      : 'text-dark-300 hover:text-white hover:bg-dark-700/50'
+                  }`}
+                >
+                  All Images
+                </button>
+                
+                <button
+                  onClick={() => setFilter('sfw')}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
+                    filter === 'sfw' 
+                      ? 'bg-gradient-to-r from-green-600 to-emerald-500 text-white shadow-lg shadow-green-500/30 scale-105' 
+                      : 'text-dark-300 hover:text-white hover:bg-dark-700/50'
+                  }`}
+                >
+                  Safe
+                </button>
+                
+                <button
+                  onClick={() => setFilter('nsfw')}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
+                    filter === 'nsfw' 
+                      ? 'bg-gradient-to-r from-orange-600 to-red-600 text-white shadow-lg shadow-orange-500/30 scale-105' 
+                      : 'text-dark-300 hover:text-white hover:bg-dark-700/50'
+                  }`}
+                >
+                  Adult
+                </button>
+              </div>
+              
+              {/* NSFW Blur Toggle - Consistent Size */}
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={() => setBlurNSFW(!blurNSFW)}
+                  className={`relative inline-flex h-8 w-11 items-center rounded-full transition-colors duration-200 ${
+                    blurNSFW 
+                      ? 'bg-pink-600' 
+                      : 'bg-dark-600'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
+                      blurNSFW ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+            
+            {/* Generate Button - Premium */}
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-pink-600/20 to-purple-600/20 rounded-2xl blur-xl"></div>
+              <button
+                onClick={handleGenerateNewImage}
+                disabled={isGenerating || !editedCharacter.generation?.style}
+                className="relative px-6 py-3 bg-gradient-to-r from-pink-600 via-pink-500 to-purple-600 text-white rounded-full text-sm font-bold hover:from-pink-500 hover:via-pink-400 hover:to-purple-500 disabled:from-dark-600 disabled:via-dark-700 disabled:to-dark-800 disabled:cursor-not-allowed transition-all duration-300 shadow-xl shadow-pink-500/40 hover:shadow-pink-500/60 hover:scale-105 border border-pink-500/30"
+              >
+                {isGenerating ? (
+                  <span className="flex items-center">
+                    <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Creating Magic...
+                  </span>
+                ) : (
+                  <span className="flex items-center">
+                    <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7m0 0l7-7" />
+                    </svg>
+                    Create New
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+
         {characterImages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <div className="w-20 h-20 bg-dark-800/50 rounded-full flex items-center justify-center mb-4 border border-dark-600/50">
@@ -266,7 +363,14 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
           <div className="h-full overflow-y-auto p-8">
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
               <AnimatePresence>
-                {characterImages.map((image, index) => (
+                {characterImages
+                  .filter(image => {
+                    if (filter === 'all') return true;
+                    if (filter === 'sfw') return !isNSFWImage(image);
+                    if (filter === 'nsfw') return isNSFWImage(image);
+                    return true;
+                  })
+                  .map((image, index) => (
                   <motion.div
                     key={image.id}
                     initial={{ opacity: 0, scale: 0.8 }}
@@ -280,8 +384,17 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
                       <img
                         src={image.imageUrl}
                         alt={`Character image ${index + 1}`}
-                        className="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-300 pointer-events-none"
+                        className={`w-full h-64 object-cover group-hover:scale-105 transition-transform duration-300 pointer-events-none ${
+                          isNSFWImage(image) && blurNSFW ? 'blur-lg' : ''
+                        }`}
                       />
+                      
+                      {/* NSFW Devil Emoji Icon */}
+                      {isNSFWImage(image) && (
+                        <div className="absolute top-2 left-2 w-6 h-6 bg-black/60 backdrop-blur-sm rounded-full flex items-center justify-center">
+                          <span className="text-sm">😈</span>
+                        </div>
+                      )}
                       
                       {/* 3-dot menu button */}
                       <button
@@ -335,7 +448,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
                               Image {index + 1}
                             </span>
                             {image.isPrimary && (
-                              <span className="px-2 py-1 bg-purple-500/20 text-purple-300 rounded-full text-xs border border-purple-500/30">
+                              <span className="px-2 py-1 bg-pink-500/20 text-pink-300 rounded-full text-xs border border-pink-500/30">
                                 Primary
                               </span>
                             )}
@@ -351,7 +464,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
         )}
       </div>
 
-      {/* Edit Modal */}
+      {/* Edit Modal - Simplified Design */}
       <AnimatePresence>
         {showEditModal && (
           <motion.div 
@@ -370,12 +483,12 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
               className="relative bg-dark-800 rounded-2xl border border-dark-700 max-w-2xl w-full max-h-[80vh] overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Modal Header */}
+              {/* Modal Header - Simple */}
               <div className="px-6 py-4 border-b border-dark-700 flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-dark-200">Edit Character</h3>
+                <h3 className="text-lg font-semibold text-white">Edit Character</h3>
                 <button
                   onClick={() => setShowEditModal(false)}
-                  className="w-8 h-8 flex items-center justify-center text-dark-400 hover:text-dark-200 transition-colors"
+                  className="w-8 h-8 flex items-center justify-center text-pink-400 hover:text-pink-300 transition-colors"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -383,26 +496,26 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
                 </button>
               </div>
               
-              {/* Modal Content */}
+              {/* Modal Content - Simple */}
               <div className="p-6 space-y-6 overflow-y-auto max-h-[60vh]">
                 <div>
-                  <label className="text-dark-500 text-xs block mb-2">Name</label>
+                  <label className="text-pink-400 text-sm font-medium block mb-2">Character Name</label>
                   <input
                     type="text"
                     value={editedCharacter.name || ''}
                     onChange={(e) => handleInputChange('name', e.target.value)}
-                    className="w-full px-4 py-2 bg-dark-700/50 text-dark-200 rounded-lg border border-dark-600/50 focus:border-purple-500/50 focus:outline-none"
+                    className="w-full px-4 py-3 bg-dark-700/50 text-white rounded-lg border border-dark-600 focus:border-pink-500 focus:outline-none transition-colors duration-200"
                     placeholder="Enter character name..."
                   />
                 </div>
                 
                 <div>
-                  <label className="text-dark-500 text-xs block mb-2">Age</label>
+                  <label className="text-pink-400 text-sm font-medium block mb-2">Age</label>
                   <input
                     type="number"
                     value={editedCharacter.identity.age || ''}
                     onChange={(e) => handleInputChange('identity.age', e.target.value)}
-                    className="w-full px-4 py-2 bg-dark-700/50 text-dark-200 rounded-lg border border-dark-600/50 focus:border-purple-500/50 focus:outline-none"
+                    className="w-full px-4 py-3 bg-dark-700/50 text-white rounded-lg border border-dark-600 focus:border-pink-500 focus:outline-none transition-colors duration-200"
                     placeholder="Enter age..."
                     min="18"
                     max="100"
@@ -410,33 +523,34 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
                 </div>
                 
                 <div className="bg-dark-700/30 rounded-xl p-4 border border-dark-600/50">
-                  <h4 className="text-sm font-medium text-purple-400 mb-3">Character Info</h4>
-                  <div className="space-y-2 text-sm">
+                  <h4 className="text-sm font-medium text-pink-400 mb-3">Character Details</h4>
+                  <div className="space-y-2">
                     <div className="flex justify-between">
                       <span className="text-dark-400">Archetype:</span>
-                      <span className="text-dark-200 capitalize">{editedCharacter.personality.archetype || 'Not specified'}</span>
+                      <span className="text-white capitalize">{editedCharacter.personality.archetype || 'Not specified'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-dark-400">Style:</span>
-                      <span className="text-dark-200 capitalize">{editedCharacter.generation?.style || 'Not specified'}</span>
+                      <span className="text-white capitalize">{editedCharacter.generation?.style || 'Not specified'}</span>
                     </div>
                   </div>
                 </div>
               </div>
               
-              {/* Modal Footer */}
+              {/* Modal Footer - Simple */}
               <div className="px-6 py-4 border-t border-dark-700 flex justify-end space-x-3">
                 <button
                   onClick={() => setShowEditModal(false)}
-                  className="px-4 py-2 bg-dark-700/50 text-dark-300 rounded-lg border border-dark-600/50 hover:bg-dark-600/50 transition-all duration-200 text-sm"
+                  className="px-4 py-2 bg-dark-700/50 text-pink-300 rounded-lg border border-pink-600/30 hover:bg-pink-600/20 transition-colors duration-200"
                 >
                   Cancel
                 </button>
-                <PrimaryCTAButton
-                  label="Save Changes"
+                <button
                   onClick={handleSaveCharacter}
-                  className="px-6"
-                />
+                  className="px-4 py-2 bg-pink-600 text-white rounded-lg font-medium hover:bg-pink-700 transition-colors duration-200"
+                >
+                  Save Changes
+                </button>
               </div>
             </motion.div>
           </motion.div>
@@ -469,13 +583,15 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
                   transition={{ duration: 0.3 }}
                   src={characterImages[zoomedImageIndex]?.imageUrl}
                   alt={`Zoomed character image ${zoomedImageIndex + 1}`}
-                  className="max-w-full max-h-full object-contain rounded-lg"
+                  className={`max-w-full max-h-full object-contain rounded-lg ${
+                    characterImages[zoomedImageIndex] && isNSFWImage(characterImages[zoomedImageIndex]) && blurNSFW ? 'blur-lg' : ''
+                  }`}
                 />
               
               {/* Close Button */}
               <button
                 onClick={handleCloseZoom}
-                className="absolute top-4 right-4 w-10 h-10 bg-red-500/80 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-red-600/90 transition-all duration-200 hover:scale-110"
+                className="absolute top-4 right-4 w-10 h-10 bg-pink-500/80 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-pink-600/90 transition-all duration-200 hover:scale-110"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -490,7 +606,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
                       e.stopPropagation();
                       handlePreviousImage();
                     }}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-white/30 transition-colors"
+                    className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-pink-500/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-pink-500/30 transition-colors"
                   >
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -501,7 +617,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
                       e.stopPropagation();
                       handleNextImage();
                     }}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-white/30 transition-colors"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-pink-500/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-pink-500/30 transition-colors"
                   >
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

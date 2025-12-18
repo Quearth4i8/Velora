@@ -1,10 +1,12 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Navbar } from '@/components/Navbar';
 
 export default function GalleryPage() {
+  const [filter, setFilter] = useState<'all' | 'sfw' | 'nsfw'>('all');
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950">
       <Navbar />
@@ -23,6 +25,42 @@ export default function GalleryPage() {
             <p className="text-dark-400 text-lg">
               Discover amazing characters created by our community
             </p>
+          </div>
+          
+          {/* Filter Section */}
+          <div className="flex justify-center mb-8">
+            <div className="inline-flex rounded-lg bg-dark-800/50 backdrop-blur-sm border border-dark-700 p-1">
+              <button
+                onClick={() => setFilter('all')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
+                  filter === 'all' 
+                    ? 'bg-pink-600 text-white' 
+                    : 'text-dark-300 hover:text-white hover:bg-dark-700'
+                }`}
+              >
+                All
+              </button>
+              <button
+                onClick={() => setFilter('sfw')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
+                  filter === 'sfw' 
+                    ? 'bg-pink-600 text-white' 
+                    : 'text-dark-300 hover:text-white hover:bg-dark-700'
+                }`}
+              >
+                SFW
+              </button>
+              <button
+                onClick={() => setFilter('nsfw')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
+                  filter === 'nsfw' 
+                    ? 'bg-pink-600 text-white' 
+                    : 'text-dark-300 hover:text-white hover:bg-dark-700'
+                }`}
+              >
+                NSFW
+              </button>
+            </div>
           </div>
           
           <div className="text-center py-16">

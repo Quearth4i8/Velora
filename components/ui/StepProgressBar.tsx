@@ -24,7 +24,7 @@ export const StepProgressBar: React.FC<StepProgressBarProps> = ({
             <motion.div
               className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all duration-300 ${
                 index + 1 <= currentStep
-                  ? 'bg-purple-500 text-white shadow-glow'
+                  ? 'bg-pink-500 text-white shadow-glow'
                   : 'bg-dark-700 text-dark-400'
               }`}
               initial={{ scale: 0 }}
@@ -42,7 +42,7 @@ export const StepProgressBar: React.FC<StepProgressBarProps> = ({
 
       <div className="w-full bg-dark-700 h-1 rounded-full overflow-hidden">
         <motion.div
-          className="h-full bg-gradient-to-r from-purple-500 to-purple-400 rounded-full"
+          className="h-full bg-gradient-to-r from-pink-500 to-pink-400 rounded-full"
           initial={{ width: 0 }}
           animate={{ width: `${progress}%` }}
           transition={{ duration: 0.5, ease: 'easeOut' }}
