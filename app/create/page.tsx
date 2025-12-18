@@ -5,11 +5,14 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { Navbar } from '@/components/Navbar';
 import { CharacterBuilder } from '@/components/CharacterBuilder';
+import { AnimatedBackground } from '@/components/AnimatedBackground';
 
 export default function CreateCharacterPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950">
-      <Navbar />
+    <div className="min-h-screen bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950 relative">
+      <AnimatedBackground />
+      <div className="relative z-10">
+        <Navbar />
       
       <motion.div
         className="container mx-auto px-4 py-8"
@@ -30,6 +33,7 @@ export default function CreateCharacterPage() {
           <CharacterBuilder />
         </div>
       </motion.div>
+      </div>
     </div>
   );
 }

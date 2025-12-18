@@ -7,6 +7,9 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('Supabase credentials not configured. Storage will not work.');
 }
 
+// Import the shared Supabase client to avoid multiple instances
+import { supabase } from './supabase';
+
 export interface StorageFile {
   name: string;
   url: string;
@@ -15,7 +18,7 @@ export interface StorageFile {
 }
 
 export class StorageService {
-  private supabase = createClient(supabaseUrl, supabaseAnonKey);
+  private supabase = supabase;
   private bucketName = 'character-images';
 
   /**

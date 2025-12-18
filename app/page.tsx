@@ -7,11 +7,14 @@ import { CharacterSelection } from '@/components/CharacterSelection';
 import { Navbar } from '@/components/Navbar';
 import { PrimaryCTAButton } from '@/components/ui/PrimaryCTAButton';
 import { SearchBar } from '@/components/ui/SearchBar';
+import { AnimatedBackground } from '@/components/AnimatedBackground';
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950">
-      <Navbar />
+    <div className="min-h-screen bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950 relative">
+      <AnimatedBackground />
+      <div className="relative z-10">
+        <Navbar />
       
       {/* Hero Section */}
       <motion.div
@@ -21,7 +24,7 @@ export default function Home() {
         transition={{ duration: 0.5 }}
       >
         {/* Left Image - Positioned Absolutely */}
-        <div className="hidden lg:block absolute left-0 top-8">
+        <div className="hidden lg:block absolute left-8 top-8">
           <div className="relative">
             <img 
               src="/images/left.png" 
@@ -60,7 +63,7 @@ export default function Home() {
         </div>
         
         {/* Right Image - Positioned Absolutely */}
-        <div className="hidden lg:block absolute right-0 top-8">
+        <div className="hidden lg:block absolute right-8 top-12">
           <div className="relative">
             <img 
               src="/images/right.png" 
@@ -131,6 +134,7 @@ export default function Home() {
             window.location.href = '/create';
           }}
         />
+      </div>
       </div>
     </div>
   );

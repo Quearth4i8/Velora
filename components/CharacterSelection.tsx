@@ -120,7 +120,7 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
 
   if (isLoading && characters.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950 flex items-center justify-center">
+      <div className="flex items-center justify-center py-24">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
           <p className="text-dark-300 text-lg font-medium">Loading characters...</p>
@@ -133,7 +133,7 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
   // Show skeleton while loading in background
   if (isLoading && characters.length > 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950 py-8 px-4">
+      <div className="py-8 px-4">
         <div className="max-w-7xl mx-auto">
           <div className="mb-8">
             <div className="h-12 bg-dark-800/50 rounded-lg animate-pulse mb-4"></div>
@@ -151,7 +151,7 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950 py-12 px-4">
+      <div className="py-12 px-4">
         <div className="max-w-6xl mx-auto">
           <div className="text-center">
             <p className="text-red-400 mb-4">{error instanceof Error ? error.message : String(error)}</p>
@@ -163,7 +163,7 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950 py-8 px-4">
+    <div className="py-8 px-4">
       <div className="max-w-7xl mx-auto">
         <motion.div
           className="mb-8"

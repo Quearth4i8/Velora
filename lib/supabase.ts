@@ -9,7 +9,10 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('Supabase credentials not configured. Character creation will not work.');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Create a single Supabase client instance
+const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+
+export const supabase = supabaseClient;
 
 export const characterService = {
   async createCharacter(character: CharacterDraft): Promise<CharacterDraft> {
