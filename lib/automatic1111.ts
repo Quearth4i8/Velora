@@ -129,9 +129,9 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
   const { identity, body, appearance, personality } = draft;
   
   const stylePrompts = {
-    [CharacterStyle.ANIME]: 'lazypos, masterpiece, best quality, ultra-detailed, high quality anime art, illustration, clean lines, vibrant colors, solo character, single person, only one character',
-    [CharacterStyle.REALISTIC]: 'lazypos, masterpiece, best quality, ultra-realistic, photorealistic, professional photography, detailed, high resolution, 8k, solo character, single person, only one character',
-    [CharacterStyle.ARTISTIC]: 'lazypos, masterpiece, best quality, artistic, digital painting, concept art, detailed, stunning, high quality, solo character, single person, only one character',
+    [CharacterStyle.ANIME]: 'lazypos, lazyhand, masterpiece, best quality, ultra-detailed, high quality anime art, illustration, clean lines, vibrant colors, solo character, single person, only one character, perfect hands, detailed fingers, proper hand anatomy, full body portrait',
+    [CharacterStyle.REALISTIC]: 'lazypos, lazyhand, masterpiece, best quality, ultra-realistic, photorealistic, professional photography, detailed, high resolution, 8k, solo character, single person, only one character, perfect hands, detailed fingers, proper hand anatomy, full body portrait',
+    [CharacterStyle.ARTISTIC]: 'lazypos, lazyhand, masterpiece, best quality, artistic, digital painting, concept art, detailed, stunning, high quality, solo character, single person, only one character, perfect hands, detailed fingers, proper hand anatomy, full body portrait',
   };
 
   // Basic characteristics

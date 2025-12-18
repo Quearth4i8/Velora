@@ -6,6 +6,7 @@ import { CharacterDraft, ChatMessage, CharacterImage } from '@/lib/types';
 import { automatic1111API } from '@/lib/automatic1111';
 import { characterAPI } from '@/lib/api';
 import { PrimaryCTAButton } from '@/components/ui/PrimaryCTAButton';
+import { GenerationSettingsModal } from '@/components/ui/GenerationSettingsModal';
 import { useBlurNSFW } from '@/lib/useBlurNSFW';
 
 interface CharacterGalleryProps {
@@ -24,6 +25,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
   const [showNavbarDropdown, setShowNavbarDropdown] = useState(false);
   const [zoomedImageIndex, setZoomedImageIndex] = useState(0);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showGenerationSettingsModal, setShowGenerationSettingsModal] = useState(false);
   const [filter, setFilter] = useState<'all' | 'sfw' | 'nsfw'>('all');
   
   // Local generation settings
@@ -317,116 +319,20 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
               </div>
             </div>
             
-            {/* Generation Settings Panel */}
-            <div className="mt-6 p-4 bg-dark-800/50 border border-dark-700 rounded-xl">
-              <h3 className="text-white font-medium mb-4 text-sm">Generation Settings</h3>
-              
-              <div className="space-y-4">
-                {/* Steps */}
-                <div>
-                  <label className="text-dark-300 text-xs block mb-1">Steps: {generationSettings.steps}</label>
-                  <input
-                    type="range"
-                    min="10"
-                    max="100"
-                    value={generationSettings.steps}
-                    onChange={(e) => setGenerationSettings({...generationSettings, steps: parseInt(e.target.value)})}
-                    className="w-full h-2 bg-dark-700 rounded-lg appearance-none cursor-pointer"
-                  />
-                </div>
-                
-                {/* CFG Scale */}
-                <div>
-                  <label className="text-dark-300 text-xs block mb-1">CFG Scale: {generationSettings.cfgScale}</label>
-                  <input
-                    type="range"
-                    min="1"
-                    max="20"
-                    step="0.5"
-                    value={generationSettings.cfgScale}
-                    onChange={(e) => setGenerationSettings({...generationSettings, cfgScale: parseFloat(e.target.value)})}
-                    className="w-full h-2 bg-dark-700 rounded-lg appearance-none cursor-pointer"
-                  />
-                </div>
-                
-                {/* Aspect Ratio */}
-                <div>
-                  <label className="text-dark-300 text-xs block mb-1">Aspect Ratio</label>
-                  <select
-                    value={generationSettings.aspectRatio}
-                    onChange={(e) => setGenerationSettings({...generationSettings, aspectRatio: e.target.value})}
-                    className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white text-sm"
-                  >
-                    <option value="portrait">Portrait (768x1024)</option>
-                    <option value="landscape">Landscape (1024x768)</option>
-                    <option value="square">Square (896x896)</option>
-                    <option value="cinematic">Cinematic (832x1216)</option>
-                    <option value="mobile">Mobile (720x1280)</option>
-                  </select>
-                </div>
-                
-                {/* Sampler */}
-                <div>
-                  <label className="text-dark-300 text-xs block mb-1">Sampler</label>
-                  <select
-                    value={generationSettings.sampler}
-                    onChange={(e) => setGenerationSettings({...generationSettings, sampler: e.target.value})}
-                    className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white text-sm"
-                  >
-                    <option value="DPM++ 2M Karras">DPM++ 2M Karras</option>
-                    <option value="DPM++ SDE Karras">DPM++ SDE Karras</option>
-                    <option value="Euler a">Euler a</option>
-                    <option value="Euler">Euler</option>
-                    <option value="DDIM">DDIM</option>
-                  </select>
-                </div>
-                
-                {/* Seed */}
-                <div>
-                  <label className="text-dark-300 text-xs block mb-1">Seed</label>
-                  <div className="flex space-x-2">
-                    <input
-                      type="number"
-                      value={generationSettings.seed}
-                      onChange={(e) => setGenerationSettings({...generationSettings, seed: parseInt(e.target.value) || -1})}
-                      className="flex-1 px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white text-sm"
-                      placeholder="-1 for random"
-                    />
-                    <button
-                      onClick={() => setGenerationSettings({...generationSettings, seed: Math.floor(Math.random() * 1000000)})}
-                      className="px-3 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-lg text-sm transition-colors"
-                    >
-                      Random
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
             {/* Generate Button - Premium */}
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-r from-pink-600/20 to-purple-600/20 rounded-2xl blur-xl"></div>
               <button
-                onClick={handleGenerateNewImage}
+                onClick={() => setShowGenerationSettingsModal(true)}
                 disabled={isGenerating || !editedCharacter.generation?.style}
                 className="relative px-6 py-3 bg-gradient-to-r from-pink-600 via-pink-500 to-purple-600 text-white rounded-full text-sm font-bold hover:from-pink-500 hover:via-pink-400 hover:to-purple-500 disabled:from-dark-600 disabled:via-dark-700 disabled:to-dark-800 disabled:cursor-not-allowed transition-all duration-300 shadow-xl shadow-pink-500/40 hover:shadow-pink-500/60 hover:scale-105 border border-pink-500/30"
               >
-                {isGenerating ? (
-                  <span className="flex items-center">
-                    <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Creating Magic...
-                  </span>
-                ) : (
-                  <span className="flex items-center">
-                    <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7m0 0l7-7" />
-                    </svg>
-                    Create New
-                  </span>
-                )}
+                <span className="flex items-center">
+                  <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7m0 0l7-7" />
+                  </svg>
+                  Create New
+                </span>
               </button>
             </div>
           </div>
@@ -443,7 +349,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
             <p className="text-dark-400 mb-6">Generate your first image to start building the gallery</p>
             <PrimaryCTAButton
               label={isGenerating ? "Generating..." : "Generate First Image"}
-              onClick={handleGenerateNewImage}
+              onClick={() => setShowGenerationSettingsModal(true)}
               disabled={isGenerating || !editedCharacter.generation?.style}
             />
           </div>
@@ -644,6 +550,17 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Generation Settings Modal */}
+      <GenerationSettingsModal
+        isOpen={showGenerationSettingsModal}
+        onClose={() => setShowGenerationSettingsModal(false)}
+        settings={generationSettings}
+        onSettingsChange={setGenerationSettings}
+        onGenerate={handleGenerateNewImage}
+        isGenerating={isGenerating}
+        disabled={!editedCharacter.generation?.style}
+      />
 
       {/* Simple Zoom Modal */}
       <AnimatePresence>
