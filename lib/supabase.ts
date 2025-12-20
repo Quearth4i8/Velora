@@ -42,6 +42,40 @@ export const characterService = {
     return data;
   },
 
+  async listSpecialCharactersCached(limit = 10) {
+    const cacheKey = `special_characters_list_${limit}`;
+    const cached = localStorage.getItem(cacheKey);
+
+    if (cached) {
+      const { data, timestamp } = JSON.parse(cached);
+      if (Date.now() - timestamp < 120000) {
+        return data;
+      }
+    }
+
+    const data = await this.listSpecialCharacters(limit);
+
+    try {
+      localStorage.setItem(cacheKey, JSON.stringify({
+        data,
+        timestamp: Date.now()
+      }));
+    } catch (error) {
+      if (error instanceof Error && error.name === 'QuotaExceededError') {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('special_characters_list_')) {
+            localStorage.removeItem(key);
+          }
+        }
+      } else {
+        console.error('Unexpected error caching special characters:', error);
+      }
+    }
+
+    return data;
+  },
+
   async getCharacterCached(id: string) {
     // Check cache first
     const cacheKey = `character_${id}`;
@@ -80,7 +114,20 @@ export const characterService = {
     const { data, error } = await supabase
       .from('characters')
       .select('*')
+      .neq('character_type', 'special')
       .neq('name', 'Gallery Generated') // Exclude gallery-only character by name
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+    return data;
+  },
+
+  async listSpecialCharacters(limit = 10) {
+    const { data, error } = await supabase
+      .from('characters')
+      .select('*')
+      .eq('character_type', 'special')
       .order('created_at', { ascending: false })
       .limit(limit);
 
@@ -145,6 +192,8 @@ export const characterService = {
     // Also clear the list cache
     localStorage.removeItem('characters_list_10');
     localStorage.removeItem('characters_list_50');
+    localStorage.removeItem('special_characters_list_10');
+    localStorage.removeItem('special_characters_list_50');
     
     // Only include name and age in the update payload
     const updatePayload: Record<string, any> = {

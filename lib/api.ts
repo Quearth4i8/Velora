@@ -3,6 +3,36 @@ import { storageService } from './storage';
 import { CharacterDraft, CharacterImage } from './types';
 import { deserializeCharacter } from './db';
 
+const normalizeStoragePath = (value: string): string => {
+  let path = value.trim();
+  path = path.replace(/^\/+/, '');
+  path = path.split('?')[0].split('#')[0];
+  try {
+    path = decodeURIComponent(path);
+  } catch {
+    // ignore decode errors
+  }
+  return path;
+};
+
+const extractStoragePathFromUrl = (rawUrl: string): string | null => {
+  try {
+    const url = new URL(rawUrl);
+    const parts = url.pathname.split('/').filter(Boolean);
+    const markerIndex = parts.findIndex(part => part === 'public' || part === 'sign');
+    if (markerIndex !== -1 && parts.length > markerIndex + 2) {
+      return normalizeStoragePath(parts.slice(markerIndex + 2).join('/'));
+    }
+    const last = parts[parts.length - 1] || '';
+    return normalizeStoragePath(last);
+  } catch {
+    const withoutQuery = rawUrl.split('?')[0].split('#')[0];
+    const urlParts = withoutQuery.split('/');
+    const last = urlParts[urlParts.length - 1] || '';
+    return normalizeStoragePath(last);
+  }
+};
+
 export const characterAPI = {
   async createCharacter(draft: CharacterDraft) {
     try {
@@ -36,6 +66,17 @@ export const characterAPI = {
     }
   },
 
+  async getSpecialCharacters() {
+    try {
+      const results = await characterService.listSpecialCharactersCached(50);
+      const deserialized = results.map(deserializeCharacter);
+      return { success: true, data: deserialized };
+    } catch (error) {
+      console.error('Failed to get special characters:', error);
+      return { success: false, error };
+    }
+  },
+
   async listCharacters(limit = 10) {
     try {
       const results = await characterService.listCharactersCached(limit);
@@ -47,12 +88,36 @@ export const characterAPI = {
     }
   },
 
+  async listSpecialCharacters(limit = 10) {
+    try {
+      const results = await characterService.listSpecialCharactersCached(limit);
+      const deserialized = results.map(deserializeCharacter);
+      return { success: true, data: deserialized };
+    } catch (error) {
+      console.error('Failed to list special characters:', error);
+      return { success: false, error };
+    }
+  },
+
   async updateCharacter(id: string, draft: Partial<CharacterDraft>) {
     try {
       const result = await characterService.updateCharacter(id, draft);
       return { success: true, data: result };
     } catch (error) {
       console.error('Failed to update character:', error);
+      return { success: false, error };
+    }
+  },
+
+  async updateCharacterDirect(id: string, updates: Record<string, any>) {
+    try {
+      const result = await characterService.updateCharacterDirect(id, {
+        ...updates,
+        updated_at: new Date().toISOString(),
+      });
+      return { success: true, data: result };
+    } catch (error) {
+      console.error('Failed to update character directly:', error);
       return { success: false, error };
     }
   },
@@ -106,15 +171,13 @@ export const characterAPI = {
 
   async deleteCharacterImage(characterId: string, imageUrl: string): Promise<{ success: boolean; error?: any }> {
     try {
-      // Extract file name from URL
-      const urlParts = imageUrl.split('/');
-      const fileName = urlParts[urlParts.length - 1];
-      
-      // Delete from storage
-      const deleted = await storageService.deleteImage(fileName);
-      
-      if (!deleted) {
-        console.warn('Failed to delete image from storage, but continuing...');
+      const storagePath = imageUrl ? extractStoragePathFromUrl(imageUrl) : null;
+      if (storagePath) {
+        const deleted = await storageService.deleteImage(storagePath);
+
+        if (!deleted) {
+          console.warn('Failed to delete image from storage, but continuing...');
+        }
       }
 
       // Update character to remove image URL
@@ -259,21 +322,15 @@ export const characterAPI = {
       }
 
       let fileName = imageData?.file_name;
-      
+
       // If file_name is not available, try to extract from URL
       if (!fileName && imageData?.image_url) {
         console.log('Original image URL:', imageData.image_url);
-        
-        // Extract file name from Supabase URL
-        const urlParts = imageData.image_url.split('/');
-        fileName = urlParts[urlParts.length - 1];
-        
-        // If the URL contains encoded characters, decode them
-        try {
-          fileName = decodeURIComponent(fileName);
-        } catch (decodeError) {
-          console.warn('Failed to decode filename, using original:', fileName);
-        }
+        fileName = extractStoragePathFromUrl(imageData.image_url);
+      }
+
+      if (fileName) {
+        fileName = normalizeStoragePath(fileName);
       }
 
       if (!fileName) {

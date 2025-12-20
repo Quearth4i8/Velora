@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { CharacterDraft } from '@/lib/types';
 import { characterAPI } from '@/lib/api';
 import { CharacterGalleryComponent } from '@/components/CharacterGallery';
 
-export default function CharacterGallery() {
+export default function SpecialCharacterGallery() {
   const params = useParams();
   const router = useRouter();
   const [character, setCharacter] = useState<CharacterDraft | null>(null);
@@ -25,6 +25,10 @@ export default function CharacterGallery() {
 
         const result = await characterAPI.getCharacter(characterId);
         if (result.success && result.data) {
+          if (result.data.characterType !== 'special') {
+            setError('Special Character Not Found');
+            return;
+          }
           setCharacter(result.data);
         } else {
           setError(result.error instanceof Error ? result.error : new Error(String(result.error)) || 'Failed to fetch character');
@@ -40,12 +44,7 @@ export default function CharacterGallery() {
   }, [params.id]);
 
   const handleBack = () => {
-    if (character?.characterType === 'special') {
-      router.push(`/special/${params.id}`);
-      return;
-    }
-
-    router.push(`/${params.id}`);
+    router.push(`/special/${params.id}`);
   };
 
   const handleCharacterUpdate = (updatedCharacter: CharacterDraft) => {

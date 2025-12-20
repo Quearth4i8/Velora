@@ -21,16 +21,18 @@ export const CHARACTER_CONFIG = {
 
   heights: [
     { label: 'Tiny', value: Height.TINY },
-    { label: 'Below Average', value: Height.BELOW_AVERAGE },
+    { label: 'Childlike', value: Height.CHILDLIKE },
+    { label: 'Petite', value: Height.PETITE },
     { label: 'Average', value: Height.AVERAGE },
     { label: 'Tall', value: Height.TALL },
-    { label: 'Giant', value: Height.GIANT },
   ],
 
   physiques: [
+    { label: 'Childlike', value: Physique.CHILDLIKE },
+    { label: 'Petite', value: Physique.PETITE },
     { label: 'Slim', value: Physique.SLIM },
     { label: 'Athletic', value: Physique.ATHLETIC },
-    { label: 'Average', value: Physique.AVERAGE },
+    { label: 'Thicc', value: Physique.THICC },
     { label: 'Curvy', value: Physique.CURVY },
     { label: 'BBW', value: Physique.BBW },
   ],
@@ -63,14 +65,24 @@ export const CHARACTER_CONFIG = {
 
   hairColors: [
     { label: 'Black', value: HairColor.BLACK },
+    { label: 'Dark Brown', value: HairColor.DARK_BROWN },
     { label: 'Brown', value: HairColor.BROWN },
+    { label: 'Light Brown', value: HairColor.LIGHT_BROWN },
     { label: 'Blonde', value: HairColor.BLONDE },
+    { label: 'Platinum Blonde', value: HairColor.PLATINUM_BLONDE },
+    { label: 'White', value: HairColor.WHITE },
     { label: 'Red', value: HairColor.RED },
+    { label: 'Auburn', value: HairColor.AUBURN },
+    { label: 'Orange', value: HairColor.ORANGE },
     { label: 'Purple', value: HairColor.PURPLE },
     { label: 'Pink', value: HairColor.PINK },
     { label: 'Blue', value: HairColor.BLUE },
+    { label: 'Teal', value: HairColor.TEAL },
     { label: 'Green', value: HairColor.GREEN },
+    { label: 'Turquoise', value: HairColor.TURQUOISE },
     { label: 'Silver', value: HairColor.SILVER },
+    { label: 'Gray', value: HairColor.GRAY },
+    { label: 'Lavender', value: HairColor.LAVENDER },
   ],
 
   eyeColors: [

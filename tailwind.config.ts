@@ -23,8 +23,8 @@ const config: Config = {
         },
       },
       boxShadow: {
-        glow: '0 0 20px rgba(139, 92, 246, 0.5)',
-        'glow-lg': '0 0 40px rgba(139, 92, 246, 0.6)',
+        glow: '0 0 20px rgba(236, 72, 153, 0.45)',
+        'glow-lg': '0 0 40px rgba(236, 72, 153, 0.55)',
       },
       animation: {
         'fade-in': 'fadeIn 0.3s ease-in-out',

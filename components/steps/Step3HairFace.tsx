@@ -3,7 +3,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { useCharacterBuilder } from '@/lib/store';
-import { HairStyle, HairColor, EyeColor, EyeType, ClothingStyle } from '@/lib/types';
+import { CharacterStyle, HairStyle, HairColor, EyeColor, EyeType, ClothingStyle } from '@/lib/types';
 import { ImageOptionCard } from '../ui/ImageOptionCard';
 import { OptionPill } from '../ui/OptionPill';
 import { ColorPicker } from '../ui/ColorPicker';
@@ -20,14 +20,24 @@ const hairStyleOptions = [
 
 const hairColors = [
   { label: 'Black', value: HairColor.BLACK },
+  { label: 'Dark Brown', value: HairColor.DARK_BROWN },
   { label: 'Brown', value: HairColor.BROWN },
+  { label: 'Light Brown', value: HairColor.LIGHT_BROWN },
   { label: 'Blonde', value: HairColor.BLONDE },
+  { label: 'Platinum Blonde', value: HairColor.PLATINUM_BLONDE },
+  { label: 'White', value: HairColor.WHITE },
   { label: 'Red', value: HairColor.RED },
+  { label: 'Auburn', value: HairColor.AUBURN },
+  { label: 'Orange', value: HairColor.ORANGE },
   { label: 'Purple', value: HairColor.PURPLE },
   { label: 'Pink', value: HairColor.PINK },
   { label: 'Blue', value: HairColor.BLUE },
+  { label: 'Teal', value: HairColor.TEAL },
   { label: 'Green', value: HairColor.GREEN },
+  { label: 'Turquoise', value: HairColor.TURQUOISE },
   { label: 'Silver', value: HairColor.SILVER },
+  { label: 'Gray', value: HairColor.GRAY },
+  { label: 'Lavender', value: HairColor.LAVENDER },
 ];
 
 const eyeColorOptions = [
@@ -40,15 +50,26 @@ const eyeColorOptions = [
   { id: EyeColor.VIOLET, label: 'Violet', image: '/images/eyes-violet.jpg' },
 ];
 
-const eyeTypeOptions = [
-  { id: EyeType.NORMAL, label: 'Normal', image: '/images/eyes-normal.jpg' },
-  { id: EyeType.SIREN, label: 'Siren', image: '/images/eyes-siren.jpg' },
-  { id: EyeType.FOX, label: 'Fox', image: '/images/eyes-fox.jpg' },
-  { id: EyeType.CAT, label: 'Cat', image: '/images/eyes-cat.jpg' },
-  { id: EyeType.DOE, label: 'Doe', image: '/images/eyes-doe.jpg' },
-  { id: EyeType.WOLF, label: 'Wolf', image: '/images/eyes-wolf.jpg' },
-  { id: EyeType.EAGLE, label: 'Eagle', image: '/images/eyes-eagle.jpg' },
-  { id: EyeType.DRAGON, label: 'Dragon', image: '/images/eyes-dragon.jpg' },
+const animeEyeTypeOptions = [
+  { id: EyeType.BIG_ROUND, label: 'Big round eyes' },
+  { id: EyeType.TAREME, label: 'Droopy eyes (tareme)' },
+  { id: EyeType.TSURIME, label: 'Sharp eyes (tsurime)' },
+  { id: EyeType.HALF_LIDDED, label: 'Half-lidded eyes' },
+  { id: EyeType.SLEEPY, label: 'Sleepy eyes' },
+  { id: EyeType.SPARKLY, label: 'Sparkly eyes' },
+  { id: EyeType.NARROW, label: 'Narrow eyes' },
+  { id: EyeType.PIERCING, label: 'Piercing eyes' },
+];
+
+const realisticEyeTypeOptions = [
+  { id: EyeType.NORMAL, label: 'Normal' },
+  { id: EyeType.FOX, label: 'Fox' },
+  { id: EyeType.SIREN, label: 'Siren' },
+  { id: EyeType.CAT, label: 'Cat' },
+  { id: EyeType.DOE, label: 'Doe' },
+  { id: EyeType.WOLF, label: 'Wolf' },
+  { id: EyeType.EAGLE, label: 'Eagle' },
+  { id: EyeType.DRAGON, label: 'Dragon' },
 ];
 
 const clothingOptions = [
@@ -64,6 +85,18 @@ const clothingOptions = [
 
 export const Step3HairFace: React.FC = () => {
   const { draft, setAppearance } = useCharacterBuilder();
+
+  const isAnimeStyle = draft.generation?.style === CharacterStyle.ANIME;
+  const eyeTypeOptions = isAnimeStyle ? animeEyeTypeOptions : realisticEyeTypeOptions;
+
+  React.useEffect(() => {
+    if (!draft.appearance.eyeType) return;
+
+    const allowedEyeTypes = new Set(eyeTypeOptions.map((option) => option.id));
+    if (!allowedEyeTypes.has(draft.appearance.eyeType)) {
+      setAppearance({ eyeType: null });
+    }
+  }, [draft.appearance.eyeType, eyeTypeOptions, setAppearance]);
 
   const handleHairStyleSelect = (style: HairStyle) => {
     setAppearance({ hairStyle: style });
@@ -95,7 +128,7 @@ export const Step3HairFace: React.FC = () => {
       <div>
         <h2 className="text-2xl font-bold text-white mb-2">Hair Style</h2>
         <p className="text-dark-400 mb-6">Choose your hair style</p>
-        <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-4">
           {hairStyleOptions.map((option) => (
             <ImageOptionCard
               key={option.id}
@@ -122,7 +155,7 @@ export const Step3HairFace: React.FC = () => {
       <div className="border-t border-dark-700 pt-8">
         <h2 className="text-2xl font-bold text-white mb-2">Eye Color</h2>
         <p className="text-dark-400 mb-6">Choose eye color</p>
-        <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-4">
           {eyeColorOptions.map((option) => (
             <ImageOptionCard
               key={option.id}
@@ -139,13 +172,11 @@ export const Step3HairFace: React.FC = () => {
       <div className="border-t border-dark-700 pt-8">
         <h2 className="text-2xl font-bold text-white mb-2">Eye Type</h2>
         <p className="text-dark-400 mb-6">Choose eye shape and style</p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="flex flex-wrap gap-3">
           {eyeTypeOptions.map((option) => (
-            <ImageOptionCard
+            <OptionPill
               key={option.id}
-              id={option.id}
               label={option.label}
-              imageUrl={option.image}
               isSelected={draft.appearance.eyeType === option.id}
               onClick={() => handleEyeTypeSelect(option.id as EyeType)}
             />
@@ -156,7 +187,7 @@ export const Step3HairFace: React.FC = () => {
       <div className="border-t border-dark-700 pt-8">
         <h2 className="text-2xl font-bold text-white mb-2">Clothing Style</h2>
         <p className="text-dark-400 mb-6">Choose clothing style</p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {clothingOptions.map((option) => (
             <ImageOptionCard
               key={option.id}

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { useCharacterBuilder } from '@/lib/store';
@@ -26,6 +26,12 @@ export function CharacterBuilder() {
   const totalSteps = 7;
   const currentStep = draft.currentStep || 0;
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [currentStep]);
+
   const handleNext = () => {
     if (currentStep < totalSteps - 1) {
       setCurrentStep(currentStep + 1);
@@ -41,10 +47,21 @@ export function CharacterBuilder() {
   };
 
   const handleGenerate = async () => {
-    if (!draft.generation?.style || !draft.generation?.model) {
-      setError('Please select a style and model before generating.');
+    if (!draft.generation?.style) {
+      setError('Please select an image style before generating.');
       return;
     }
+
+    const resolvedModel = draft.generation.model || automatic1111API.getModelForStyle(draft.generation.style);
+    const resolvedDraft = draft.generation.model
+      ? draft
+      : {
+          ...draft,
+          generation: {
+            ...draft.generation,
+            model: resolvedModel,
+          },
+        };
 
     setIsGenerating(true);
     setError(null);
@@ -53,7 +70,7 @@ export function CharacterBuilder() {
       console.log('Starting character creation with draft:', draft);
       
       // First create the character in the database
-      const createResult = await characterAPI.createCharacter(draft);
+      const createResult = await characterAPI.createCharacter(resolvedDraft);
       if (!createResult.success || !createResult.data) {
         console.error('Character creation failed:', createResult.error);
         throw new Error('Failed to create character');
@@ -63,7 +80,7 @@ export function CharacterBuilder() {
 
       // Update draft with character ID
       const characterWithId = {
-        ...draft,
+        ...resolvedDraft,
         id: createResult.data.id,
       };
 
@@ -88,17 +105,17 @@ export function CharacterBuilder() {
       case 0:
         return <Step1CoreIdentity />;
       case 1:
-        return <Step2BodyProportions />;
-      case 2:
-        return <Step3HairFace />;
-      case 3:
-        return <Step4BodyProportions />;
-      case 4:
-        return <Step4Personality />;
-      case 5:
         return <Step6Generation />;
+      case 2:
+        return <Step2BodyProportions />;
+      case 3:
+        return <Step3HairFace />;
+      case 4:
+        return <Step4BodyProportions />;
+      case 5:
+        return <Step4Personality />;
       case 6:
-        return <Step5Confirmation onConfirm={handleGenerate} isLoading={isGenerating} />;
+        return <Step5Confirmation />;
       default:
         return <Step1CoreIdentity />;
     }
@@ -107,19 +124,19 @@ export function CharacterBuilder() {
   const getStepTitle = () => {
     switch (currentStep) {
       case 0:
-        return 'Core Identity';
+        return 'Name & Age';
       case 1:
-        return 'Body Proportions';
+        return 'Image Style';
       case 2:
-        return 'Hair & Face';
+        return 'Background & Height';
       case 3:
-        return 'Body Shape';
+        return 'Hair, Eyes & Style';
       case 4:
-        return 'Personality';
+        return 'Body Shape';
       case 5:
-        return 'Generation Settings';
+        return 'Personality';
       case 6:
-        return 'Confirmation';
+        return 'Review & Generate';
       default:
         return 'Character Creation';
     }
@@ -128,19 +145,19 @@ export function CharacterBuilder() {
   const getStepDescription = () => {
     switch (currentStep) {
       case 0:
-        return 'Set the basic identity and name for your character';
+        return "Give your character a name and set their age";
       case 1:
-        return 'Define body type, height, and physical proportions';
+        return 'Choose anime, realistic, or artistic style';
       case 2:
-        return 'Choose hair style, color, eyes, and facial features';
+        return "Choose ethnicity, skin tone, and height";
       case 3:
-        return 'Select physique, chest size, and butt size';
+        return "Pick hair, eyes, and a default clothing style";
       case 4:
-        return 'Set personality traits and character archetype';
+        return 'Select physique, chest size, and butt size';
       case 5:
-        return 'Choose image style and AI model for generation';
+        return 'Set personality traits and character archetype';
       case 6:
-        return 'Review your character and generate the image';
+        return 'Review your character details, then generate';
       default:
         return 'Create your AI companion';
     }
@@ -149,18 +166,23 @@ export function CharacterBuilder() {
   const canProceed = () => {
     switch (currentStep) {
       case 0:
-        return draft.name && draft.identity.age;
+        return Boolean(draft.name?.trim()) && typeof draft.identity.age === 'number';
       case 1:
-        return draft.identity.ethnicity && draft.body.height && draft.identity.skinTone;
+        return Boolean(draft.generation?.style);
       case 2:
-        return draft.appearance.hairStyle && draft.appearance.hairColor && 
-               draft.appearance.eyeColor && draft.appearance.eyeType;
+        return Boolean(draft.identity.ethnicity) && Boolean(draft.body.height) && Boolean(draft.identity.skinTone);
       case 3:
-        return draft.body.physique && draft.body.chestSize && draft.body.buttSize;
+        return (
+          Boolean(draft.appearance.hairStyle) &&
+          Boolean(draft.appearance.hairColor) &&
+          Boolean(draft.appearance.eyeColor) &&
+          Boolean(draft.appearance.eyeType) &&
+          Boolean(draft.appearance.clothing)
+        );
       case 4:
-        return draft.personality.archetype;
+        return Boolean(draft.body.physique) && Boolean(draft.body.chestSize) && Boolean(draft.body.buttSize);
       case 5:
-        return draft.generation?.style && draft.generation?.model;
+        return Boolean(draft.personality.archetype);
       case 6:
         return true; // Confirmation step doesn't require additional validation
       default:
@@ -169,19 +191,21 @@ export function CharacterBuilder() {
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto">
+    <div className="w-full max-w-6xl mx-auto">
       {/* Progress Bar */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold text-white">{getStepTitle()}</h2>
+          <h2 className="text-2xl font-extrabold bg-gradient-to-r from-pink-300 via-pink-400 to-fuchsia-400 bg-clip-text text-transparent">
+            {getStepTitle()}
+          </h2>
           <span className="text-dark-400 text-sm">
             Step {currentStep + 1} of {totalSteps}
           </span>
         </div>
         
-        <div className="w-full bg-dark-800 rounded-full h-2">
+        <div className="w-full bg-dark-900/60 rounded-full h-2">
           <motion.div
-            className="bg-gradient-to-r from-purple-600 to-purple-500 h-2 rounded-full"
+            className="bg-gradient-to-r from-pink-600 to-fuchsia-500 h-2 rounded-full"
             initial={{ width: `${((currentStep) / totalSteps) * 100}%` }}
             animate={{ width: `${((currentStep + 1) / totalSteps) * 100}%` }}
             transition={{ duration: 0.5, ease: 'easeInOut' }}
@@ -204,17 +228,22 @@ export function CharacterBuilder() {
 
       {/* Step Content */}
       <div className="mb-8">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentStep}
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ duration: 0.3 }}
-          >
-            {renderStep()}
-          </motion.div>
-        </AnimatePresence>
+        <div className="relative overflow-hidden rounded-2xl border border-pink-500/10 bg-dark-800/40 backdrop-blur-sm p-6 shadow-2xl shadow-pink-500/5">
+          <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-pink-500/10 via-transparent to-fuchsia-500/10" />
+          <div className="relative">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentStep}
+                initial={{ opacity: 0, x: 50 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -50 }}
+                transition={{ duration: 0.3 }}
+              >
+                {renderStep()}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        </div>
       </div>
 
       {/* Navigation Buttons */}
@@ -225,7 +254,7 @@ export function CharacterBuilder() {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={handlePrevious}
-              className="px-6 py-3 bg-dark-800 text-white rounded-xl border border-dark-600 hover:bg-dark-700 transition-all duration-200"
+              className="px-6 py-3 bg-dark-900/40 text-white rounded-xl border border-pink-500/15 hover:border-pink-500/25 hover:bg-dark-800/60 transition-all duration-200"
             >
               Previous
             </motion.button>
@@ -241,7 +270,7 @@ export function CharacterBuilder() {
               disabled={!canProceed()}
               className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 ${
                 canProceed()
-                  ? 'bg-gradient-to-r from-purple-600 to-purple-500 text-white hover:from-purple-500 hover:to-purple-600 shadow-lg shadow-purple-500/20'
+                  ? 'bg-gradient-to-r from-pink-600 to-fuchsia-500 text-white hover:from-pink-500 hover:to-fuchsia-400 shadow-lg shadow-pink-500/20'
                   : 'bg-dark-800 text-dark-400 cursor-not-allowed'
               }`}
             >
@@ -260,7 +289,7 @@ export function CharacterBuilder() {
       </div>
 
       {/* Quick Actions */}
-      <div className="mt-8 pt-8 border-t border-dark-800">
+      <div className="mt-8 pt-8 border-t border-dark-700/60">
         <div className="flex items-center justify-between">
           <div className="text-dark-400 text-sm">
             Want to start over?{' '}
@@ -269,7 +298,7 @@ export function CharacterBuilder() {
                 resetDraft();
                 setError(null);
               }}
-              className="text-purple-400 hover:text-purple-300 transition-colors"
+              className="text-pink-400 hover:text-pink-300 transition-colors"
             >
               Reset Character
             </button>
@@ -279,7 +308,7 @@ export function CharacterBuilder() {
             Already have a character?{' '}
             <button
               onClick={() => router.push('/')}
-              className="text-purple-400 hover:text-purple-300 transition-colors"
+              className="text-pink-400 hover:text-pink-300 transition-colors"
             >
               Back to Home
             </button>

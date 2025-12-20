@@ -120,13 +120,22 @@ export class StorageService {
    */
   async deleteImage(fileName: string): Promise<boolean> {
     try {
+      let normalizedFileName = fileName.trim();
+      normalizedFileName = normalizedFileName.replace(/^\/+/, '');
+      normalizedFileName = normalizedFileName.split('?')[0].split('#')[0];
+      try {
+        normalizedFileName = decodeURIComponent(normalizedFileName);
+      } catch {
+        // ignore decode errors
+      }
+
       // Try multiple deletion methods since Supabase sometimes returns success without actually deleting
       let deletionSuccess = false;
       
       // Method 1: Standard deletion
       const { error } = await this.supabase.storage
         .from(this.bucketName)
-        .remove([fileName]);
+        .remove([normalizedFileName]);
 
       if (error) {
         console.error('Storage delete error:', error);
@@ -138,7 +147,7 @@ export class StorageService {
         const emptyBlob = new Blob([''], { type: 'text/plain' });
         const { error: uploadError } = await this.supabase.storage
           .from(this.bucketName)
-          .upload(fileName, emptyBlob, { 
+          .upload(normalizedFileName, emptyBlob, { 
             contentType: 'text/plain',
             upsert: true 
           });
@@ -147,7 +156,7 @@ export class StorageService {
           // Now try to delete the empty file
           const { error: deleteError } = await this.supabase.storage
             .from(this.bucketName)
-            .remove([fileName]);
+            .remove([normalizedFileName]);
             
           if (!deleteError) {
             deletionSuccess = true;
@@ -162,7 +171,7 @@ export class StorageService {
         try {
           const { error: pathError } = await this.supabase.storage
             .from(this.bucketName)
-            .remove([`/${fileName}`]);
+            .remove([`/${normalizedFileName}`]);
             
           if (!pathError) {
             deletionSuccess = true;
@@ -174,11 +183,19 @@ export class StorageService {
       
       // Verify file actually doesn't exist anymore
       try {
-        const { data: fileData } = await this.supabase.storage
+        const lastSlashIndex = normalizedFileName.lastIndexOf('/');
+        const listPath = lastSlashIndex >= 0 ? normalizedFileName.slice(0, lastSlashIndex) : '';
+        const searchName = lastSlashIndex >= 0 ? normalizedFileName.slice(lastSlashIndex + 1) : normalizedFileName;
+        const { data: fileData, error: listError } = await this.supabase.storage
           .from(this.bucketName)
-          .list('', { search: fileName });
+          .list(listPath, { search: searchName });
+
+        if (listError) {
+          console.error('Storage verify error:', listError);
+          return false;
+        }
         
-        const fileStillExists = fileData && fileData.some(file => file.name === fileName);
+        const fileStillExists = fileData && fileData.some(file => file.name === searchName);
         
         if (fileStillExists) {
           console.error('File still exists after deletion attempts - may need manual cleanup');
@@ -187,8 +204,7 @@ export class StorageService {
           deletionSuccess = true;
         }
       } catch (verifyError) {
-        // Verification error likely means file was deleted
-        deletionSuccess = true;
+        return false;
       }
 
       return deletionSuccess;

@@ -20,20 +20,18 @@ export enum Height {
   TINY = 'tiny',
   CHILDLIKE = 'childlike',
   PETITE = 'petite',
-  BELOW_AVERAGE = 'below_average',
   AVERAGE = 'average',
   TALL = 'tall',
-  GIANT = 'giant',
 }
 
 export enum Physique {
-  SLIM = 'slim',
-  ATHLETIC = 'athletic',
-  AVERAGE = 'average',
-  CURVY = 'curvy',
-  BBW = 'bbw',
   CHILDLIKE = 'childlike',
   PETITE = 'petite',
+  SLIM = 'slim',
+  ATHLETIC = 'athletic',
+  THICC = 'thicc',
+  CURVY = 'curvy',
+  BBW = 'bbw',
 }
 
 export enum ChestSize {
@@ -64,14 +62,24 @@ export enum HairStyle {
 
 export enum HairColor {
   BLACK = '#000000',
+  DARK_BROWN = '#2C1B0F',
   BROWN = '#8B4513',
+  LIGHT_BROWN = '#C68642',
   BLONDE = '#FFD700',
+  PLATINUM_BLONDE = '#F8F6E7',
+  WHITE = '#FFFFFF',
   RED = '#DC143C',
+  AUBURN = '#A52A2A',
+  ORANGE = '#FF8C00',
   PURPLE = '#800080',
   PINK = '#FF69B4',
   BLUE = '#0000FF',
+  TEAL = '#008080',
   GREEN = '#008000',
   SILVER = '#C0C0C0',
+  GRAY = '#808080',
+  TURQUOISE = '#40E0D0',
+  LAVENDER = '#E6E6FA',
 }
 
 export enum EyeColor {
@@ -93,6 +101,14 @@ export enum EyeType {
   WOLF = 'wolf',
   EAGLE = 'eagle',
   DRAGON = 'dragon',
+  BIG_ROUND = 'big_round',
+  TAREME = 'tareme',
+  TSURIME = 'tsurime',
+  HALF_LIDDED = 'half_lidded',
+  SLEEPY = 'sleepy',
+  SPARKLY = 'sparkly',
+  NARROW = 'narrow',
+  PIERCING = 'piercing',
 }
 
 export enum ClothingStyle {
@@ -171,9 +187,17 @@ export interface CharacterPersonality {
   traits: PersonalityTraits;
 }
 
+export type CharacterType = 'custom' | 'special';
+
 export interface CharacterDraft {
   id?: string;
   name?: string;
+  characterType?: CharacterType;
+  mainTag?: string;
+  loraName?: string;
+  loraWeight?: number | null;
+  specialPrompt?: string;
+  specialNegativePrompt?: string;
   currentStep: number;
   identity: CharacterIdentity;
   body: CharacterBody;

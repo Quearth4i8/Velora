@@ -11,36 +11,46 @@ const STYLE_TO_MODEL_MAP: Record<CharacterStyle, AIModel> = {
 
 const hexToColorName = (hex: string): string => {
   const colorMap: Record<string, string> = {
+    '#fff4e8': 'porcelain',
     '#ffe0bd': 'light beige',
+    '#ffcd94': 'light tan',
+    '#eac086': 'warm beige',
+    '#e0ac69': 'tan',
+    '#d99e6c': 'medium tan',
+    '#c58c6b': 'deep tan',
+    '#b97c4b': 'caramel',
+    '#a57c5a': 'brown',
+    '#8d5524': 'deep brown',
+    '#6b4423': 'dark brown',
+    '#4a2c1a': 'very dark brown',
     '#800080': 'purple',
     '#c0c0c0': 'silver',
-    '#ffd700': 'gold',
+    '#ffd700': 'blonde',
     '#000000': 'black',
     '#ffffff': 'white',
     '#ff0000': 'red',
+    '#dc143c': 'red',
+    '#ff69b4': 'pink',
     '#00ff00': 'green',
     '#0000ff': 'blue',
     '#ffff00': 'yellow',
     '#ff00ff': 'magenta',
-    '#00ffff': 'cyan',
-    '#ffa500': 'orange',
-    '#800000': 'maroon',
-    '#008000': 'dark green',
-    '#000080': 'navy',
-    '#808080': 'gray',
-    '#ffc0cb': 'pink',
-    '#a52a2a': 'brown',
-    '#808000': 'olive',
-    '#008080': 'teal',
-    '#dc143c': 'crimson red',
-    '#ff1493': 'deep pink',
     '#ff6347': 'tomato red',
     '#ff4500': 'orange red',
     '#daa520': 'goldenrod',
     '#b8860b': 'dark goldenrod',
     '#d2691e': 'chocolate',
     '#cd853f': 'peru',
-    '#8b4513': 'saddle brown',
+    '#8b4513': 'brown',
+    '#2c1b0f': 'dark brown',
+    '#c68642': 'light brown',
+    '#f8f6e7': 'platinum blonde',
+    '#ff8c00': 'orange',
+    '#40e0d0': 'turquoise',
+    '#a52a2a': 'auburn',
+    '#008000': 'green',
+    '#008080': 'teal',
+    '#808080': 'gray',
     '#a0522d': 'sienna',
     '#708090': 'slate gray',
     '#778899': 'light slate gray',
@@ -94,6 +104,15 @@ const getDimensionsFromAspectRatio = (aspectRatio: string) => {
   }
 };
 
+const hashStringToSeed = (input: string): number => {
+  let hash = 0;
+  for (let i = 0; i < input.length; i += 1) {
+    hash = (hash << 5) - hash + input.charCodeAt(i);
+    hash |= 0;
+  }
+  return hash >>> 0;
+};
+
 const getClothingDetails = (clothing: string, isCharacterGeneration: boolean = true): string => {
   const regularClothingMap: Record<string, string> = {
     'casual': 'jeans and t-shirt',
@@ -115,7 +134,6 @@ const getClothingDetails = (clothing: string, isCharacterGeneration: boolean = t
     'bodysuit': 'tight bodysuit, form-fitting',
   };
 
-  // For character generation, always use regular clothing
   if (isCharacterGeneration) {
     return regularClothingMap[clothing.toLowerCase()] || 'casual outfit';
   }
@@ -125,26 +143,53 @@ const getClothingDetails = (clothing: string, isCharacterGeneration: boolean = t
   return allClothingMap[clothing.toLowerCase()] || clothing;
 };
 
+const buildLoraTag = (loraName: string, loraWeight?: number | null): string => {
+  const weight = typeof loraWeight === 'number' && !Number.isNaN(loraWeight) ? loraWeight : 1;
+  return `<lora:${loraName}:${weight}>`;
+};
+
 const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
   const { identity, body, appearance, personality } = draft;
-  
+
   const stylePrompts = {
-    [CharacterStyle.ANIME]: 'lazypos, lazyhand, masterpiece, best quality, ultra-detailed, high quality anime art, illustration, clean lines, vibrant colors, solo character, single person, only one character, perfect hands, detailed fingers, proper hand anatomy, full body portrait',
-    [CharacterStyle.REALISTIC]: 'lazypos, lazyhand, masterpiece, best quality, ultra-realistic, photorealistic, professional photography, detailed, high resolution, 8k, solo character, single person, only one character, perfect hands, detailed fingers, proper hand anatomy, full body portrait',
-    [CharacterStyle.ARTISTIC]: 'lazypos, lazyhand, masterpiece, best quality, artistic, digital painting, concept art, detailed, stunning, high quality, solo character, single person, only one character, perfect hands, detailed fingers, proper hand anatomy, full body portrait',
+    [CharacterStyle.ANIME]: 'lazypos, masterpiece, best quality, ultra-detailed, high quality anime art, illustration, clean lines, vibrant colors, solo character, single person, only one character, perfect hands, detailed fingers, full body portrait',
+    [CharacterStyle.REALISTIC]: 'lazypos, masterpiece, best quality, ultra-realistic, photorealistic, professional photography, detailed, high resolution, 8k, solo character, single person, only one character, perfect hands, detailed fingers, full body portrait',
+    [CharacterStyle.ARTISTIC]: 'lazypos, masterpiece, best quality, artistic, digital painting, concept art, detailed, stunning, high quality, solo character, single person, only one character, perfect hands, detailed fingers, full body portrait',
   };
 
+  const isSpecialCharacter = draft.characterType === 'special';
+  const mainTag = draft.mainTag?.trim();
+  const loraName = draft.loraName?.trim();
+  const specialPrompt = draft.specialPrompt?.trim();
+
   // Basic characteristics
-  const age = identity.age ? `${identity.age} years old` : '';
+  const ageNumber = typeof identity.age === 'number' && Number.isFinite(identity.age) ? identity.age : null;
+  const age = ageNumber !== null ? `${ageNumber} years old` : '';
+  const isMinor = ageNumber !== null && ageNumber < 18;
+  const subjectDescriptor = isMinor ? 'girl' : 'woman';
+  const ageDescriptor =
+    ageNumber === null
+      ? ''
+      : ageNumber <= 12
+        ? 'child'
+        : ageNumber <= 17
+          ? 'teen'
+          : ageNumber <= 24
+            ? 'young adult'
+            : ageNumber <= 34
+              ? 'adult'
+              : ageNumber <= 44
+                ? 'mature adult'
+                : 'older adult';
   const ethnicity = identity.ethnicity?.toLowerCase() || '';
   const skinTone = identity.skinTone?.toLowerCase() || '';
-  
+
   // Body characteristics
   const height = body.height?.toLowerCase() || '';
-  const physique = body.physique?.toLowerCase() || '';
+  const physiqueRaw = body.physique?.toLowerCase() || '';
+  const physique = isMinor && ['thicc', 'curvy', 'bbw'].includes(physiqueRaw) ? 'petite' : physiqueRaw;
   const chestSize = body.chestSize?.toLowerCase() || '';
-  const buttSize = body.buttSize?.toLowerCase() || '';
-  
+
   // Appearance characteristics
   const hairStyle = appearance.hairStyle?.toLowerCase() || '';
   const hairColor = appearance.hairColor?.toLowerCase() || '';
@@ -152,36 +197,42 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
   const eyeType = appearance.eyeType?.toLowerCase() || '';
   const clothing = appearance.clothing?.toLowerCase() || '';
   const environment = appearance.environment?.toLowerCase().replace('_', ' ') || '';
-  
+
   // Personality characteristics
   const archetype = personality.archetype?.toLowerCase() || '';
-  
+
   // Build detailed personality description from traits
   const personalityTraits = [];
   if (personality.traits) {
     const { submissiveDominant, insecureConfident, coldPassionate, reservedOutgoing, seriousPlayful } = personality.traits;
-    
+
     if (submissiveDominant <= 3) personalityTraits.push('submissive');
     else if (submissiveDominant >= 7) personalityTraits.push('dominant');
-    
+
     if (insecureConfident <= 3) personalityTraits.push('insecure');
     else if (insecureConfident >= 7) personalityTraits.push('confident');
-    
+
     if (coldPassionate <= 3) personalityTraits.push('cold');
     else if (coldPassionate >= 7) personalityTraits.push('passionate');
-    
+
     if (reservedOutgoing <= 3) personalityTraits.push('reserved');
     else if (reservedOutgoing >= 7) personalityTraits.push('outgoing');
-    
+
     if (seriousPlayful <= 3) personalityTraits.push('serious');
     else if (seriousPlayful >= 7) personalityTraits.push('playful');
   }
-  
+
   const personalityDescription = personalityTraits.length > 0 ? personalityTraits.join(', ') : archetype;
 
   // Build comprehensive prompt
   let prompt = `${stylePrompts[style]}`;
-  
+
+  if (isSpecialCharacter) {
+    if (mainTag) prompt += `, ${mainTag}`;
+    if (loraName) prompt += `, ${buildLoraTag(loraName, draft.loraWeight)}`;
+    if (specialPrompt) prompt += `, ${specialPrompt}`;
+  }
+
   // Add basic info
   if (age) prompt += `, ${age}`;
   if (ethnicity) prompt += ` ${ethnicity}`;
@@ -189,16 +240,17 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
     const colorName = hexToColorName(skinTone);
     prompt += `, ${colorName} skin`;
   }
-  prompt += ` female`;
-  
+  prompt += `, ${subjectDescriptor}`;
+  if (ageDescriptor) prompt += `, ${ageDescriptor}`;
+
   // Add body characteristics
   if (height) prompt += `, ${height}`;
   if (physique) prompt += ` ${physique}`;
   if (chestSize) prompt += `, ${chestSize} breasts`;
-  
+
   // Add appearance characteristics
   if (clothing) {
-    const detailedClothing = getClothingDetails(clothing, false); 
+    const detailedClothing = getClothingDetails(clothing, false);
     prompt += `, wearing detailed ${detailedClothing}`;
   }
   if (hairStyle) prompt += `, ${hairStyle} hairstyle`;
@@ -218,20 +270,53 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
       'wolf': 'intense wolf eyes with piercing gaze',
       'eagle': 'sharp eagle eyes with keen vision',
       'dragon': 'mystical dragon eyes with power',
+      'big_round': 'big round anime eyes',
+      'tareme': 'droopy tareme eyes',
+      'tsurime': 'sharp tsurime eyes',
+      'half_lidded': 'half-lidded eyes',
+      'sleepy': 'sleepy eyes',
+      'sparkly': 'sparkly eyes',
+      'narrow': 'narrow eyes',
+      'piercing': 'piercing eyes',
     };
     const description = eyeTypeDescriptions[eyeType] || `${eyeType} eyes`;
     prompt += `, ${description}`;
   }
   if (environment) prompt += `, in ${environment} setting`;
-  
+
   // Add personality
   if (personalityDescription) prompt += `, ${personalityDescription} personality`;
 
   return prompt;
 };
 
-const buildNegativePrompt = (): string => {
-  return 'lazyneg, low quality, worst quality, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry, artist name, deformed, disfigured, malformed, mutated, ugly, disgusting, distorted, bad proportions, extra limbs, missing limbs, fused fingers, too many fingers, long neck, multiple characters, two characters, group, couple, duo, pair, more than one person, multiple people, crowd, friends';
+const buildNegativePrompt = (draft?: CharacterDraft): string => {
+  let negativePrompt = 'lazyneg, low quality, worst quality, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry, artist name, deformed, disfigured, malformed, mutated, ugly, disgusting, distorted, bad proportions, extra limbs, missing limbs, fused fingers, too many fingers, long neck, multiple characters, two characters, group, couple, duo, pair, more than one person, multiple people, crowd, friends';
+
+  const extraNegativePrompts: string[] = [];
+
+  const ageNumber =
+    typeof draft?.identity?.age === 'number' && Number.isFinite(draft.identity.age) ? draft.identity.age : null;
+  if (ageNumber !== null) {
+    if (ageNumber < 18) {
+      extraNegativePrompts.push('');
+    } else if (ageNumber <= 30) {
+      extraNegativePrompts.push('old, elderly, wrinkles, aged, middle aged');
+    } else if (ageNumber <= 45) {
+      extraNegativePrompts.push('elderly, deep wrinkles, aged');
+    }
+  }
+
+  if (draft?.generation?.negativePrompt) extraNegativePrompts.push(draft.generation.negativePrompt);
+  if (draft?.characterType === 'special' && draft.specialNegativePrompt) {
+    extraNegativePrompts.push(draft.specialNegativePrompt);
+  }
+
+  if (extraNegativePrompts.length > 0) {
+    negativePrompt += `, ${extraNegativePrompts.join(', ')}`;
+  }
+
+  return negativePrompt;
 };
 
 export const automatic1111API = {
@@ -291,7 +376,14 @@ export const automatic1111API = {
     }
 
     const prompt = buildPrompt(draft, style);
-    const negativePrompt = buildNegativePrompt();
+    const negativePrompt = buildNegativePrompt(draft);
+
+    const derivedSeed = typeof draft.id === 'string' && draft.id.length > 0 ? hashStringToSeed(draft.id) : undefined;
+    const requestedSeed = settings?.seed;
+    const seed =
+      requestedSeed === undefined || requestedSeed === null || requestedSeed === -1
+        ? derivedSeed ?? -1
+        : requestedSeed;
 
     const payload = {
       prompt,
@@ -302,7 +394,7 @@ export const automatic1111API = {
       cfg_scale: settings?.cfgScale || 8,
       sampler_name: settings?.sampler || 'DPM++ 2M Karras',
       model_name: model,
-      seed: settings?.seed || -1,
+      seed,
     };
 
     try {

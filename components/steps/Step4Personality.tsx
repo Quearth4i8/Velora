@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useCharacterBuilder } from '@/lib/store';
 import { PersonalityTraits } from '@/lib/types';
-import { Slider } from '@radix-ui/react-slider';
 
 interface PersonalityArchetype {
   id: string;
@@ -111,15 +110,15 @@ export const Step4Personality: React.FC = () => {
       <div>
         <h2 className="text-2xl font-bold text-white mb-2">Personality Archetype</h2>
         <p className="text-dark-400 mb-6">Select an archetype or customize</p>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           {archetypes.map((archetype) => (
             <motion.button
               key={archetype.id}
               onClick={() => handleArchetypeSelect(archetype)}
               className={`p-4 rounded-lg border-2 transition-all duration-300 text-center ${
                 draft.personality.archetype === archetype.id
-                  ? 'border-purple-500 bg-purple-500/10 shadow-glow'
-                  : 'border-dark-600 bg-dark-800 hover:border-purple-400'
+                  ? 'border-pink-500 bg-pink-500/10 shadow-lg shadow-pink-500/20'
+                  : 'border-dark-700 bg-dark-950/40 hover:border-pink-500/30'
               }`}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -143,21 +142,58 @@ export const Step4Personality: React.FC = () => {
             <div key={key} className="space-y-2">
               <div className="flex justify-between items-center">
                 <label className="text-sm font-medium text-dark-300">{left}</label>
-                <span className="text-xs text-purple-400 font-semibold">
+                <span className="text-xs text-pink-300 font-semibold">
                   {draft.personality.traits[key]}
                 </span>
                 <label className="text-sm font-medium text-dark-300">{right}</label>
               </div>
-              <Slider
-                value={[draft.personality.traits[key]]}
-                onValueChange={(value) => handleTraitChange(key, value[0])}
+              <input
+                type="range"
                 min={0}
                 max={100}
                 step={1}
-                className="w-full h-2 bg-dark-700 rounded-full cursor-pointer"
+                value={draft.personality.traits[key]}
+                onChange={(e) => handleTraitChange(key, Number(e.target.value))}
+                className="w-full h-2 rounded-full appearance-none cursor-pointer slider"
+                style={{
+                  background: `linear-gradient(to right, #ec4899 0%, #ec4899 ${draft.personality.traits[key]}%, #374151 ${draft.personality.traits[key]}%, #374151 100%)`,
+                }}
               />
             </div>
           ))}
+
+          <style jsx>{`
+            .slider::-webkit-slider-thumb {
+              appearance: none;
+              width: 18px;
+              height: 18px;
+              background: #ec4899;
+              border: 2px solid #fff;
+              border-radius: 9999px;
+              cursor: pointer;
+              box-shadow: 0 0 12px rgba(236, 72, 153, 0.45);
+            }
+
+            .slider::-moz-range-thumb {
+              width: 18px;
+              height: 18px;
+              background: #ec4899;
+              border: 2px solid #fff;
+              border-radius: 9999px;
+              cursor: pointer;
+              box-shadow: 0 0 12px rgba(236, 72, 153, 0.45);
+            }
+
+            .slider::-webkit-slider-thumb:hover {
+              background: #f472b6;
+              box-shadow: 0 0 16px rgba(236, 72, 153, 0.6);
+            }
+
+            .slider::-moz-range-thumb:hover {
+              background: #f472b6;
+              box-shadow: 0 0 16px rgba(236, 72, 153, 0.6);
+            }
+          `}</style>
         </motion.div>
       )}
     </motion.div>

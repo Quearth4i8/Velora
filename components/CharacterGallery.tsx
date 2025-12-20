@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CharacterDraft, ChatMessage, CharacterImage } from '@/lib/types';
 import { automatic1111API } from '@/lib/automatic1111';
@@ -38,14 +38,24 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
   });
 
   // Function to detect if an image is NSFW based on generation prompt
-  const isNSFWImage = (image: CharacterImage): boolean => {
+  const isNSFWImage = useCallback((image: CharacterImage): boolean => {
     if (!image.generationPrompt) return false;
     
     const nsfwKeywords = ['naked', 'nude', 'lingerie', 'bikini', 'underwear', 'revealing', 'bodysuit'];
     const prompt = image.generationPrompt.toLowerCase();
     
     return nsfwKeywords.some(keyword => prompt.includes(keyword));
-  };
+  }, []);
+
+  const filteredImages = useMemo(() => {
+    if (filter === 'all') return characterImages;
+    return characterImages.filter((image) => {
+      const nsfw = isNSFWImage(image);
+      if (filter === 'sfw') return !nsfw;
+      if (filter === 'nsfw') return nsfw;
+      return true;
+    });
+  }, [characterImages, filter, isNSFWImage]);
 
   // Load character images from gallery
   useEffect(() => {
@@ -53,6 +63,25 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
       loadCharacterImages();
     }
   }, [character.id]);
+
+  useEffect(() => {
+    if (isZoomed) {
+      setIsZoomed(false);
+      setZoomedImageIndex(0);
+    }
+  }, [filter]);
+
+  useEffect(() => {
+    if (filteredImages.length === 0 && isZoomed) {
+      setIsZoomed(false);
+      setZoomedImageIndex(0);
+      return;
+    }
+
+    if (zoomedImageIndex >= filteredImages.length && filteredImages.length > 0) {
+      setZoomedImageIndex(0);
+    }
+  }, [filteredImages.length, isZoomed, zoomedImageIndex]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -138,8 +167,10 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
 
   
   const handleImageClick = (index: number) => {
-    setZoomedImageIndex(index);
-    setIsZoomed(true);
+    if (index >= 0 && index < filteredImages.length) {
+      setZoomedImageIndex(index);
+      setIsZoomed(true);
+    }
   };
 
   const handleCloseZoom = () => {
@@ -147,11 +178,11 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
   };
 
   const handlePreviousImage = () => {
-    setZoomedImageIndex((prev: number) => (prev === 0 ? characterImages.length - 1 : prev - 1));
+    setZoomedImageIndex((prev: number) => (prev === 0 ? filteredImages.length - 1 : prev - 1));
   };
 
   const handleNextImage = () => {
-    setZoomedImageIndex((prev: number) => (prev === characterImages.length - 1 ? 0 : prev + 1));
+    setZoomedImageIndex((prev: number) => (prev === filteredImages.length - 1 ? 0 : prev + 1));
   };
 
   const handleSetAsPrimary = async (imageId: string) => {
@@ -355,15 +386,9 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
           </div>
         ) : (
           <div className="h-full overflow-y-auto p-8">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+            <div className="masonry-grid">
               <AnimatePresence>
-                {characterImages
-                  .filter(image => {
-                    if (filter === 'all') return true;
-                    if (filter === 'sfw') return !isNSFWImage(image);
-                    if (filter === 'nsfw') return isNSFWImage(image);
-                    return true;
-                  })
+                {filteredImages
                   .map((image, index) => (
                   <motion.div
                     key={image.id}
@@ -371,14 +396,14 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.8 }}
                     transition={{ delay: index * 0.1 }}
-                    className="group relative"
+                    className="masonry-item group relative"
                   >
                     <div className="relative overflow-hidden rounded-2xl border border-dark-700/50 bg-dark-800/30 cursor-pointer"
                      onClick={() => handleImageClick(index)}>
                       <img
                         src={image.imageUrl}
                         alt={`Character image ${index + 1}`}
-                        className={`w-full h-64 object-cover group-hover:scale-105 transition-transform duration-300 pointer-events-none ${
+                        className={`w-full h-auto object-cover group-hover:scale-105 transition-transform duration-300 pointer-events-none ${
                           isNSFWImage(image) && blurNSFW ? 'blur-lg' : ''
                         }`}
                       />
@@ -454,6 +479,70 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
                 ))}
               </AnimatePresence>
             </div>
+
+            <style jsx>{`
+              .masonry-grid {
+                column-count: 1;
+                column-gap: 1rem;
+                width: 100%;
+              }
+
+              .masonry-item {
+                break-inside: avoid;
+                margin-bottom: 1rem;
+                width: 100%;
+              }
+
+              @media (min-width: 640px) {
+                .masonry-grid {
+                  column-count: 2;
+                  column-gap: 1rem;
+                }
+                .masonry-item {
+                  margin-bottom: 1rem;
+                }
+              }
+
+              @media (min-width: 768px) {
+                .masonry-grid {
+                  column-count: 3;
+                  column-gap: 1.25rem;
+                }
+                .masonry-item {
+                  margin-bottom: 1.25rem;
+                }
+              }
+
+              @media (min-width: 1024px) {
+                .masonry-grid {
+                  column-count: 4;
+                  column-gap: 1.5rem;
+                }
+                .masonry-item {
+                  margin-bottom: 1.5rem;
+                }
+              }
+
+              @media (min-width: 1280px) {
+                .masonry-grid {
+                  column-count: 4;
+                  column-gap: 1.5rem;
+                }
+                .masonry-item {
+                  margin-bottom: 1.5rem;
+                }
+              }
+
+              @media (min-width: 1536px) {
+                .masonry-grid {
+                  column-count: 4;
+                  column-gap: 1.75rem;
+                }
+                .masonry-item {
+                  margin-bottom: 1.75rem;
+                }
+              }
+            `}</style>
           </div>
         )}
       </div>
@@ -511,7 +600,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
                     onChange={(e) => handleInputChange('identity.age', e.target.value)}
                     className="w-full px-4 py-3 bg-dark-700/50 text-white rounded-lg border border-dark-600 focus:border-pink-500 focus:outline-none transition-colors duration-200"
                     placeholder="Enter age..."
-                    min="18"
+                    min="0"
                     max="100"
                   />
                 </div>
@@ -586,10 +675,10 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
                   animate={{ scale: 1 }}
                   exit={{ scale: 0.9 }}
                   transition={{ duration: 0.3 }}
-                  src={characterImages[zoomedImageIndex]?.imageUrl}
+                  src={filteredImages[zoomedImageIndex]?.imageUrl}
                   alt={`Zoomed character image ${zoomedImageIndex + 1}`}
                   className={`max-w-full max-h-full object-contain rounded-lg ${
-                    characterImages[zoomedImageIndex] && isNSFWImage(characterImages[zoomedImageIndex]) && blurNSFW ? 'blur-lg' : ''
+                    filteredImages[zoomedImageIndex] && isNSFWImage(filteredImages[zoomedImageIndex]) && blurNSFW ? 'blur-lg' : ''
                   }`}
                 />
               
@@ -604,14 +693,14 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
               </button>
               
               {/* Navigation */}
-              {characterImages.length > 1 && (
+              {filteredImages.length > 1 && (
                 <>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       handlePreviousImage();
                     }}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-pink-500/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-pink-500/30 transition-colors"
+                    className="fixed left-8 top-1/2 -translate-y-1/2 w-12 h-12 bg-pink-500/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-pink-500/30 transition-colors z-50"
                   >
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -622,7 +711,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
                       e.stopPropagation();
                       handleNextImage();
                     }}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-pink-500/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-pink-500/30 transition-colors"
+                    className="fixed right-8 top-1/2 -translate-y-1/2 w-12 h-12 bg-pink-500/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-pink-500/30 transition-colors z-50"
                   >
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -631,7 +720,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
                   
                   {/* Image Counter */}
                   <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full text-white text-sm">
-                    {zoomedImageIndex + 1} / {characterImages.length}
+                    {zoomedImageIndex + 1} / {filteredImages.length}
                   </div>
                 </>
               )}

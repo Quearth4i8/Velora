@@ -1,4 +1,4 @@
-import { CharacterDraft } from './types';
+import { CharacterDraft, Height, Physique } from './types';
 
 export const serializeCharacter = (draft: CharacterDraft): Record<string, any> => {
   // Debug logging
@@ -25,6 +25,12 @@ export const serializeCharacter = (draft: CharacterDraft): Record<string, any> =
   
   const serialized = {
     name: draft.name,
+    character_type: draft.characterType || 'custom',
+    main_tag: draft.mainTag || null,
+    lora_name: draft.loraName || null,
+    lora_weight: draft.loraWeight ?? null,
+    special_prompt: draft.specialPrompt || null,
+    special_negative_prompt: draft.specialNegativePrompt || null,
     age: draft.identity.age,
     ethnicity: draft.identity.ethnicity,
     skin_tone: draft.identity.skinTone || null,
@@ -50,9 +56,30 @@ export const serializeCharacter = (draft: CharacterDraft): Record<string, any> =
 };
 
 export const deserializeCharacter = (data: Record<string, any>): CharacterDraft => {
+  const normalizeHeight = (value: any): Height | null => {
+    if (!value) return null;
+    if (value === 'below_average') return Height.PETITE;
+    if (value === 'giant') return Height.TALL;
+    if ((Object.values(Height) as string[]).includes(value)) return value as Height;
+    return null;
+  };
+
+  const normalizePhysique = (value: any): Physique | null => {
+    if (!value) return null;
+    if (value === 'average') return Physique.THICC;
+    if ((Object.values(Physique) as string[]).includes(value)) return value as Physique;
+    return null;
+  };
+
   return {
     id: data.id,
     name: data.name,
+    characterType: data.character_type || 'custom',
+    mainTag: data.main_tag || undefined,
+    loraName: data.lora_name || undefined,
+    loraWeight: data.lora_weight ?? undefined,
+    specialPrompt: data.special_prompt || undefined,
+    specialNegativePrompt: data.special_negative_prompt || undefined,
     currentStep: 5,
     identity: {
       age: data.age,
@@ -60,8 +87,8 @@ export const deserializeCharacter = (data: Record<string, any>): CharacterDraft 
       skinTone: data.skin_tone,
     },
     body: {
-      height: data.height,
-      physique: data.physique,
+      height: normalizeHeight(data.height),
+      physique: normalizePhysique(data.physique),
       chestSize: data.chest_size,
       buttSize: data.butt_size,
     },

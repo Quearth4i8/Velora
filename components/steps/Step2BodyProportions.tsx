@@ -17,14 +17,21 @@ const ethnicityOptions = [
 ];
 
 const skinToneOptions = [
-  { label: 'Very Light', value: '#FFE0BD' },
-  { label: 'Light', value: '#FFCD94' },
-  { label: 'Light Medium', value: '#EAC086' },
-  { label: 'Medium', value: '#D99E6C' },
-  { label: 'Medium Dark', value: '#C58C6B' },
-  { label: 'Dark', value: '#A57C5A' },
-  { label: 'Very Dark', value: '#8D5524' },
+  '#FFF4E8',
+  '#FFE0BD',
+  '#FFCD94',
+  '#EAC086',
+  '#E0AC69',
+  '#D99E6C',
+  '#C58C6B',
+  '#B97C4B',
+  '#A57C5A',
+  '#8D5524',
+  '#6B4423',
+  '#4A2C1A',
 ];
+
+const heightOptions = [Height.TINY, Height.CHILDLIKE, Height.PETITE, Height.AVERAGE, Height.TALL];
 
 export const Step2BodyProportions: React.FC = () => {
   const { draft, setIdentity, setBody } = useCharacterBuilder();
@@ -71,21 +78,18 @@ export const Step2BodyProportions: React.FC = () => {
         <div className="flex flex-wrap gap-4">
           {skinToneOptions.map((tone) => (
             <div
-              key={tone.value}
+              key={tone}
               className={`relative cursor-pointer rounded-lg border-2 transition-all ${
-                draft.identity.skinTone === tone.value
-                  ? 'border-purple-500 shadow-lg shadow-purple-500/20'
+                draft.identity.skinTone === tone
+                  ? 'border-pink-500 shadow-lg shadow-pink-500/20'
                   : 'border-dark-600 hover:border-dark-500'
               }`}
-              onClick={() => handleSkinToneSelect(tone.value)}
+              onClick={() => handleSkinToneSelect(tone)}
             >
               <div
                 className="w-20 h-20 rounded-md"
-                style={{ backgroundColor: tone.value }}
+                style={{ backgroundColor: tone }}
               />
-              <span className="absolute bottom-1 left-1/2 transform -translate-x-1/2 text-xs text-white bg-dark-900/80 px-2 py-1 rounded">
-                {tone.label}
-              </span>
             </div>
           ))}
         </div>
@@ -95,7 +99,7 @@ export const Step2BodyProportions: React.FC = () => {
         <h2 className="text-2xl font-bold text-white mb-2">Height</h2>
         <p className="text-dark-400 mb-6">Choose your character's height</p>
         <div className="flex flex-wrap gap-3">
-          {Object.values(Height).map((height) => (
+          {heightOptions.map((height) => (
             <OptionPill
               key={height}
               label={height.charAt(0).toUpperCase() + height.slice(1).replace(/_/g, ' ')}

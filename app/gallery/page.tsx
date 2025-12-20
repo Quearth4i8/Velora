@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Navbar } from '@/components/Navbar';
 import { AnimatedBackground } from '@/components/AnimatedBackground';
 import { characterAPI } from '@/lib/api';
-import { Ethnicity, Height, Physique, ChestSize, ButtSize, HairStyle, EyeType, ClothingStyle, Environment, HairColor, EyeColor } from '@/lib/types';
+import { CharacterStyle, Ethnicity, Height, Physique, ChestSize, ButtSize, HairStyle, EyeType, ClothingStyle, Environment, HairColor, EyeColor } from '@/lib/types';
 import { useBlurNSFW } from '@/lib/useBlurNSFW';
 
 export default function GalleryPage() {
@@ -34,13 +34,12 @@ export default function GalleryPage() {
   
   // Generation settings
   const [generationSettings, setGenerationSettings] = useState({
-    style: 'realistic',
+    style: CharacterStyle.REALISTIC,
     quality: 'standard',
     aspectRatio: '1:1',
     steps: 20,
     cfgScale: 7,
     sampler: 'DPM++ 2M Karras',
-    model: 'cyberrealisticPony_v140.safetensors',
     negativePrompt: '',
     seed: -1
   });
@@ -168,6 +167,7 @@ export default function GalleryPage() {
     };
 
       const dimensions = getDimensionsFromAspectRatio(generationSettings.aspectRatio || 'portrait');
+      const resolvedModel = automatic1111API.getModelForStyle(generationSettings.style);
       const payload = {
         prompt: getEnhancedPrompt(prompt, generationSettings.style),
         negative_prompt: `lazyneg, ${generationSettings.negativePrompt || 'low quality, worst quality, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry, artist name, deformed, disfigured, malformed, mutated, ugly, disgusting, distorted, bad proportions, extra limbs, missing limbs, fused fingers, too many fingers, long neck'}`,
@@ -177,7 +177,7 @@ export default function GalleryPage() {
         cfg_scale: generationSettings.cfgScale || 8,
         sampler_name: generationSettings.sampler || 'DPM++ 2M Karras',
         seed: generationSettings.seed === -1 ? -1 : generationSettings.seed,
-        model_name: generationSettings.model,
+        model_name: resolvedModel,
       };
 
       console.log('Generating image with prompt:', prompt);
@@ -250,7 +250,7 @@ export default function GalleryPage() {
               },
               generation: {
                 style: generationSettings.style as any,
-                model: generationSettings.model as any
+                model: resolvedModel as any
               },
               isGalleryOnly: true
             };
@@ -273,7 +273,7 @@ export default function GalleryPage() {
         targetCharacterId,
         base64Image,
         prompt,
-        generationSettings.model,
+        resolvedModel,
         generationSettings.style
       );
       
@@ -322,12 +322,12 @@ export default function GalleryPage() {
             <label className="block text-dark-300 text-xs font-medium mb-1">Style</label>
             <select
               value={generationSettings.style}
-              onChange={(e) => setGenerationSettings(prev => ({ ...prev, style: e.target.value }))}
+              onChange={(e) => setGenerationSettings(prev => ({ ...prev, style: e.target.value as CharacterStyle }))}
               className="w-full p-2 text-sm bg-dark-900 text-white rounded-lg border border-dark-700 focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
             >
-              <option value="realistic">Realistic</option>
-              <option value="anime">Anime</option>
-              <option value="artistic">Artistic</option>
+              <option value={CharacterStyle.REALISTIC}>Realistic</option>
+              <option value={CharacterStyle.ANIME}>Anime</option>
+              <option value={CharacterStyle.ARTISTIC}>Artistic</option>
             </select>
           </div>
 
@@ -355,19 +355,6 @@ export default function GalleryPage() {
               <option value="16:9">Landscape (16:9)</option>
               <option value="9:16">Portrait (9:16)</option>
               <option value="4:3">Wide (4:3)</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-dark-300 text-xs font-medium mb-1">Model</label>
-            <select
-              value={generationSettings.model}
-              onChange={(e) => setGenerationSettings(prev => ({ ...prev, model: e.target.value }))}
-              className="w-full p-2 text-sm bg-dark-900 text-white rounded-lg border border-dark-700 focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
-            >
-              <option value="cyberrealisticPony_v140.safetensors">CyberRealistic</option>
-              <option value="oneObsession_v18.safetensors">OneObsession</option>
-              <option value="perfectdeliberate_v30.safetensors">PerfectDeliberate</option>
             </select>
           </div>
 

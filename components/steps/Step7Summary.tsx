@@ -165,14 +165,10 @@ export const Step7Summary: React.FC<{ onConfirm: () => void; isLoading?: boolean
           transition={{ delay: 0.4 }}
         >
           <h3 className="text-xl font-semibold text-purple-400 mb-4">Generation Settings</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-1 gap-4 text-sm">
             <div>
               <p className="text-dark-400">Art Style</p>
               <p className="text-white font-medium">{formatValue(draft.generation?.style)}</p>
-            </div>
-            <div>
-              <p className="text-dark-400">AI Model</p>
-              <p className="text-white font-medium">{draft.generation?.model ? draft.generation.model.replace('.safetensors', '') : 'Not selected'}</p>
             </div>
           </div>
         </motion.div>

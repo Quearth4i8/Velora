@@ -3,7 +3,6 @@
 import React from 'react';
 import { useCharacterBuilder } from '@/lib/store';
 import { CharacterStyle, AIModel } from '@/lib/types';
-import { OptionPill } from '@/components/ui/OptionPill';
 import { PrimaryCTAButton } from '@/components/ui/PrimaryCTAButton';
 
 const STYLE_OPTIONS = [
@@ -27,24 +26,6 @@ const STYLE_OPTIONS = [
   },
 ];
 
-const MODEL_OPTIONS = [
-  {
-    id: AIModel.CYBERREALISTIC,
-    label: 'CyberRealistic',
-    description: 'Best for realistic characters',
-  },
-  {
-    id: AIModel.ONEOBSESSION,
-    label: 'OneObsession',
-    description: 'Perfect for anime style',
-  },
-  {
-    id: AIModel.PERFECTDELIBERATE,
-    label: 'PerfectDeliberate',
-    description: 'Great for artistic styles',
-  },
-];
-
 export function Step6ModelSelection({ onGenerate, isLoading }: { onGenerate: () => void; isLoading?: boolean }) {
   const { draft, setGeneration } = useCharacterBuilder();
 
@@ -58,7 +39,6 @@ export function Step6ModelSelection({ onGenerate, isLoading }: { onGenerate: () 
   };
 
   const selectedStyle = draft.generation?.style;
-  const selectedModel = draft.generation?.model;
 
   return (
     <div className="space-y-8">
@@ -96,7 +76,7 @@ export function Step6ModelSelection({ onGenerate, isLoading }: { onGenerate: () 
       {selectedStyle && (
         <div className="p-4 bg-green-500/20 border border-green-500/30 rounded-lg">
           <p className="text-green-400 text-sm">
-            ✓ Style selected. AI model automatically configured: {MODEL_OPTIONS.find(m => m.id === selectedModel)?.label}
+            ✓ Style selected. Ready to generate.
           </p>
         </div>
       )}

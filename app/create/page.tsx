@@ -20,7 +20,7 @@ export default function CreateCharacterPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           <div className="text-center mb-8">
             <h1 className="text-3xl md:text-4xl font-bold text-white mb-4">
               Create Your Character

@@ -7,13 +7,13 @@ import { Physique, ChestSize, ButtSize } from '@/lib/types';
 import { ImageOptionCard } from '../ui/ImageOptionCard';
 
 const physiqueOptions = [
-  { id: Physique.SLIM, label: 'Slim', image: '/images/physique-slim.jpg' },
-  { id: Physique.ATHLETIC, label: 'Athletic', image: '/images/physique-athletic.jpg' },
-  { id: Physique.AVERAGE, label: 'Average', image: '/images/physique-average.jpg' },
-  { id: Physique.CURVY, label: 'Curvy', image: '/images/physique-curvy.jpg' },
-  { id: Physique.BBW, label: 'BBW', image: '/images/physique-bbw.jpg' },
   { id: Physique.CHILDLIKE, label: 'Childlike', image: '/images/physique-childlike.jpg' },
   { id: Physique.PETITE, label: 'Petite', image: '/images/physique-petite.jpg' },
+  { id: Physique.SLIM, label: 'Slim', image: '/images/physique-slim.jpg' },
+  { id: Physique.ATHLETIC, label: 'Athletic', image: '/images/physique-athletic.jpg' },
+  { id: Physique.THICC, label: 'Thicc', image: '/images/physique-average.jpg' },
+  { id: Physique.CURVY, label: 'Curvy', image: '/images/physique-curvy.jpg' },
+  { id: Physique.BBW, label: 'BBW', image: '/images/physique-bbw.jpg' },
 ];
 
 const chestOptions = [

@@ -20,9 +20,9 @@ export const Modal: React.FC<ModalProps> = ({
   size = 'md',
 }) => {
   const sizeClasses = {
-    sm: 'max-w-sm',
-    md: 'max-w-md',
-    lg: 'max-w-lg',
+    sm: 'max-w-md',
+    md: 'max-w-2xl',
+    lg: 'max-w-4xl',
   };
 
   return (
@@ -30,18 +30,19 @@ export const Modal: React.FC<ModalProps> = ({
       {isOpen && (
         <>
           <motion.div
-            className="fixed inset-0 bg-black/50 z-40"
+            className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-          />
-          <motion.div
-            className={`fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 ${sizeClasses[size]} w-full mx-4`}
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
           >
+            <motion.div
+              className={`${sizeClasses[size]} w-full max-h-[70vh] overflow-y-auto`}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
+            >
             <div className="bg-dark-800 border border-dark-700 rounded-lg shadow-xl">
               <div className="flex items-center justify-between p-6 border-b border-dark-700">
                 <h2 className="text-xl font-semibold text-white">{title}</h2>
@@ -54,6 +55,7 @@ export const Modal: React.FC<ModalProps> = ({
               </div>
               <div className="p-6">{children}</div>
             </div>
+            </motion.div>
           </motion.div>
         </>
       )}

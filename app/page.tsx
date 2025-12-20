@@ -4,6 +4,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { CharacterSelection } from '@/components/CharacterSelection';
+import { SpecialCharacterSection } from '@/components/SpecialCharacterSection';
 import { Navbar } from '@/components/Navbar';
 import { PrimaryCTAButton } from '@/components/ui/PrimaryCTAButton';
 import { SearchBar } from '@/components/ui/SearchBar';
@@ -123,6 +124,14 @@ export default function Home() {
 
       {/* Character Gallery Section */}
       <div className="container mx-auto px-4 pb-16">
+        <SpecialCharacterSection
+          onSelectCharacter={(character) => {
+            if (character.id) {
+              window.location.href = `/special/${character.id}`;
+            }
+          }}
+        />
+
         <CharacterSelection 
           onSelectCharacter={(character) => {
             if (character.id) {
