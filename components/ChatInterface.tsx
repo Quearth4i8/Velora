@@ -413,14 +413,14 @@ export function ChatInterface({ character, onBack }: ChatInterfaceProps) {
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {[
-                    { id: 'casual', label: 'Casual', image: '/images/clothing-casual.jpg', description: 'Everyday wear - comfortable jeans and t-shirt perfect for daily activities' },
-                    { id: 'formal', label: 'Formal', image: '/images/clothing-formal.jpg', description: 'Elegant evening wear - sophisticated dress and heels for special occasions' },
-                    { id: 'sporty', label: 'Sporty', image: '/images/clothing-sporty.jpg', description: 'Athletic wear - comfortable shorts and sports bra for active lifestyle' },
-                    { id: 'elegant', label: 'Elegant', image: '/images/clothing-elegant.jpg', description: 'High fashion - stunning evening gown with jewelry for formal events' },
-                    { id: 'cute', label: 'Cute', image: '/images/clothing-cute.jpg', description: 'Adorable style - colorful sundress and sandals for a sweet look' },
-                    { id: 'edgy', label: 'Edgy', image: '/images/clothing-edgy.jpg', description: 'Alternative fashion - leather jacket and ripped jeans for bold style' },
-                    { id: 'traditional', label: 'Traditional', image: '/images/clothing-traditional.jpg', description: 'Cultural attire - traditional dress with authentic accessories' },
-                    { id: 'fantasy', label: 'Fantasy', image: '/images/clothing-fantasy.jpg', description: 'Magical style - mystical robes and enchanting accessories' }
+                    { id: 'casual', label: 'Casual', image: '/images/clothing-casual.jpg', description: 'Flirty everyday look - tight low-rise jeans hugging curves, cropped tank top showing a hint of midriff, casual yet teasingly sexy' },
+{ id: 'formal', label: 'Formal', image: '/images/clothing-formal.jpg', description: 'Sultry evening elegance - form-fitting cocktail dress with deep V-neckline, thigh-high slit, paired with strappy heels for a sophisticated allure' },
+{ id: 'sporty', label: 'Sporty', image: '/images/clothing-sporty.jpg', description: 'Sexy athletic vibe - high-waisted leggings that accentuate the hips and thighs, supportive sports bra with plunging neckline, perfect for a confident workout glow' },
+{ id: 'elegant', label: 'Elegant', image: '/images/clothing-elegant.jpg', description: 'Graceful sensuality - sleek satin gown that drapes beautifully over curves, subtle backless design, delicate straps, and tasteful side slit for refined allure' },
+{ id: 'cute', label: 'Cute', image: '/images/clothing-cute.jpg', description: 'Playful and flirty - short pleated skirt with a fitted off-shoulder top, soft pastel colors, and a touch of lace for an irresistibly sweet yet teasing charm' },
+{ id: 'edgy', label: 'Edgy', image: '/images/clothing-edgy.jpg', description: 'Bold and provocative - cropped leather jacket over a lace bralette, distressed skinny jeans with strategic rips, combat boots for a fierce, seductive edge' },
+{ id: 'traditional', label: 'Traditional', image: '/images/clothing-traditional.jpg', description: 'Timeless beauty with allure - elegantly draped traditional attire that flatters the figure, subtle sheer accents and intricate embroidery highlighting graceful curves' },
+{ id: 'fantasy', label: 'Fantasy', image: '/images/clothing-fantasy.jpg', description: 'Enchanting seduction - flowing ethereal dress with delicate sheer layers, corset-style bodice accentuating the waist, mystical jewelry for a captivating otherworldly charm' }
                   ].map((outfit) => (
                     <motion.button
                       key={outfit.id}

@@ -1,4 +1,16 @@
-import { AgeGroup, Ethnicity, Height, Physique, ChestSize, ButtSize, HairStyle, HairColor, EyeColor } from '@/lib/types';
+import { AgeGroup, Ethnicity, Height, Physique, ChestSize, ButtSize, HairStyle, HairColor, EyeColor, CharacterStyle } from '@/lib/types';
+
+type LoraPreset = {
+  id: string;
+  label: string;
+  description?: string;
+  mainTag?: string;
+  specialPrompt?: string;
+  loraNames?: string[];
+  loraName?: string;
+  loraWeight?: number | null;
+  imageSrc?: string;
+};
 
 export const CHARACTER_CONFIG = {
   ageGroups: [
@@ -23,6 +35,7 @@ export const CHARACTER_CONFIG = {
     { label: 'Tiny', value: Height.TINY },
     { label: 'Childlike', value: Height.CHILDLIKE },
     { label: 'Petite', value: Height.PETITE },
+    { label: 'Small', value: Height.SMALL },
     { label: 'Average', value: Height.AVERAGE },
     { label: 'Tall', value: Height.TALL },
   ],
@@ -55,6 +68,7 @@ export const CHARACTER_CONFIG = {
 
   hairStyles: [
     { label: 'Straight', value: HairStyle.STRAIGHT },
+    { label: 'Long', value: HairStyle.LONG },
     { label: 'Bangs', value: HairStyle.BANGS },
     { label: 'Braids', value: HairStyle.BRAIDS },
     { label: 'Curly', value: HairStyle.CURLY },
@@ -72,6 +86,7 @@ export const CHARACTER_CONFIG = {
     { label: 'Platinum Blonde', value: HairColor.PLATINUM_BLONDE },
     { label: 'White', value: HairColor.WHITE },
     { label: 'Red', value: HairColor.RED },
+    { label: 'Maroon', value: HairColor.MAROON },
     { label: 'Auburn', value: HairColor.AUBURN },
     { label: 'Orange', value: HairColor.ORANGE },
     { label: 'Purple', value: HairColor.PURPLE },
@@ -193,6 +208,177 @@ export const CHARACTER_CONFIG = {
       default: 50,
     },
   ],
+
+  imageStylePresets: {
+    [CharacterStyle.ANIME]: [
+      {
+        id: 'lamia',
+        label: 'Lamia',
+        mainTag: 'lamia',
+        specialPrompt: 'lamia, snake woman, anime fantasy girl, serpent tail, mythical creature',
+        loraName: 'lamia.safetensors',
+        loraWeight: 0.7,
+      },
+      {
+        id: 'harpy',
+        label: 'Harpy',
+        mainTag: 'harpy',
+        specialPrompt: 'Harpy, wings, talons, monster girl, winged arms, feathered wings, bird legs,',
+        loraName: 'harpy.safetensors',
+        loraWeight: 0.7,
+      },
+      {
+        id: 'centaur',
+        label: 'Centaur',
+        mainTag: 'centaur',
+        specialPrompt: 'deer taur, monster girl, deer body, detailed fur',
+        loraName: 'centaur.safetensors',
+        loraWeight: 0.8,
+      },
+      {
+        id: 'goblin-girl',
+        label: 'Goblin Girl',
+        mainTag: 'goblin girl',
+        specialPrompt:
+          'female goblin, colored skin, green skin, freckles, long pointed ears, wide hips, large breasts, sharp teeth',
+        loraName: 'goblina.safetensors',
+        loraWeight: 0.9,
+      },
+      {
+        id: 'elf',
+        label: 'Elf',
+        mainTag: 'elf',
+        specialPrompt: 'long pointed ears, longer ears, slender figure, long legs',
+        loraName: undefined,
+        loraWeight: null,
+      },
+      {
+        id: 'fairy',
+        label: 'Fairy',
+        mainTag: 'fairy',
+        specialPrompt: 'butterfly wings, blue wings, fairy, fairymge, pointy ears, fairy wings, mini person, size difference',
+        loraName: 'fairy.safetensors',
+        loraWeight: 1,
+      },
+      {
+        id: 'demon',
+        label: 'Demon',
+        mainTag: 'demon',
+        specialPrompt:
+          'demonmge, demon girl, monster girl, pointy ears, demon tail, demon wings, demon horns, colored skin, blue skin, colored sclera, black sclera, spade-tipped tail, prehensile tail, claws, dark purple wings, dark purple tail',
+        loraName: 'demon.safetensors',
+        loraWeight: 0.8,
+      },
+      {
+        id: 'succubus',
+        label: 'Succubus',
+        mainTag: 'succubus',
+        specialPrompt:
+          'succubus, demon girl, monster girl, pointy ears, demon tail, demon horns, colored skin, blue skin, colored sclera, black sclera, spade-tipped tail, prehensile tail, claws, dark purple tail, no wings, small horns, womb tattoo',
+        loraNames: ['demon.safetensors', 'womb_tattoo.safetensors'],
+        loraName: undefined,
+        loraWeight: 0.8,
+      },
+    ] as LoraPreset[],
+    [CharacterStyle.ARTISTIC]: [
+      {
+        id: 'lamia',
+        label: 'Lamia',
+        mainTag: 'lamia',
+        specialPrompt: 'lamia, snake woman, anime fantasy girl, serpent tail, mythical creature',
+        loraName: 'lamia.safetensors',
+        loraWeight: 0.7,
+      },
+      {
+        id: 'harpy',
+        label: 'Harpy',
+        mainTag: 'harpy',
+        specialPrompt: 'Harpy, wings, talons, monster girl, winged arms, feathered wings, bird legs,',
+        loraName: 'harpy.safetensors',
+        loraWeight: 0.7,
+      },
+      {
+        id: 'centaur',
+        label: 'Centaur',
+        mainTag: 'centaur',
+        specialPrompt: 'deer taur, monster girl, deer body, detailed fur',
+        loraName: 'centaur.safetensors',
+        loraWeight: 0.8,
+      },
+      {
+        id: 'goblin-girl',
+        label: 'Goblin Girl',
+        mainTag: 'goblin girl',
+        specialPrompt:
+          'female goblin, colored skin, green skin, freckles, long pointed ears, wide hips, large breasts, sharp teeth',
+        loraName: 'goblina.safetensors',
+        loraWeight: 0.9,
+      },
+      {
+        id: 'elf',
+        label: 'Elf',
+        mainTag: 'elf',
+        specialPrompt: 'long pointed ears, longer ears, slender figure, long legs',
+        loraName: undefined,
+        loraWeight: null,
+      },
+      {
+        id: 'fairy',
+        label: 'Fairy',
+        mainTag: 'fairy',
+        specialPrompt: 'butterfly wings, blue wings, fairy, fairymge, pointy ears, fairy wings, mini person, size difference',
+        loraName: 'fairy.safetensors',
+        loraWeight: 1,
+      },
+      {
+        id: 'demon',
+        label: 'Demon',
+        mainTag: 'demon',
+        specialPrompt:
+          'demonmge, demon girl, monster girl, pointy ears, demon tail, demon wings, demon horns, colored skin, blue skin, colored sclera, black sclera, spade-tipped tail, prehensile tail, claws, dark purple wings, dark purple tail',
+        loraName: 'demon.safetensors',
+        loraWeight: 0.8,
+      },
+      {
+        id: 'succubus',
+        label: 'Succubus',
+        mainTag: 'succubus',
+        specialPrompt:
+          'succubus, demon girl, monster girl, pointy ears, demon tail, demon horns, colored skin, blue skin, colored sclera, black sclera, spade-tipped tail, prehensile tail, claws, dark purple tail, no wings, small horns, womb tattoo',
+        loraNames: ['demon.safetensors', 'womb_tattoo.safetensors'],
+        loraName: undefined,
+        loraWeight: 0.8,
+      },
+    ] as LoraPreset[],
+    [CharacterStyle.REALISTIC]: [
+      {
+        id: 'goth',
+        label: 'Goth',
+        mainTag: 'goth',
+        specialPrompt: 'goth girl, bold makeup',
+        loraName: 'goth.safetensors',
+        loraWeight: 0.7,
+      },
+      {
+        id: 'vampire',
+        label: 'Vampire',
+        mainTag: 'vampire',
+        specialPrompt:
+          'Vampire Fangs, cute freckled vampire woman, Extremely high-resolution details, photographic, realism pushed to extreme, fine texture,',
+        loraName: 'vampire.safetensors',
+        loraWeight: 0.8,
+      },
+      {
+        id: 'cyberpunk-girl',
+        label: 'Cyberpunk Girl',
+        mainTag: 'cyberpunk girl',
+        specialPrompt:
+          'cyberpunk girls style, neon lights, high detail, vibrant colors, cybernetic fashion, gritty sci-fi aesthetic',
+        loraName: 'cyber.safetensors',
+        loraWeight: 0.6,
+      },
+    ] as LoraPreset[],
+  },
 };
 
 export type CharacterConfig = typeof CHARACTER_CONFIG;

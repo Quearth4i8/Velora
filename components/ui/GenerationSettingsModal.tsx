@@ -100,9 +100,9 @@ export function GenerationSettingsModal({
                   className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white text-sm"
                 >
                   <option value="portrait">Portrait (768x1024)</option>
-                  <option value="landscape">Landscape (1024x768)</option>
+                  <option value="landscape">Landscape (1024x576)</option>
                   <option value="square">Square (896x896)</option>
-                  <option value="cinematic">Cinematic (832x1216)</option>
+                  <option value="cinematic">Cinematic (1216x512)</option>
                   <option value="mobile">Mobile (720x1280)</option>
                 </select>
               </div>

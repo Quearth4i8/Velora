@@ -265,7 +265,7 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
                   onClick={() => handleSelectCharacter(character)}
                 >
                   {/* Character Image Section - Full height card */}
-                  <div className="relative h-80 bg-gradient-to-br from-purple-600/10 to-purple-500/10 overflow-hidden">
+                  <div className="relative h-full min-h-96 bg-gradient-to-br from-purple-600/10 to-purple-500/10 overflow-hidden">
                     {character.generation?.generatedImage ? (
                       <>
                         <img 

@@ -9,13 +9,14 @@ import { OptionPill } from '../ui/OptionPill';
 import { ColorPicker } from '../ui/ColorPicker';
 
 const hairStyleOptions = [
-  { id: HairStyle.STRAIGHT, label: 'Straight', image: '/images/hair-straight.jpg' },
-  { id: HairStyle.BANGS, label: 'Bangs', image: '/images/hair-bangs.jpg' },
-  { id: HairStyle.BRAIDS, label: 'Braids', image: '/images/hair-braids.jpg' },
-  { id: HairStyle.CURLY, label: 'Curly', image: '/images/hair-curly.jpg' },
-  { id: HairStyle.BUN, label: 'Bun', image: '/images/hair-bun.jpg' },
-  { id: HairStyle.PONYTAIL, label: 'Ponytail', image: '/images/hair-ponytail.jpg' },
-  { id: HairStyle.BOB, label: 'Bob', image: '/images/hair-bob.jpg' },
+  { id: HairStyle.LONG, label: 'Long', image: '/hair/long hair.jpg' },
+  { id: HairStyle.STRAIGHT, label: 'Straight', image: '/hair/straight hair.jpg' },
+  { id: HairStyle.BANGS, label: 'Bangs', image: '/hair/bangs hair.jpg' },
+  { id: HairStyle.BRAIDS, label: 'Braids', image: '/hair/braids hair.jpg' },
+  { id: HairStyle.CURLY, label: 'Curly', image: '/hair/curly hair.jpg' },
+  { id: HairStyle.BUN, label: 'Bun', image: '/hair/bun hair.jpg' },
+  { id: HairStyle.PONYTAIL, label: 'Ponytail', image: '/hair/ponytail hair.jpg' },
+  { id: HairStyle.BOB, label: 'Bob', image: '/hair/bob hair.jpg' },
 ];
 
 const hairColors = [
@@ -27,6 +28,7 @@ const hairColors = [
   { label: 'Platinum Blonde', value: HairColor.PLATINUM_BLONDE },
   { label: 'White', value: HairColor.WHITE },
   { label: 'Red', value: HairColor.RED },
+  { label: 'Maroon', value: HairColor.MAROON },
   { label: 'Auburn', value: HairColor.AUBURN },
   { label: 'Orange', value: HairColor.ORANGE },
   { label: 'Purple', value: HairColor.PURPLE },
@@ -41,35 +43,35 @@ const hairColors = [
 ];
 
 const eyeColorOptions = [
-  { id: EyeColor.BROWN, label: 'Brown', image: '/images/eyes-brown.jpg' },
-  { id: EyeColor.BLUE, label: 'Blue', image: '/images/eyes-blue.jpg' },
-  { id: EyeColor.GREEN, label: 'Green', image: '/images/eyes-green.jpg' },
-  { id: EyeColor.HAZEL, label: 'Hazel', image: '/images/eyes-hazel.jpg' },
-  { id: EyeColor.GRAY, label: 'Gray', image: '/images/eyes-gray.jpg' },
-  { id: EyeColor.AMBER, label: 'Amber', image: '/images/eyes-amber.jpg' },
-  { id: EyeColor.VIOLET, label: 'Violet', image: '/images/eyes-violet.jpg' },
+  { id: EyeColor.BROWN, label: 'Brown', image: '/eyes/brown eye.jpg' },
+  { id: EyeColor.BLUE, label: 'Blue', image: '/eyes/blue eye.jpg' },
+  { id: EyeColor.GREEN, label: 'Green', image: '/eyes/green eye.jpg' },
+  { id: EyeColor.HAZEL, label: 'Hazel', image: '/eyes/hazel eye.jpg' },
+  { id: EyeColor.GRAY, label: 'Gray', image: '/eyes/grey eye.jpg' },
+  { id: EyeColor.AMBER, label: 'Amber', image: '/eyes/amber eye.jpg' },
+  { id: EyeColor.VIOLET, label: 'Violet', image: '/eyes/violet eye.jpg' },
 ];
 
 const animeEyeTypeOptions = [
-  { id: EyeType.BIG_ROUND, label: 'Big round eyes' },
-  { id: EyeType.TAREME, label: 'Droopy eyes (tareme)' },
-  { id: EyeType.TSURIME, label: 'Sharp eyes (tsurime)' },
-  { id: EyeType.HALF_LIDDED, label: 'Half-lidded eyes' },
-  { id: EyeType.SLEEPY, label: 'Sleepy eyes' },
-  { id: EyeType.SPARKLY, label: 'Sparkly eyes' },
-  { id: EyeType.NARROW, label: 'Narrow eyes' },
-  { id: EyeType.PIERCING, label: 'Piercing eyes' },
+  { id: EyeType.BIG_ROUND, label: 'Big round eyes', image: '/images/velora.png' },
+  { id: EyeType.TAREME, label: 'Droopy eyes (tareme)', image: '/images/velora.png' },
+  { id: EyeType.TSURIME, label: 'Sharp eyes (tsurime)', image: '/images/velora.png' },
+  { id: EyeType.HALF_LIDDED, label: 'Half-lidded eyes', image: '/images/velora.png' },
+  { id: EyeType.SLEEPY, label: 'Sleepy eyes', image: '/images/velora.png' },
+  { id: EyeType.SPARKLY, label: 'Sparkly eyes', image: '/images/velora.png' },
+  { id: EyeType.NARROW, label: 'Narrow eyes', image: '/images/velora.png' },
+  { id: EyeType.PIERCING, label: 'Piercing eyes', image: '/images/velora.png' },
 ];
 
 const realisticEyeTypeOptions = [
-  { id: EyeType.NORMAL, label: 'Normal' },
-  { id: EyeType.FOX, label: 'Fox' },
-  { id: EyeType.SIREN, label: 'Siren' },
-  { id: EyeType.CAT, label: 'Cat' },
-  { id: EyeType.DOE, label: 'Doe' },
-  { id: EyeType.WOLF, label: 'Wolf' },
-  { id: EyeType.EAGLE, label: 'Eagle' },
-  { id: EyeType.DRAGON, label: 'Dragon' },
+  { id: EyeType.NORMAL, label: 'Normal', image: '/images/velora.png' },
+  { id: EyeType.FOX, label: 'Fox', image: '/images/velora.png' },
+  { id: EyeType.SIREN, label: 'Siren', image: '/images/velora.png' },
+  { id: EyeType.CAT, label: 'Cat', image: '/images/velora.png' },
+  { id: EyeType.DOE, label: 'Doe', image: '/images/velora.png' },
+  { id: EyeType.WOLF, label: 'Wolf', image: '/images/velora.png' },
+  { id: EyeType.EAGLE, label: 'Eagle', image: '/images/velora.png' },
+  { id: EyeType.DRAGON, label: 'Dragon', image: '/images/velora.png' },
 ];
 
 const clothingOptions = [
@@ -128,7 +130,7 @@ export const Step3HairFace: React.FC = () => {
       <div>
         <h2 className="text-2xl font-bold text-white mb-2">Hair Style</h2>
         <p className="text-dark-400 mb-6">Choose your hair style</p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
           {hairStyleOptions.map((option) => (
             <ImageOptionCard
               key={option.id}
@@ -172,11 +174,13 @@ export const Step3HairFace: React.FC = () => {
       <div className="border-t border-dark-700 pt-8">
         <h2 className="text-2xl font-bold text-white mb-2">Eye Type</h2>
         <p className="text-dark-400 mb-6">Choose eye shape and style</p>
-        <div className="flex flex-wrap gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
           {eyeTypeOptions.map((option) => (
-            <OptionPill
+            <ImageOptionCard
               key={option.id}
+              id={option.id}
               label={option.label}
+              imageUrl={option.image}
               isSelected={draft.appearance.eyeType === option.id}
               onClick={() => handleEyeTypeSelect(option.id as EyeType)}
             />

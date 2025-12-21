@@ -8,11 +8,18 @@ import { characterAPI } from '@/lib/api';
 import { CharacterStyle, Ethnicity, Height, Physique, ChestSize, ButtSize, HairStyle, EyeType, ClothingStyle, Environment, HairColor, EyeColor } from '@/lib/types';
 import { useBlurNSFW } from '@/lib/useBlurNSFW';
 import { useDialog } from '@/components/ui/DialogProvider';
+import { Eye, Sparkles } from 'lucide-react';
 
 export default function GalleryPage() {
   const [filter, setFilter] = useState<'all' | 'sfw' | 'nsfw'>('all');
   const [prompt, setPrompt] = useState('');
+  const [specialPrompt, setSpecialPrompt] = useState('');
+  const [specialNegativePrompt, setSpecialNegativePrompt] = useState('');
+  const [specialFocus, setSpecialFocus] = useState<'custom' | 'eyes' | 'face' | 'scene' | 'object'>('eyes');
+  const [specialRawPrompt, setSpecialRawPrompt] = useState(false);
+  const [specialOpen, setSpecialOpen] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSpecialGenerating, setIsSpecialGenerating] = useState(false);
   const [communityImages, setCommunityImages] = useState<any[]>([]);
   const [isLoadingImages, setIsLoadingImages] = useState(true);
   const [isZoomed, setIsZoomed] = useState(false);
@@ -28,6 +35,220 @@ export default function GalleryPage() {
     const nsfwKeywords = ['naked', 'nude', 'lingerie', 'bikini', 'underwear', 'revealing', 'bodysuit'];
     const promptText = String(image.generationPrompt).toLowerCase();
     return nsfwKeywords.some(keyword => promptText.includes(keyword));
+  };
+
+  const dedupeCommaTags = (input: string) => {
+    const parts = String(input || '')
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean);
+
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const part of parts) {
+      const key = part.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push(part);
+    }
+    return result.join(', ');
+  };
+
+  const buildSpecialPrompt = (userPrompt: string, style: CharacterStyle) => {
+    const cleaned = String(userPrompt || '').trim();
+    if (!cleaned) return '';
+
+    if (specialRawPrompt) {
+      return cleaned;
+    }
+
+    const stylePrefixes: Record<CharacterStyle, string> = {
+      [CharacterStyle.ANIME]:
+        'high quality, best quality, masterpiece, highres, very aesthetic, absurdres, anime art, illustration, clean lineart, vibrant colors',
+      [CharacterStyle.REALISTIC]:
+        'high quality, best quality, masterpiece, highres, very aesthetic, absurdres, photorealistic, professional photography, high resolution',
+      [CharacterStyle.ARTISTIC]:
+        'high quality, best quality, masterpiece, highres, very aesthetic, absurdres, artistic, digital painting, concept art, detailed',
+    };
+
+    const focusPrefixes: Record<typeof specialFocus, string> = {
+      eyes: 'extreme close-up, single face, single set of eyes, eyes only, detailed irises, glossy highlights, symmetrical eyes, soft shading',
+      face: 'close-up portrait, single face, detailed face, skin texture, sharp focus',
+      scene: 'wide shot, environment, cinematic lighting, depth of field',
+      object: 'product shot, centered composition, sharp focus, studio lighting',
+      custom: '',
+    };
+
+    const pieces = [stylePrefixes[style], focusPrefixes[specialFocus], cleaned].filter(Boolean);
+    return dedupeCommaTags(pieces.join(', '));
+  };
+
+  const buildSpecialNegativePrompt = (userNegativePrompt: string) => {
+    const base =
+      'low quality, worst quality, jpeg artifacts, watermark, signature, text, blurry, duplicate, duplicates, multiple faces, two faces, twins, extra face, extra head, extra eyes, extra mouth, extra nose';
+    const cleaned = String(userNegativePrompt || '').trim();
+    return dedupeCommaTags(cleaned ? `${base}, ${cleaned}` : base);
+  };
+
+  const handleSpecialGenerate = async () => {
+    if (!specialPrompt.trim()) return;
+
+    setIsSpecialGenerating(true);
+    try {
+      const { automatic1111API } = await import('@/lib/automatic1111');
+
+      const isConnected = await automatic1111API.checkConnection();
+      if (!isConnected) {
+        throw new Error('Automatic1111 is not running or not accessible');
+      }
+
+      const getDimensionsFromAspectRatio = (aspectRatio: string) => {
+        switch (aspectRatio) {
+          case 'portrait':
+          case '9:16':
+            return { width: 768, height: 1024 };
+          case 'landscape':
+          case '16:9':
+            return { width: 1024, height: 768 };
+          case 'square':
+          case '1:1':
+            return { width: 896, height: 896 };
+          case 'cinematic':
+          case '21:9':
+            return { width: 832, height: 1216 };
+          case 'mobile':
+          case '9:19':
+            return { width: 720, height: 1280 };
+          default:
+            return { width: 768, height: 1024 };
+        }
+      };
+
+      const dimensions = getDimensionsFromAspectRatio(generationSettings.aspectRatio || 'portrait');
+      const resolvedModel = automatic1111API.getModelForStyle(generationSettings.style);
+
+      const finalPrompt = buildSpecialPrompt(specialPrompt, generationSettings.style);
+      const finalNegativePrompt = buildSpecialNegativePrompt(specialNegativePrompt);
+
+      const payload = {
+        prompt: finalPrompt,
+        negative_prompt: finalNegativePrompt,
+        width: dimensions.width,
+        height: dimensions.height,
+        steps: generationSettings.steps || 30,
+        cfg_scale: generationSettings.cfgScale || 8,
+        sampler_name: generationSettings.sampler || 'DPM++ 2M Karras',
+        seed: generationSettings.seed === -1 ? -1 : generationSettings.seed,
+        model_name: resolvedModel,
+      };
+
+      const AUTOMATIC1111_URL = process.env.AUTOMATIC1111_URL || 'http://127.0.0.1:7860';
+      const response = await fetch(`${AUTOMATIC1111_URL}/sdapi/v1/txt2img`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Automatic1111 API error: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
+      if (!result.images || result.images.length === 0) {
+        throw new Error('No images returned from Automatic1111');
+      }
+
+      const base64Image = result.images[0];
+      let targetCharacterId = null;
+
+      try {
+        const charactersResult = await characterAPI.getCharacters();
+        if (charactersResult.success && charactersResult.data) {
+          const existingGalleryChar = charactersResult.data.find((char: any) => char.name === 'Gallery Generated');
+
+          if (existingGalleryChar) {
+            targetCharacterId = existingGalleryChar.id;
+          } else {
+            const galleryCharacter = {
+              name: 'Gallery Generated',
+              currentStep: 7,
+              identity: {
+                age: 25,
+                ethnicity: Ethnicity.MIXED,
+                skinTone: '#ffe0bd',
+              },
+              body: {
+                height: Height.AVERAGE,
+                physique: Physique.ATHLETIC,
+                chestSize: ChestSize.AVERAGE,
+                buttSize: ButtSize.AVERAGE,
+              },
+              appearance: {
+                hairStyle: HairStyle.STRAIGHT,
+                hairColor: HairColor.BLACK,
+                eyeColor: EyeColor.BLUE,
+                eyeType: EyeType.NORMAL,
+                clothing: ClothingStyle.CASUAL,
+                environment: Environment.LIBRARY,
+              },
+              personality: {
+                archetype: 'balanced',
+                isCustom: false,
+                traits: {
+                  submissiveDominant: 5,
+                  insecureConfident: 5,
+                  coldPassionate: 5,
+                  reservedOutgoing: 5,
+                  seriousPlayful: 5,
+                },
+              },
+              generation: {
+                style: generationSettings.style as any,
+                model: resolvedModel as any,
+              },
+              isGalleryOnly: true,
+            };
+
+            const createResult = await characterAPI.createCharacter(galleryCharacter);
+            if (createResult.success && createResult.data) {
+              targetCharacterId = createResult.data.id;
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error with gallery character:', error);
+      }
+
+      if (!targetCharacterId) {
+        throw new Error('Could not create or find gallery character for image generation');
+      }
+
+      const uploadResult = await characterAPI.addCharacterImage(
+        targetCharacterId,
+        base64Image,
+        finalPrompt,
+        resolvedModel,
+        generationSettings.style
+      );
+
+      if (!uploadResult.success) {
+        throw new Error('Failed to add generated image to gallery');
+      }
+
+      await fetchAllCharacterImages();
+      setSpecialPrompt('');
+    } catch (error) {
+      console.error('Failed to generate image:', error);
+      await dialog.alert({
+        title: 'Error',
+        message: 'Failed to generate image. Please check Automatic1111 and try again.',
+      });
+    } finally {
+      setIsSpecialGenerating(false);
+    }
   };
 
   const filteredImages = communityImages.filter((img) => {
@@ -338,7 +559,7 @@ export default function GalleryPage() {
     }
   };
 
-  const SidebarContent = () => (
+  const renderSidebarContent = () => (
     <div className="space-y-4">
       <div className="bg-dark-800/40 backdrop-blur-sm border border-dark-700 rounded-xl p-5">
         <h2 className="text-lg font-semibold text-white mb-3">Generate</h2>
@@ -358,6 +579,127 @@ export default function GalleryPage() {
         >
           {isGenerating ? 'Generating...' : 'Generate'}
         </button>
+      </div>
+
+      <div className="bg-dark-800/40 backdrop-blur-sm border border-dark-700 rounded-xl p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-white">Special Lab</h2>
+          <button
+            onClick={() => setSpecialOpen((prev) => !prev)}
+            className="text-dark-300 hover:text-white transition-colors"
+          >
+            {specialOpen ? 'Hide' : 'Show'}
+          </button>
+        </div>
+
+        <AnimatePresence initial={false}>
+          {specialOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.25 }}
+              className="space-y-3"
+            >
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setSpecialFocus('eyes')}
+                  className={`inline-flex items-center gap-2 h-8 px-3 rounded-lg border text-xs transition-colors ${
+                    specialFocus === 'eyes'
+                      ? 'bg-pink-600/20 border-pink-500/40 text-pink-200'
+                      : 'bg-dark-900/40 border-dark-700 text-dark-200 hover:bg-dark-800/60'
+                  }`}
+                  type="button"
+                >
+                  <Eye className="w-4 h-4" />
+                  Eyes
+                </button>
+                <button
+                  onClick={() => setSpecialFocus('face')}
+                  className={`h-8 px-3 rounded-lg border text-xs transition-colors ${
+                    specialFocus === 'face'
+                      ? 'bg-pink-600/20 border-pink-500/40 text-pink-200'
+                      : 'bg-dark-900/40 border-dark-700 text-dark-200 hover:bg-dark-800/60'
+                  }`}
+                  type="button"
+                >
+                  Face
+                </button>
+                <button
+                  onClick={() => setSpecialFocus('scene')}
+                  className={`h-8 px-3 rounded-lg border text-xs transition-colors ${
+                    specialFocus === 'scene'
+                      ? 'bg-pink-600/20 border-pink-500/40 text-pink-200'
+                      : 'bg-dark-900/40 border-dark-700 text-dark-200 hover:bg-dark-800/60'
+                  }`}
+                  type="button"
+                >
+                  Scene
+                </button>
+                <button
+                  onClick={() => setSpecialFocus('object')}
+                  className={`h-8 px-3 rounded-lg border text-xs transition-colors ${
+                    specialFocus === 'object'
+                      ? 'bg-pink-600/20 border-pink-500/40 text-pink-200'
+                      : 'bg-dark-900/40 border-dark-700 text-dark-200 hover:bg-dark-800/60'
+                  }`}
+                  type="button"
+                >
+                  Object
+                </button>
+                <button
+                  onClick={() => setSpecialFocus('custom')}
+                  className={`h-8 px-3 rounded-lg border text-xs transition-colors ${
+                    specialFocus === 'custom'
+                      ? 'bg-pink-600/20 border-pink-500/40 text-pink-200'
+                      : 'bg-dark-900/40 border-dark-700 text-dark-200 hover:bg-dark-800/60'
+                  }`}
+                  type="button"
+                >
+                  Custom
+                </button>
+              </div>
+
+              <textarea
+                value={specialPrompt}
+                onChange={(e) => setSpecialPrompt(e.target.value)}
+                rows={4}
+                className="w-full px-3 py-2 bg-dark-950/60 text-white rounded-lg border border-dark-700 focus:ring-2 focus:ring-pink-500 focus:border-pink-500 resize-none"
+                placeholder="Describe exactly what you want..."
+                disabled={isSpecialGenerating}
+              />
+
+              <div className="flex items-center justify-between gap-3">
+                <label className="flex items-center gap-2 text-xs text-dark-200 select-none">
+                  <input
+                    type="checkbox"
+                    checked={specialRawPrompt}
+                    onChange={(e) => setSpecialRawPrompt(e.target.checked)}
+                    className="accent-pink-500"
+                  />
+                  Raw prompt (no prefix)
+                </label>
+              </div>
+
+              <textarea
+                value={specialNegativePrompt}
+                onChange={(e) => setSpecialNegativePrompt(e.target.value)}
+                rows={2}
+                className="w-full px-3 py-2 bg-dark-950/40 text-white rounded-lg border border-dark-700 focus:ring-2 focus:ring-pink-500 focus:border-pink-500 resize-none"
+                placeholder="Optional negative prompt"
+                disabled={isSpecialGenerating}
+              />
+
+              <button
+                onClick={handleSpecialGenerate}
+                disabled={!specialPrompt.trim() || isSpecialGenerating}
+                className="w-full bg-pink-600 hover:bg-pink-700 disabled:bg-dark-600 disabled:cursor-not-allowed text-white font-semibold h-10 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center"
+              >
+                {isSpecialGenerating ? 'Generating...' : 'Generate'}
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       <div className="bg-dark-800/40 backdrop-blur-sm border border-dark-700 rounded-xl p-4">
@@ -506,7 +848,7 @@ export default function GalleryPage() {
               className="sidebar-container fixed left-0 top-16 bottom-0 w-[360px] z-50 bg-dark-900 shadow-2xl"
             >
               <div className="h-full overflow-y-auto px-4 py-6">
-                <SidebarContent />
+                {renderSidebarContent()}
               </div>
             </motion.div>
           )}
@@ -535,13 +877,13 @@ export default function GalleryPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </button>
-              <div className="h-full overflow-y-auto px-4 py-6 pt-16">
-                <SidebarContent />
+              <div className="h-full overflow-y-auto px-2 py-6 pt-16">
+                {renderSidebarContent()}
               </div>
             </div>
           </motion.div>
 
-          {isDesktop && isDesktopSidebarCollapsed && (
+          {isDesktop && isDesktopSidebarCollapsed && !isZoomed && (
             <button
               onClick={() => setIsDesktopSidebarCollapsed(false)}
               className="sidebar-toggle-button fixed left-6 top-24 z-[60] w-10 h-10 bg-dark-800/90 backdrop-blur-sm border border-dark-600 rounded-lg hidden lg:flex items-center justify-center text-pink-400 hover:text-pink-300 hover:bg-dark-700/90 transition-all duration-300"
@@ -558,12 +900,12 @@ export default function GalleryPage() {
           )}
 
           <motion.div
-            className="flex-1 min-w-0 px-4 sm:px-6 lg:px-8 py-8 transition-all duration-300 ease-in-out"
+            className={`flex-1 min-w-0 px-4 sm:px-6 lg:px-8 py-8 transition-all duration-300 ease-in-out ${isDesktopSidebarCollapsed ? 'lg:pl-20' : ''}`}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-          <div className={`w-full ${isDesktopSidebarCollapsed ? 'max-w-7xl' : 'max-w-6xl'} mx-auto`}>
+          <div className={`w-full ${isDesktopSidebarCollapsed ? 'max-w-none' : 'max-w-none'} mx-auto`}>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
               <div className="text-center sm:text-left">
                 <h1 className="text-3xl md:text-4xl font-bold text-white">Gallery</h1>
@@ -720,7 +1062,7 @@ export default function GalleryPage() {
               
               @media (min-width: 1024px) {
                 .masonry-grid {
-                  column-count: 4;
+                  column-count: 3;
                   column-gap: 1.5rem;
                 }
                 .masonry-item {
@@ -745,6 +1087,16 @@ export default function GalleryPage() {
                 }
                 .masonry-item {
                   margin-bottom: 1.75rem;
+                }
+              }
+              
+              @media (min-width: 1920px) {
+                .masonry-grid {
+                  column-count: 5;
+                  column-gap: 2rem;
+                }
+                .masonry-item {
+                  margin-bottom: 2rem;
                 }
               }
             `}</style>

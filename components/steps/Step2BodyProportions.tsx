@@ -31,7 +31,7 @@ const skinToneOptions = [
   '#4A2C1A',
 ];
 
-const heightOptions = [Height.TINY, Height.CHILDLIKE, Height.PETITE, Height.AVERAGE, Height.TALL];
+const heightOptions = [Height.TINY, Height.CHILDLIKE, Height.PETITE, Height.SMALL, Height.AVERAGE, Height.TALL];
 
 export const Step2BodyProportions: React.FC = () => {
   const { draft, setIdentity, setBody } = useCharacterBuilder();

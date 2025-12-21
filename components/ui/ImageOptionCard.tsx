@@ -45,7 +45,7 @@ export const ImageOptionCard: React.FC<ImageOptionCardProps> = ({
           <img
             src={imageUrl}
             alt={label}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover object-top"
             onError={() => setImageError(true)}
           />
         ) : (
@@ -79,7 +79,7 @@ export const ImageOptionCard: React.FC<ImageOptionCardProps> = ({
         {label}
       </p>
       {description && (
-        <p className="mt-1 text-xs text-dark-400 text-center px-2">
+        <p className="mt-1 text-xs text-dark-400 text-center px-2 min-h-8 max-h-8 overflow-hidden">
           {description}
         </p>
       )}

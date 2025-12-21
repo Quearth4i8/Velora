@@ -31,6 +31,7 @@ export const serializeCharacter = (draft: CharacterDraft): Record<string, any> =
   const serialized = {
     name: draft.name,
     character_type: draft.characterType || 'custom',
+    style_preset: draft.stylePreset || null,
     main_tag: draft.mainTag || null,
     lora_name: serializedLoraName,
     lora_weight: draft.loraWeight ?? null,
@@ -111,6 +112,7 @@ export const deserializeCharacter = (data: Record<string, any>): CharacterDraft 
     id: data.id,
     name: data.name,
     characterType: data.character_type || 'custom',
+    stylePreset: data.style_preset || undefined,
     mainTag: data.main_tag || undefined,
     loraNames: normalizeLoraNames(data.lora_names, data.lora_name),
     loraName: data.lora_name || undefined,

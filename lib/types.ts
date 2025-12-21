@@ -20,6 +20,7 @@ export enum Height {
   TINY = 'tiny',
   CHILDLIKE = 'childlike',
   PETITE = 'petite',
+  SMALL = 'small',
   AVERAGE = 'average',
   TALL = 'tall',
 }
@@ -55,6 +56,7 @@ export enum HairStyle {
   BANGS = 'bangs',
   BRAIDS = 'braids',
   CURLY = 'curly',
+  LONG = 'long',
   BUN = 'bun',
   PONYTAIL = 'ponytail',
   BOB = 'bob',
@@ -69,6 +71,7 @@ export enum HairColor {
   PLATINUM_BLONDE = '#F8F6E7',
   WHITE = '#FFFFFF',
   RED = '#DC143C',
+  MAROON = '#800000',
   AUBURN = '#A52A2A',
   ORANGE = '#FF8C00',
   PURPLE = '#800080',
@@ -193,6 +196,7 @@ export interface CharacterDraft {
   id?: string;
   name?: string;
   characterType?: CharacterType;
+  stylePreset?: string;
   mainTag?: string;
   loraNames?: string[];
   loraName?: string;

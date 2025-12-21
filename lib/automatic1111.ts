@@ -30,6 +30,7 @@ const hexToColorName = (hex: string): string => {
     '#ffffff': 'white',
     '#ff0000': 'red',
     '#dc143c': 'red',
+    '#800000': 'maroon',
     '#ff69b4': 'pink',
     '#00ff00': 'green',
     '#0000ff': 'blue',
@@ -89,13 +90,13 @@ const getDimensionsFromAspectRatio = (aspectRatio: string) => {
       return { width: 768, height: 1024 };
     case 'landscape':
     case '16:9':
-      return { width: 1024, height: 768 };
+      return { width: 1024, height: 576 };
     case 'square':
     case '1:1':
       return { width: 896, height: 896 };
     case 'cinematic':
     case '21:9':
-      return { width: 832, height: 1216 };
+      return { width: 1216, height: 512 };
     case 'mobile':
     case '9:19':
       return { width: 720, height: 1280 };
@@ -126,12 +127,12 @@ const getClothingDetails = (clothing: string, isCharacterGeneration: boolean = t
   };
 
   const nsfwClothingMap: Record<string, string> = {
-    'lingerie': 'sexy lingerie set with lace details',
-    'naked': 'completely nude, no clothing',
-    'bikini': 'revealing bikini, beachwear',
-    'underwear': 'sexy underwear set, intimate apparel',
-    'revealing': 'revealing outfit, showing skin',
-    'bodysuit': 'tight bodysuit, form-fitting',
+    'lingerie': 'ultra-sheer lace lingerie, completely transparent babydoll, open-cup bra, crotchless garter belt with stockings, tiny g-string thong barely covering anything, nipples and pussy visible through fabric, extreme see-through material',
+    'naked': 'completely nude, fully naked body, no clothing whatsoever, totally exposed breasts and genitals, bare skin only, explicit nudity',
+    'bikini': 'extreme micro bikini, strings-only bikini, pasties and g-string, massive sideboob and underboob, thong bottom disappearing between labia, sheer wet fabric clinging to nipples and pussy outline, practically nude',
+    'underwear': 'open-cup sheer bra with exposed nipples, crotchless lace panties, transparent cupless teddy, fishnet crotchless set, labia and nipples fully visible, barely-there straps, erotic intimate apparel leaving nothing to imagination',
+    'revealing': 'completely see-through outfit, transparent mesh dress with no underwear, extreme deep plunging neckline to navel, massive cleavage spill, sideboob and underboob fully exposed, backless and crotchless design, clothing optionally dissolved or torn for extra exposure',
+    'bodysuit': 'ultra-transparent sheer bodysuit, full fishnet bodysuit with large holes exposing nipples and pussy, crotchless and open-chest design, strategic cutouts over breasts and genitals, glossy wet-look latex bodysuit clinging to every curve, nipples and labia clearly outlined',
   };
 
   if (isCharacterGeneration) {
@@ -177,9 +178,9 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
   const { identity, body, appearance, personality } = draft;
 
   const stylePrompts = {
-    [CharacterStyle.ANIME]: 'lazypos, masterpiece, best quality, ultra-detailed, high quality anime art, illustration, clean lines, vibrant colors, solo character, single person, only one character, perfect hands, detailed fingers, full body portrait',
-    [CharacterStyle.REALISTIC]: 'lazypos, masterpiece, best quality, ultra-realistic, photorealistic, professional photography, detailed, high resolution, 8k, solo character, single person, only one character, perfect hands, detailed fingers, full body portrait',
-    [CharacterStyle.ARTISTIC]: 'lazypos, masterpiece, best quality, artistic, digital painting, detailed, stunning, high quality, 1 girl, perfect hands, detailed fingers, full body portrait',
+    [CharacterStyle.ANIME]: 'high quality, best quality, masterpiece, highres, very aesthetic, absurdres, lazypos, ultra-detailed, high quality anime art, illustration, clean lines, vibrant colors, solo character, single person, only one character, one girl, individual, alone, perfect hands, detailed fingers, full body portrait, beautiful face, symmetrical eyes, perfect smile, natural teeth, soft lips, well-proportioned facial features',
+    [CharacterStyle.REALISTIC]: 'high quality, best quality, masterpiece, highres, very aesthetic, absurdres, lazypos, ultra-realistic, photorealistic, professional photography, detailed, high resolution, 8k, solo character, single person, only one character, one girl, individual, alone, perfect hands, detailed fingers, full body portrait, beautiful face, symmetrical eyes, perfect smile, natural teeth, soft lips, well-proportioned facial features, perfect facial anatomy',
+    [CharacterStyle.ARTISTIC]: 'high quality, best quality, masterpiece, highres, very aesthetic, absurdres, lazypos, artistic, digital painting, detailed, stunning, solo character, single person, only one character, one girl, individual, alone, perfect hands, detailed fingers, full body portrait, beautiful face, symmetrical eyes, perfect smile, natural teeth, soft lips, well-proportioned facial features',
   };
 
   const loraNames = normalizeLoraNames(draft);
@@ -319,7 +320,7 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
 };
 
 const buildNegativePrompt = (draft?: CharacterDraft): string => {
-  let negativePrompt = 'lazyneg, low quality, worst quality, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry, artist name, deformed, disfigured, malformed, mutated, ugly, disgusting, distorted, bad proportions, extra limbs, missing limbs, fused fingers, too many fingers, long neck, multiple characters, two characters, group, couple, duo, pair, more than one person, multiple people, crowd, friends';
+  let negativePrompt = 'lazyneg, low quality, worst quality, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry, artist name, deformed, disfigured, malformed, mutated, ugly, disgusting, distorted, bad proportions, extra limbs, missing limbs, fused fingers, too many fingers, long neck, multiple characters, two characters, group, couple, duo, pair, more than one person, multiple people, crowd, friends, 2 girls, 2 women, two girls, two women, double, duplicate, twins, sisters, together, side by side, multiple subjects, 2 subjects, two subjects, deformed eyes, ugly teeth, distorted mouth, unnatural pupils, bad teeth, crooked teeth, misaligned eyes, cross-eyed, wall-eyed, bug eyes, asymmetrical eyes, distorted face, malformed mouth, weird tongue, unnatural tongue, bad lip shape, distorted lips, asymmetrical face, facial deformity, eye deformity, mouth deformity';
 
   const extraNegativePrompts: string[] = [];
 
