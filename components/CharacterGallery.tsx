@@ -86,7 +86,8 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Element;
+      const target = event.target;
+      if (!(target instanceof Element)) return;
       
       // Close navbar dropdown if clicking outside
       if (showNavbarDropdown && !target.closest('.navbar-dropdown')) {

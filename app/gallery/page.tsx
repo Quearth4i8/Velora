@@ -17,6 +17,9 @@ export default function GalleryPage() {
   const [isZoomed, setIsZoomed] = useState(false);
   const [zoomedImageIndex, setZoomedImageIndex] = useState(0);
   const { blurNSFW, toggleBlurNSFW } = useBlurNSFW();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
+  const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
 
   const isNSFWImage = (image: any): boolean => {
     if (!image?.generationPrompt) return false;
@@ -61,6 +64,38 @@ export default function GalleryPage() {
       setZoomedImageIndex(0);
     }
   }, [filteredImages, zoomedImageIndex]);
+
+  // Close sidebar when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+
+      if (isSidebarOpen && !target.closest('.sidebar-container') && !target.closest('.sidebar-toggle-button')) {
+        setIsSidebarOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isSidebarOpen]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const mediaQuery = window.matchMedia('(min-width: 1024px)');
+    const handleChange = (event: MediaQueryListEvent | MediaQueryList) => {
+      const matches = 'matches' in event ? event.matches : mediaQuery.matches;
+      setIsDesktop(matches);
+      if (matches) {
+        setIsSidebarOpen(false);
+      }
+    };
+
+    handleChange(mediaQuery);
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
 
   const fetchAllCharacterImages = async () => {
     try {
@@ -428,19 +463,96 @@ export default function GalleryPage() {
       <AnimatedBackground />
       <div className="relative z-10">
         <Navbar />
-        <div className="hidden lg:block fixed left-0 top-16 bottom-0 w-[360px] z-40 bg-dark-900/40 backdrop-blur-md border-r border-dark-800">
-          <div className="h-full overflow-y-auto px-4 py-6">
-            <SidebarContent />
-          </div>
-        </div>
+        
+        {/* Sidebar Toggle Button */}
+        {!isDesktop && (
+          <button
+            onClick={() => {
+              setIsSidebarOpen(!isSidebarOpen);
+            }}
+            className="sidebar-toggle-button fixed left-4 top-20 z-[60] w-10 h-10 bg-dark-800/90 backdrop-blur-sm border border-dark-600 rounded-lg flex items-center justify-center text-pink-400 hover:text-pink-300 hover:bg-dark-700/90 transition-all duration-300"
+          >
+            <svg
+              className="w-5 h-5 transition-transform duration-300"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              style={{ transform: isSidebarOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+            </svg>
+          </button>
+        )}
 
-        <motion.div
-          className="px-4 sm:px-6 lg:px-8 py-8 lg:ml-[360px]"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <div className="w-full max-w-6xl mx-auto">
+        {/* Collapsible Sidebar */}
+        <AnimatePresence>
+          {!isDesktop && isSidebarOpen && (
+            <motion.div
+              initial={{ x: -400, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: -400, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              className="sidebar-container fixed left-0 top-16 bottom-0 w-[360px] z-50 bg-dark-900 shadow-2xl"
+            >
+              <div className="h-full overflow-y-auto px-4 py-6">
+                <SidebarContent />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <div className="flex flex-nowrap min-h-[calc(100vh-4rem)]">
+          {/* Desktop Sidebar */}
+          <motion.div
+            className="hidden lg:block bg-dark-900/40 backdrop-blur-md border-r border-dark-800 overflow-hidden shrink-0 sticky top-16 self-start"
+            style={{ height: 'calc(100vh - 4rem)' }}
+            animate={{ width: isDesktopSidebarCollapsed ? 0 : 360 }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          >
+            <div className="relative h-full">
+              <button
+                onClick={() => setIsDesktopSidebarCollapsed(true)}
+                className="sidebar-toggle-button absolute right-4 top-4 z-10 w-10 h-10 bg-dark-800/90 backdrop-blur-sm border border-dark-600 rounded-lg flex items-center justify-center text-pink-400 hover:text-pink-300 hover:bg-dark-700/90 transition-all duration-300"
+                style={{ opacity: isDesktopSidebarCollapsed ? 0 : 1, pointerEvents: isDesktopSidebarCollapsed ? 'none' : 'auto' }}
+              >
+                <svg
+                  className="w-5 h-5 transition-transform duration-300"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <div className="h-full overflow-y-auto px-4 py-6 pt-16">
+                <SidebarContent />
+              </div>
+            </div>
+          </motion.div>
+
+          {isDesktop && isDesktopSidebarCollapsed && (
+            <button
+              onClick={() => setIsDesktopSidebarCollapsed(false)}
+              className="sidebar-toggle-button fixed left-6 top-24 z-[60] w-10 h-10 bg-dark-800/90 backdrop-blur-sm border border-dark-600 rounded-lg hidden lg:flex items-center justify-center text-pink-400 hover:text-pink-300 hover:bg-dark-700/90 transition-all duration-300"
+            >
+              <svg
+                className="w-5 h-5 transition-transform duration-300"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          )}
+
+          <motion.div
+            className="flex-1 min-w-0 px-4 sm:px-6 lg:px-8 py-8 transition-all duration-300 ease-in-out"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+          <div className={`w-full ${isDesktopSidebarCollapsed ? 'max-w-7xl' : 'max-w-6xl'} mx-auto`}>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
               <div className="text-center sm:text-left">
                 <h1 className="text-3xl md:text-4xl font-bold text-white">Gallery</h1>
@@ -493,10 +605,6 @@ export default function GalleryPage() {
                   </div>
                 </div>
               </div>
-            </div>
-
-            <div className="lg:hidden mb-6">
-              <SidebarContent />
             </div>
 
             <div className="bg-dark-800/30 backdrop-blur-sm border border-dark-700 rounded-xl p-6 sm:p-8">
@@ -630,7 +738,8 @@ export default function GalleryPage() {
               }
             `}</style>
           </div>
-        </motion.div>
+          </motion.div>
+        </div>
 
         <AnimatePresence>
           {isZoomed && (
