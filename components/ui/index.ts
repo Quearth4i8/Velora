@@ -9,6 +9,7 @@ export { AnimatedCheckmark } from './AnimatedCheckmark';
 export { LoadingSpinner } from './LoadingSpinner';
 export { ErrorBoundary } from './ErrorBoundary';
 export { Modal } from './Modal';
+export { DialogProvider, useDialog } from './DialogProvider';
 export { Toast } from './Toast';
 export { Badge } from './Badge';
 export { Divider } from './Divider';

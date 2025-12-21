@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { Providers } from './providers';
 
 export const metadata: Metadata = {
   title: 'Velora - AI Character Creator',
@@ -19,7 +20,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="bg-dark-950 text-white">
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

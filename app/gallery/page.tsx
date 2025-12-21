@@ -7,6 +7,7 @@ import { AnimatedBackground } from '@/components/AnimatedBackground';
 import { characterAPI } from '@/lib/api';
 import { CharacterStyle, Ethnicity, Height, Physique, ChestSize, ButtSize, HairStyle, EyeType, ClothingStyle, Environment, HairColor, EyeColor } from '@/lib/types';
 import { useBlurNSFW } from '@/lib/useBlurNSFW';
+import { useDialog } from '@/components/ui/DialogProvider';
 
 export default function GalleryPage() {
   const [filter, setFilter] = useState<'all' | 'sfw' | 'nsfw'>('all');
@@ -17,6 +18,7 @@ export default function GalleryPage() {
   const [isZoomed, setIsZoomed] = useState(false);
   const [zoomedImageIndex, setZoomedImageIndex] = useState(0);
   const { blurNSFW, toggleBlurNSFW } = useBlurNSFW();
+  const dialog = useDialog();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
@@ -132,9 +134,15 @@ export default function GalleryPage() {
   };
 
   const handleDeleteImage = async (imageId: string) => {
-    if (!confirm('Are you sure you want to delete this image? This action cannot be undone.')) {
-      return;
-    }
+    const ok = await dialog.confirm({
+      title: 'Delete image?',
+      message: 'Are you sure you want to delete this image? This action cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      destructive: true,
+    });
+
+    if (!ok) return;
 
     try {
       const result = await characterAPI.deleteCharacterImageFromGallery(imageId);
@@ -142,14 +150,17 @@ export default function GalleryPage() {
       if (result.success) {
         // Refresh the gallery to remove the deleted image
         await fetchAllCharacterImages();
-        alert('Image deleted successfully');
+        await dialog.alert({ title: 'Deleted', message: 'Image deleted successfully' });
       } else {
         console.error('Failed to delete image:', result.error);
-        alert('Failed to delete image. Please try again.');
+        await dialog.alert({ title: 'Error', message: 'Failed to delete image. Please try again.' });
       }
     } catch (error) {
       console.error('Error deleting image:', error);
-      alert('An error occurred while deleting the image. Check console for details.');
+      await dialog.alert({
+        title: 'Error',
+        message: 'An error occurred while deleting the image. Check console for details.',
+      });
     }
   };
 

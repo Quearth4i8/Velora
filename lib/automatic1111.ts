@@ -148,6 +148,31 @@ const buildLoraTag = (loraName: string, loraWeight?: number | null): string => {
   return `<lora:${loraName}:${weight}>`;
 };
 
+const normalizeLoraNames = (draft: CharacterDraft): string[] => {
+  const result: string[] = [];
+
+  const push = (value: unknown) => {
+    if (typeof value !== 'string') return;
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    result.push(trimmed);
+  };
+
+  if (Array.isArray(draft.loraNames)) {
+    draft.loraNames.forEach(push);
+  }
+
+  if (typeof draft.loraName === 'string') {
+    draft.loraName
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .forEach((part) => result.push(part));
+  }
+
+  return Array.from(new Set(result));
+};
+
 const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
   const { identity, body, appearance, personality } = draft;
 
@@ -157,9 +182,10 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
     [CharacterStyle.ARTISTIC]: 'lazypos, masterpiece, best quality, artistic, digital painting, detailed, stunning, high quality, 1 girl, perfect hands, detailed fingers, full body portrait',
   };
 
-  const isSpecialCharacter = draft.characterType === 'special';
+  const loraNames = normalizeLoraNames(draft);
+  const hasSpecialFields = Boolean(draft.mainTag?.trim() || loraNames.length > 0 || draft.specialPrompt?.trim());
+  const isSpecialCharacter = draft.characterType === 'special' || hasSpecialFields;
   const mainTag = draft.mainTag?.trim();
-  const loraName = draft.loraName?.trim();
   const specialPrompt = draft.specialPrompt?.trim();
 
   // Basic characteristics
@@ -229,13 +255,15 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
 
   if (isSpecialCharacter) {
     if (mainTag) prompt += `, ${mainTag}`;
-    if (loraName) prompt += `, ${buildLoraTag(loraName, draft.loraWeight)}`;
+    if (loraNames.length > 0) {
+      prompt += `, ${loraNames.map((name) => buildLoraTag(name, draft.loraWeight)).join(', ')}`;
+    }
     if (specialPrompt) prompt += `, ${specialPrompt}`;
   }
 
   // Add basic info
   if (age) prompt += `, ${age}`;
-  if (ethnicity) prompt += ` ${ethnicity}`;
+  if (ethnicity) prompt += `, ${ethnicity}`;
   if (skinTone) {
     const colorName = hexToColorName(skinTone);
     prompt += `, ${colorName} skin`;
@@ -245,7 +273,7 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
 
   // Add body characteristics
   if (height) prompt += `, ${height}`;
-  if (physique) prompt += ` ${physique}`;
+  if (physique) prompt += `, ${physique} body`;
   if (chestSize) prompt += `, ${chestSize} breasts`;
 
   // Add appearance characteristics

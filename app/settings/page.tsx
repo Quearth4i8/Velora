@@ -24,9 +24,11 @@ import {
 } from '@/lib/types';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Modal } from '@/components/ui/Modal';
+import { useDialog } from '@/components/ui/DialogProvider';
 
 export default function SettingsPage() {
   const { blurNSFW, toggleBlurNSFW } = useBlurNSFW();
+  const dialog = useDialog();
 
   const [specialCharacters, setSpecialCharacters] = useState<CharacterDraft[]>([]);
   const [specialCharactersLoading, setSpecialCharactersLoading] = useState(false);
@@ -270,7 +272,14 @@ export default function SettingsPage() {
   const deleteSpecialCharacter = async (character: CharacterDraft) => {
     if (!character.id) return;
 
-    const ok = window.confirm(`Delete ${character.name || 'this character'}? This cannot be undone.`);
+    const ok = await dialog.confirm({
+      title: 'Delete character?',
+      message: `Delete ${character.name || 'this character'}? This cannot be undone.`,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      destructive: true,
+    });
+
     if (!ok) return;
 
     try {
@@ -281,7 +290,10 @@ export default function SettingsPage() {
       invalidateCharacterCaches(character.id);
       setSpecialCharacters((prev) => prev.filter((c) => c.id !== character.id));
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to delete special character');
+      await dialog.alert({
+        title: 'Error',
+        message: err instanceof Error ? err.message : 'Failed to delete special character',
+      });
     }
   };
 

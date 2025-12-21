@@ -6,6 +6,7 @@ import { characterAPI } from '@/lib/api';
 import { automatic1111API } from '@/lib/automatic1111';
 import { CharacterDraft } from '@/lib/types';
 import { PrimaryCTAButton } from '@/components/ui/PrimaryCTAButton';
+import { useDialog } from '@/components/ui/DialogProvider';
 
 interface SpecialCharacterSectionProps {
   onSelectCharacter: (character: CharacterDraft) => void;
@@ -16,6 +17,7 @@ export function SpecialCharacterSection({ onSelectCharacter }: SpecialCharacterS
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | Error | null>(null);
   const [generatingImages, setGeneratingImages] = useState<Set<string>>(new Set());
+  const dialog = useDialog();
 
   useEffect(() => {
     loadCharacters();
@@ -42,7 +44,10 @@ export function SpecialCharacterSection({ onSelectCharacter }: SpecialCharacterS
     if (!character.id) return;
 
     if (!character.generation?.style || !character.generation?.model) {
-      alert('This character does not have style and model information.');
+      await dialog.alert({
+        title: 'Missing settings',
+        message: 'This character does not have style and model information.',
+      });
       return;
     }
 
@@ -53,7 +58,7 @@ export function SpecialCharacterSection({ onSelectCharacter }: SpecialCharacterS
       await loadCharacters();
     } catch (err) {
       console.error('Error generating image for special character:', err);
-      alert('Failed to generate image. Please try again.');
+      await dialog.alert({ title: 'Error', message: 'Failed to generate image. Please try again.' });
     } finally {
       setGeneratingImages(prev => {
         const next = new Set(prev);

@@ -194,6 +194,7 @@ export interface CharacterDraft {
   name?: string;
   characterType?: CharacterType;
   mainTag?: string;
+  loraNames?: string[];
   loraName?: string;
   loraWeight?: number | null;
   specialPrompt?: string;

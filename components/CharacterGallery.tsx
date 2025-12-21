@@ -8,6 +8,7 @@ import { characterAPI } from '@/lib/api';
 import { PrimaryCTAButton } from '@/components/ui/PrimaryCTAButton';
 import { GenerationSettingsModal } from '@/components/ui/GenerationSettingsModal';
 import { useBlurNSFW } from '@/lib/useBlurNSFW';
+import { useDialog } from '@/components/ui/DialogProvider';
 
 interface CharacterGalleryProps {
   character: CharacterDraft;
@@ -19,6 +20,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
   const [isGenerating, setIsGenerating] = useState(false);
   const [editedCharacter, setEditedCharacter] = useState<CharacterDraft>(character);
   const { blurNSFW, setBlurNSFW, toggleBlurNSFW } = useBlurNSFW();
+  const dialog = useDialog();
   const [characterImages, setCharacterImages] = useState<CharacterImage[]>([]);
   const [isZoomed, setIsZoomed] = useState(false);
   const [showImageDropdown, setShowImageDropdown] = useState<string | null>(null);
@@ -119,7 +121,10 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
 
   const handleGenerateNewImage = async () => {
     if (!editedCharacter.generation?.style || !editedCharacter.generation?.model) {
-      alert('Character must have style and model selected to generate images');
+      await dialog.alert({
+        title: 'Missing settings',
+        message: 'Character must have style and model selected to generate images',
+      });
       return;
     }
 
@@ -143,7 +148,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
       onCharacterUpdate(updatedCharacter);
     } catch (error) {
       console.error('Error generating new image:', error);
-      alert('Failed to generate new image. Please try again.');
+      await dialog.alert({ title: 'Error', message: 'Failed to generate new image. Please try again.' });
     } finally {
       setIsGenerating(false);
     }
@@ -162,7 +167,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
       }
     } catch (error) {
       console.error('Error saving character:', error);
-      alert('Failed to save character. Please try again.');
+      await dialog.alert({ title: 'Error', message: 'Failed to save character. Please try again.' });
     }
   };
 
@@ -208,12 +213,20 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
       }
     } catch (error) {
       console.error('Error setting primary image:', error);
-      alert('Failed to set primary image. Please try again.');
+      await dialog.alert({ title: 'Error', message: 'Failed to set primary image. Please try again.' });
     }
   };
 
   const handleDeleteImage = async (imageId: string) => {
-    if (!confirm('Are you sure you want to delete this image?')) return;
+    const ok = await dialog.confirm({
+      title: 'Delete image?',
+      message: 'Are you sure you want to delete this image?',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      destructive: true,
+    });
+
+    if (!ok) return;
     
     try {
       const result = await characterAPI.deleteCharacterImageFromGallery(imageId);
@@ -224,7 +237,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
       }
     } catch (error) {
       console.error('Error deleting image:', error);
-      alert('Failed to delete image. Please try again.');
+      await dialog.alert({ title: 'Error', message: 'Failed to delete image. Please try again.' });
     }
   };
 

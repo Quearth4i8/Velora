@@ -22,12 +22,17 @@ export const serializeCharacter = (draft: CharacterDraft): Record<string, any> =
     console.error('Ethnicity is missing from identity');
     throw new Error('Ethnicity is missing from character draft');
   }
+
+  const serializedLoraName =
+    Array.isArray(draft.loraNames) && draft.loraNames.length > 0
+      ? draft.loraNames.join(', ')
+      : draft.loraName || null;
   
   const serialized = {
     name: draft.name,
     character_type: draft.characterType || 'custom',
     main_tag: draft.mainTag || null,
-    lora_name: draft.loraName || null,
+    lora_name: serializedLoraName,
     lora_weight: draft.loraWeight ?? null,
     special_prompt: draft.specialPrompt || null,
     special_negative_prompt: draft.specialNegativePrompt || null,
@@ -56,6 +61,37 @@ export const serializeCharacter = (draft: CharacterDraft): Record<string, any> =
 };
 
 export const deserializeCharacter = (data: Record<string, any>): CharacterDraft => {
+  const normalizeLoraNames = (value: any, fallbackSingle?: any): string[] | undefined => {
+    const result: string[] = [];
+
+    const push = (item: any) => {
+      if (typeof item !== 'string') return;
+      const trimmed = item.trim();
+      if (!trimmed) return;
+      result.push(trimmed);
+    };
+
+    if (Array.isArray(value)) {
+      value.forEach(push);
+    } else if (typeof value === 'string') {
+      value
+        .split(',')
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .forEach((part) => result.push(part));
+    }
+
+    if (result.length === 0 && typeof fallbackSingle === 'string') {
+      fallbackSingle
+        .split(',')
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .forEach((part) => result.push(part));
+    }
+
+    return result.length > 0 ? result : undefined;
+  };
+
   const normalizeHeight = (value: any): Height | null => {
     if (!value) return null;
     if (value === 'below_average') return Height.PETITE;
@@ -76,6 +112,7 @@ export const deserializeCharacter = (data: Record<string, any>): CharacterDraft 
     name: data.name,
     characterType: data.character_type || 'custom',
     mainTag: data.main_tag || undefined,
+    loraNames: normalizeLoraNames(data.lora_names, data.lora_name),
     loraName: data.lora_name || undefined,
     loraWeight: data.lora_weight ?? undefined,
     specialPrompt: data.special_prompt || undefined,

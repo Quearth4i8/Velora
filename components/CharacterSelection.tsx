@@ -7,6 +7,7 @@ import { automatic1111API } from '@/lib/automatic1111';
 import { CharacterDraft, AgeGroup, Ethnicity, Height, Physique, ChestSize, ButtSize, HairStyle, HairColor, EyeColor, CharacterStyle, AIModel } from '@/lib/types';
 import { PrimaryCTAButton } from '@/components/ui/PrimaryCTAButton';
 import { TraitFilter } from '@/components/ui/TraitFilter';
+import { useDialog } from '@/components/ui/DialogProvider';
 
 interface CharacterTraits {
   ethnicity?: string | null;
@@ -33,6 +34,7 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
   const [error, setError] = useState<string | Error | null>(null);
   const [generatingImages, setGeneratingImages] = useState<Set<string>>(new Set());
   const [activeFilters, setActiveFilters] = useState<CharacterTraits>({});
+  const dialog = useDialog();
 
   useEffect(() => {
     // Start loading immediately
@@ -138,7 +140,11 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
 
   const handleGenerateImage = async (character: CharacterDraft) => {
     if (!character.generation?.style || !character.generation?.model) {
-      alert('This character does not have style and model information. Please recreate the character with style selection.');
+      await dialog.alert({
+        title: 'Missing settings',
+        message:
+          'This character does not have style and model information. Please recreate the character with style selection.',
+      });
       return;
     }
 
@@ -152,7 +158,7 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
       await loadCharacters();
     } catch (error) {
       console.error('Error generating image for existing character:', error);
-      alert('Failed to generate image. Please try again.');
+      await dialog.alert({ title: 'Error', message: 'Failed to generate image. Please try again.' });
     } finally {
       setGeneratingImages(prev => {
         const newSet = new Set(prev);
