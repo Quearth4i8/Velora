@@ -4,7 +4,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { useCharacterBuilder } from '@/lib/store';
 
-export const Step5Confirmation: React.FC = () => {
+export const Step6Confirmation: React.FC = () => {
   const { draft } = useCharacterBuilder();
 
   const formatValue = (value: string | null | undefined) => {

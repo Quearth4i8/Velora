@@ -154,7 +154,7 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
   const stylePrompts = {
     [CharacterStyle.ANIME]: 'lazypos, masterpiece, best quality, ultra-detailed, high quality anime art, illustration, clean lines, vibrant colors, solo character, single person, only one character, perfect hands, detailed fingers, full body portrait',
     [CharacterStyle.REALISTIC]: 'lazypos, masterpiece, best quality, ultra-realistic, photorealistic, professional photography, detailed, high resolution, 8k, solo character, single person, only one character, perfect hands, detailed fingers, full body portrait',
-    [CharacterStyle.ARTISTIC]: 'lazypos, masterpiece, best quality, artistic, digital painting, concept art, detailed, stunning, high quality, solo character, single person, only one character, perfect hands, detailed fingers, full body portrait',
+    [CharacterStyle.ARTISTIC]: 'lazypos, masterpiece, best quality, artistic, digital painting, detailed, stunning, high quality, 1 girl, perfect hands, detailed fingers, full body portrait',
   };
 
   const isSpecialCharacter = draft.characterType === 'special';
@@ -166,7 +166,7 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
   const ageNumber = typeof identity.age === 'number' && Number.isFinite(identity.age) ? identity.age : null;
   const age = ageNumber !== null ? `${ageNumber} years old` : '';
   const isMinor = ageNumber !== null && ageNumber < 18;
-  const subjectDescriptor = isMinor ? 'girl' : 'woman';
+  const subjectDescriptor = isMinor ? 'loli' : 'woman';
   const ageDescriptor =
     ageNumber === null
       ? ''
@@ -299,7 +299,7 @@ const buildNegativePrompt = (draft?: CharacterDraft): string => {
     typeof draft?.identity?.age === 'number' && Number.isFinite(draft.identity.age) ? draft.identity.age : null;
   if (ageNumber !== null) {
     if (ageNumber < 18) {
-      extraNegativePrompts.push('');
+      extraNegativePrompts.push('tall, long legs, long neck, long arms, long torso, long body');
     } else if (ageNumber <= 30) {
       extraNegativePrompts.push('old, elderly, wrinkles, aged, middle aged');
     } else if (ageNumber <= 45) {

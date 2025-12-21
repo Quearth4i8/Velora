@@ -12,7 +12,7 @@ const styleOptions = [
   { id: CharacterStyle.ARTISTIC, label: 'Artistic', description: 'Artistic and creative style' },
 ];
 
-export const Step6Generation: React.FC = () => {
+export const Step1ImageStyle: React.FC = () => {
   const { draft, setGeneration } = useCharacterBuilder();
 
   const handleStyleSelect = (style: CharacterStyle) => {

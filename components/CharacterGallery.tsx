@@ -281,7 +281,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
               className="w-8 h-8 flex items-center justify-center text-pink-400 hover:text-pink-300 transition-colors"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-4h-4v4zm0 0l4-4m4 4v11a2 2 0 002-2h6a2 2 0 002-2v-4h-4v4z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
               </svg>
             </button>
           </div>
@@ -290,7 +290,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
 
 
       {/* Images Grid - Full Height */}
-      <div className="h-[calc(100vh-140px)] overflow-hidden">
+      <div className="h-[calc(100vh-120px)] overflow-hidden">
         {/* Filter Section - Premium Design */}
         <div className="px-8 py-6 border-b border-dark-700/20 backdrop-blur-sm bg-gradient-to-r from-dark-800/30 to-dark-900/30">
           <div className="flex items-center justify-between">
@@ -360,7 +360,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
               >
                 <span className="flex items-center">
                   <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7m0 0l7-7" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
                   Create New
                 </span>
@@ -385,8 +385,8 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
             />
           </div>
         ) : (
-          <div className="h-full overflow-y-auto p-8">
-            <div className="masonry-grid">
+          <div className="h-full overflow-y-auto p-8 pb-24">
+              <div className="masonry-grid">
               <AnimatePresence>
                 {filteredImages
                   .map((image, index) => (
@@ -396,7 +396,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.8 }}
                     transition={{ delay: index * 0.1 }}
-                    className="masonry-item group relative"
+                    className="masonry-item group relative mb-8 md:mb-10 lg:mb-12"
                   >
                     <div className="relative overflow-hidden rounded-2xl border border-dark-700/50 bg-dark-800/30 cursor-pointer"
                      onClick={() => handleImageClick(index)}>
@@ -485,21 +485,20 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
                 column-count: 1;
                 column-gap: 1rem;
                 width: 100%;
+                column-fill: balance;
               }
 
               .masonry-item {
                 break-inside: avoid;
-                margin-bottom: 1rem;
                 width: 100%;
+                display: inline-block;
+                vertical-align: top;
               }
 
               @media (min-width: 640px) {
                 .masonry-grid {
                   column-count: 2;
                   column-gap: 1rem;
-                }
-                .masonry-item {
-                  margin-bottom: 1rem;
                 }
               }
 
@@ -508,18 +507,12 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
                   column-count: 3;
                   column-gap: 1.25rem;
                 }
-                .masonry-item {
-                  margin-bottom: 1.25rem;
-                }
               }
 
               @media (min-width: 1024px) {
                 .masonry-grid {
                   column-count: 4;
                   column-gap: 1.5rem;
-                }
-                .masonry-item {
-                  margin-bottom: 1.5rem;
                 }
               }
 
@@ -528,18 +521,12 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
                   column-count: 4;
                   column-gap: 1.5rem;
                 }
-                .masonry-item {
-                  margin-bottom: 1.5rem;
-                }
               }
 
               @media (min-width: 1536px) {
                 .masonry-grid {
                   column-count: 4;
                   column-gap: 1.75rem;
-                }
-                .masonry-item {
-                  margin-bottom: 1.75rem;
                 }
               }
             `}</style>

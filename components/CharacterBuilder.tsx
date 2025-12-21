@@ -9,13 +9,13 @@ import { automatic1111API } from '@/lib/automatic1111';
 import { PrimaryCTAButton } from '@/components/ui/PrimaryCTAButton';
 
 // Import all step components
-import { Step1CoreIdentity } from './steps/Step1CoreIdentity';
+import { Step0NameAge } from './steps/Step0NameAge';
+import { Step1ImageStyle } from './steps/Step1ImageStyle';
 import { Step2BodyProportions } from './steps/Step2BodyProportions';
 import { Step3HairFace } from './steps/Step3HairFace';
 import { Step4BodyProportions } from './steps/Step4BodyProportions';
-import { Step4Personality } from './steps/Step4Personality';
-import { Step5Confirmation } from './steps/Step5Confirmation';
-import { Step6Generation } from './steps/Step6Generation';
+import { Step5Personality } from './steps/Step5Personality';
+import { Step6Confirmation } from './steps/Step6Confirmation';
 
 export function CharacterBuilder() {
   const { draft, setCurrentStep, resetDraft } = useCharacterBuilder();
@@ -103,9 +103,9 @@ export function CharacterBuilder() {
   const renderStep = () => {
     switch (currentStep) {
       case 0:
-        return <Step1CoreIdentity />;
+        return <Step0NameAge />;
       case 1:
-        return <Step6Generation />;
+        return <Step1ImageStyle />;
       case 2:
         return <Step2BodyProportions />;
       case 3:
@@ -113,11 +113,11 @@ export function CharacterBuilder() {
       case 4:
         return <Step4BodyProportions />;
       case 5:
-        return <Step4Personality />;
+        return <Step5Personality />;
       case 6:
-        return <Step5Confirmation />;
+        return <Step6Confirmation />;
       default:
-        return <Step1CoreIdentity />;
+        return <Step0NameAge />;
     }
   };
 
