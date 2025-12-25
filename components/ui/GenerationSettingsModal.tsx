@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ASPECT_RATIO_OPTIONS, getDimensionsFromAspectRatio } from '@/config/aspect-ratios';
 
 interface GenerationSettings {
   steps: number;
@@ -99,11 +100,14 @@ export function GenerationSettingsModal({
                   onChange={(e) => onSettingsChange({...settings, aspectRatio: e.target.value})}
                   className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white text-sm"
                 >
-                  <option value="portrait">Portrait (768x1024)</option>
-                  <option value="landscape">Landscape (1024x576)</option>
-                  <option value="square">Square (896x896)</option>
-                  <option value="cinematic">Cinematic (1216x704)</option>
-                  <option value="mobile">Mobile (832x1216)</option>
+                  {ASPECT_RATIO_OPTIONS.map((option) => {
+                    const dims = getDimensionsFromAspectRatio(option.id);
+                    return (
+                      <option key={option.id} value={option.id}>
+                        {option.label} ({dims.width}x{dims.height})
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
               

@@ -91,7 +91,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
           console.error('Failed to save outfit to database:', result.error);
         } else {
           // Refresh character data from database to clear any cache
-          const refreshedCharacter = await characterAPI.getCharacter(currentCharacter.id);
+          const refreshedCharacter = await characterAPI.getCharacterFresh(currentCharacter.id);
           if (refreshedCharacter.success && refreshedCharacter.data) {
             setCurrentCharacter(refreshedCharacter.data);
             // Update parent component state
@@ -201,7 +201,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
           console.error('Failed to save environment to database:', result.error);
         } else {
           // Refresh character data from database to clear any cache
-          const refreshedCharacter = await characterAPI.getCharacter(currentCharacter.id);
+          const refreshedCharacter = await characterAPI.getCharacterFresh(currentCharacter.id);
           if (refreshedCharacter.success && refreshedCharacter.data) {
             setCurrentCharacter(refreshedCharacter.data);
             // Update parent component state
@@ -459,15 +459,15 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                   <h3 className="text-xl font-semibold text-pink-300">Regular Outfits</h3>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {[
-                    { id: 'casual', label: 'Casual', image: '/images/clothing-casual.jpg', description: 'Flirty everyday look - tight low-rise jeans hugging curves, cropped tank top showing a hint of midriff, casual yet teasingly sexy' },
-                    { id: 'formal', label: 'Formal', image: '/images/clothing-formal.jpg', description: 'Sultry evening elegance - form-fitting cocktail dress with deep V-neckline, thigh-high slit, paired with strappy heels for a sophisticated allure' },
-                    { id: 'sporty', label: 'Sporty', image: '/images/clothing-sporty.jpg', description: 'Sexy athletic vibe - high-waisted leggings that accentuate the hips and thighs, supportive sports bra with plunging neckline, perfect for a confident workout glow' },
-                    { id: 'elegant', label: 'Elegant', image: '/images/clothing-elegant.jpg', description: 'Graceful sensuality - sleek satin gown that drapes beautifully over curves, subtle backless design, delicate straps, and tasteful side slit for refined allure' },
-                    { id: 'cute', label: 'Cute', image: '/images/clothing-cute.jpg', description: 'Playful and flirty - short pleated skirt with a fitted off-shoulder top, soft pastel colors, and a touch of lace for an irresistibly sweet yet teasing charm' },
-                    { id: 'edgy', label: 'Edgy', image: '/images/clothing-edgy.jpg', description: 'Bold and provocative - cropped leather jacket over a lace bralette, distressed skinny jeans with strategic rips, combat boots for a fierce, seductive edge' },
-                    { id: 'traditional', label: 'Traditional', image: '/images/clothing-traditional.jpg', description: 'Timeless beauty with allure - elegantly draped traditional attire that flatters the figure, subtle sheer accents and intricate embroidery highlighting graceful curves' },
-                    { id: 'fantasy', label: 'Fantasy', image: '/images/clothing-fantasy.jpg', description: 'Enchanting seduction - flowing ethereal dress with delicate sheer layers, corset-style bodice accentuating the waist, mystical jewelry for a captivating otherworldly charm' }
+                  {[ 
+                    { id: 'casual', label: 'Casual', image: '/images/clothing-casual.jpg', description: 'Relaxed everyday style - comfortable and approachable look' },
+                    { id: 'formal', label: 'Formal', image: '/images/clothing-formal.jpg', description: 'Classic evening elegance - refined and sophisticated outfit' },
+                    { id: 'sporty', label: 'Sporty', image: '/images/clothing-sporty.jpg', description: 'Active and energetic - athletic vibe with practical details' },
+                    { id: 'elegant', label: 'Elegant', image: '/images/clothing-elegant.jpg', description: 'Timeless sophistication - graceful, polished appearance' },
+                    { id: 'cute', label: 'Cute', image: '/images/clothing-cute.jpg', description: 'Adorable and sweet - charming and playful look' },
+                    { id: 'edgy', label: 'Edgy', image: '/images/clothing-edgy.jpg', description: 'Bold modern style - confident attitude with striking accents' },
+                    { id: 'traditional', label: 'Traditional', image: '/images/clothing-traditional.jpg', description: 'Cultural elegance - rich patterns and traditional details' },
+                    { id: 'fantasy', label: 'Fantasy', image: '/images/clothing-fantasy.jpg', description: 'Magical and dreamy - enchanting fairytale outfit' }
                   ].map((outfit) => (
                     <motion.button
                       key={outfit.id}
@@ -525,8 +525,8 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                     { id: 'underwear', label: 'Underwear', image: '/images/clothing-underwear.jpg', description: 'Intimate wear - sexy underwear set for private moments' },
                     { id: 'revealing', label: 'Revealing', image: '/images/clothing-revealing.jpg', description: 'Bold style - daring outfit that shows more skin' },
                     { id: 'bodysuit', label: 'Bodysuit', image: '/images/clothing-bodysuit.jpg', description: 'Form fitting - tight bodysuit that accentuates curves' },
-                    { id: 'bunny-suit', label: 'Bunny Suit', image: '/images/clothing-bunny-suit.jpg', description: 'Ultra provocative - skimpy bunny suit with plunging neckline, extreme high-cut thighs, corset cinch, fishnets, and bunny ears for ultimate seduction' },
-                    { id: 'harness', label: 'Harness', image: '/images/clothing-harness.jpg', description: 'Edgy straps - provocative leather or strap harness for a dominant look' }
+                    { id: 'crotchless', label: 'Crotchless Panties', image: '/images/clothing-crotchless.jpg', description: 'Extremely explicit - sheer lace panties with fully open crotch, designed for instant access and maximum exposure' },
+                    { id: 'nipple-pasties', label: 'Nipple Pasties', image: '/images/clothing-nipple-pasties.jpg', description: 'tiny pasties over nipples, completely topless otherwise with thong or nothing below for ultimate tease, sheer lace panties' }
                   ].map((outfit) => (
                     <motion.button
                       key={outfit.id}

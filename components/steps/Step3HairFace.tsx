@@ -75,14 +75,14 @@ const realisticEyeTypeOptions = [
 ];
 
 const clothingOptions = [
-  { id: ClothingStyle.CASUAL, label: 'Casual', image: '/images/clothing-casual.jpg', description: 'Everyday casual wear like jeans and t-shirt' },
-  { id: ClothingStyle.FORMAL, label: 'Formal', image: '/images/clothing-formal.jpg', description: 'Elegant formal wear like dresses and suits' },
-  { id: ClothingStyle.SPORTY, label: 'Sporty', image: '/images/clothing-sporty.jpg', description: 'Athletic wear for sports and activities' },
-  { id: ClothingStyle.ELEGANT, label: 'Elegant', image: '/images/clothing-elegant.jpg', description: 'Sophisticated evening wear and gowns' },
-  { id: ClothingStyle.CUTE, label: 'Cute', image: '/images/clothing-cute.jpg', description: 'Adorable and charming outfits' },
-  { id: ClothingStyle.EDGY, label: 'Edgy', image: '/images/clothing-edgy.jpg', description: 'Alternative and rebellious style' },
+  { id: ClothingStyle.CASUAL, label: 'Casual', image: '/images/clothing-casual.jpg', description: 'Everyday relaxed outfit' },
+  { id: ClothingStyle.FORMAL, label: 'Formal', image: '/images/clothing-formal.jpg', description: 'Elegant formal outfit' },
+  { id: ClothingStyle.SPORTY, label: 'Sporty', image: '/images/clothing-sporty.jpg', description: 'Athletic and activewear style' },
+  { id: ClothingStyle.ELEGANT, label: 'Elegant', image: '/images/clothing-elegant.jpg', description: 'Sophisticated and refined look' },
+  { id: ClothingStyle.CUTE, label: 'Cute', image: '/images/clothing-cute.jpg', description: 'Adorable and charming style' },
+  { id: ClothingStyle.EDGY, label: 'Edgy', image: '/images/clothing-edgy.jpg', description: 'Alternative and rebellious look' },
   { id: ClothingStyle.TRADITIONAL, label: 'Traditional', image: '/images/clothing-traditional.jpg', description: 'Cultural and traditional attire' },
-  { id: ClothingStyle.FANTASY, label: 'Fantasy', image: '/images/clothing-fantasy.jpg', description: 'Magical and fantasy-themed outfits' },
+  { id: ClothingStyle.FANTASY, label: 'Fantasy', image: '/images/clothing-fantasy.jpg', description: 'Magical and fantasy-themed outfit' },
 ];
 
 export const Step3HairFace: React.FC = () => {

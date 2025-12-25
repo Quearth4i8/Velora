@@ -345,13 +345,26 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
               {/* Character Info */}
               <div className="flex flex-col items-center">
                 <h1 className="text-xl font-semibold text-white">{character.name || 'Character'}</h1>
-                <div className="text-sm text-pink-400 capitalize">{character.personality?.archetype || 'Mysterious'}</div>
+                <div className="text-sm text-pink-400 capitalize">{character.mainTag || 'Human'}</div>
               </div>
             </div>
           </div>
           
-          {/* 3-dot Menu Button */}
-          <div className="relative navbar-dropdown">
+          {/* Right Side Actions */}
+          <div className="flex items-center space-x-2">
+            {/* Home Button */}
+            <button
+              onClick={() => window.location.href = '/'}
+              className="flex items-center text-pink-300 hover:text-pink-200 transition-colors group"
+            >
+              <svg className="w-4 h-4 mr-2 group-hover:-translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+              <span className="text-sm font-medium">Home</span>
+            </button>
+            
+            {/* 3-dot Menu Button */}
+            <div className="relative navbar-dropdown">
             <button
               onClick={(e) => {
                 const rect = e.currentTarget.getBoundingClientRect();
@@ -369,6 +382,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
                 <circle cx="12" cy="19" r="2"/>
               </svg>
             </button>
+          </div>
           </div>
         </div>
       </div>
@@ -741,7 +755,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
               transition={{ duration: 0.3, ease: "easeOut" }}
               className="relative h-full flex items-center justify-center p-4"
             >
-              <div className="relative max-w-4xl max-h-[90vh] w-full h-full flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+              <div className="relative max-w-7xl max-h-[90vh] w-full h-full flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
                 <motion.img
                   initial={{ scale: 0.9 }}
                   animate={{ scale: 1 }}
@@ -755,14 +769,6 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
                 />
               
               {/* Close Button */}
-              <button
-                onClick={handleCloseZoom}
-                className="absolute top-4 right-4 w-10 h-10 bg-pink-500/80 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-pink-600/90 transition-all duration-200 hover:scale-110"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
               
               {/* Navigation */}
               {filteredImages.length > 1 && (
@@ -791,9 +797,6 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
                   </button>
                   
                   {/* Image Counter */}
-                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full text-white text-sm">
-                    {zoomedImageIndex + 1} / {filteredImages.length}
-                  </div>
                 </>
               )}
             </div>

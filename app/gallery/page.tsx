@@ -9,6 +9,7 @@ import { CharacterStyle, Ethnicity, Height, Physique, ChestSize, ButtSize, HairS
 import { useBlurNSFW } from '@/lib/useBlurNSFW';
 import { useDialog } from '@/components/ui/DialogProvider';
 import { Eye, Sparkles } from 'lucide-react';
+import { ASPECT_RATIO_OPTIONS, getDimensionsFromAspectRatio } from '@/config/aspect-ratios';
 
 export default function GalleryPage() {
   const [filter, setFilter] = useState<'all' | 'sfw' | 'nsfw'>('all');
@@ -54,6 +55,13 @@ export default function GalleryPage() {
     return result.join(', ');
   };
 
+  const joinAndDedupeTags = (...pieces: Array<string | undefined | null | false>) => {
+    const joined = pieces
+      .filter((piece): piece is string => typeof piece === 'string' && piece.trim().length > 0)
+      .join(', ');
+    return dedupeCommaTags(joined);
+  };
+
   const buildSpecialPrompt = (userPrompt: string, style: CharacterStyle) => {
     const cleaned = String(userPrompt || '').trim();
     if (!cleaned) return '';
@@ -61,6 +69,9 @@ export default function GalleryPage() {
     if (specialRawPrompt) {
       return cleaned;
     }
+
+    const isCentaur = /(^|\b)(centaur|taur)(\b|$)/i.test(cleaned);
+    const centaurAnatomy = isCentaur ? 'equine lower body, horse body, four legs, four hooves' : '';
 
     const stylePrefixes: Record<CharacterStyle, string> = {
       [CharacterStyle.ANIME]:
@@ -79,7 +90,7 @@ export default function GalleryPage() {
       custom: '',
     };
 
-    const pieces = [stylePrefixes[style], focusPrefixes[specialFocus], cleaned].filter(Boolean);
+    const pieces = [stylePrefixes[style], focusPrefixes[specialFocus], centaurAnatomy, cleaned].filter(Boolean);
     return dedupeCommaTags(pieces.join(', '));
   };
 
@@ -87,7 +98,13 @@ export default function GalleryPage() {
     const base =
       'low quality, worst quality, jpeg artifacts, watermark, signature, text, blurry, duplicate, duplicates, multiple faces, two faces, twins, extra face, extra head, extra eyes, extra mouth, extra nose';
     const cleaned = String(userNegativePrompt || '').trim();
-    return dedupeCommaTags(cleaned ? `${base}, ${cleaned}` : base);
+
+    const isCentaur = /(^|\b)(centaur|taur)(\b|$)/i.test(String(specialPrompt || '').trim());
+    const centaurNegative = isCentaur
+      ? 'bipedal, human legs, human lower body, only two legs, two-legged centaur, missing hind legs, missing horse legs'
+      : '';
+
+    return dedupeCommaTags(joinAndDedupeTags(base, centaurNegative, cleaned));
   };
 
   const handleSpecialGenerate = async () => {
@@ -101,28 +118,6 @@ export default function GalleryPage() {
       if (!isConnected) {
         throw new Error('Automatic1111 is not running or not accessible');
       }
-
-      const getDimensionsFromAspectRatio = (aspectRatio: string) => {
-        switch (aspectRatio) {
-          case 'portrait':
-          case '9:16':
-            return { width: 768, height: 1024 };
-          case 'landscape':
-          case '16:9':
-            return { width: 1024, height: 768 };
-          case 'square':
-          case '1:1':
-            return { width: 896, height: 896 };
-          case 'cinematic':
-          case '21:9':
-            return { width: 1216, height: 704 };
-          case 'mobile':
-          case '9:19':
-            return { width: 832, height: 1216 };
-          default:
-            return { width: 768, height: 1024 };
-        }
-      };
 
       const dimensions = getDimensionsFromAspectRatio(generationSettings.aspectRatio || 'portrait');
       const resolvedModel = automatic1111API.getModelForStyle(generationSettings.style);
@@ -262,7 +257,7 @@ export default function GalleryPage() {
   const [generationSettings, setGenerationSettings] = useState({
     style: CharacterStyle.REALISTIC,
     quality: 'standard',
-    aspectRatio: '1:1',
+    aspectRatio: 'square',
     steps: 20,
     cfgScale: 7,
     sampler: 'DPM++ 2M Karras',
@@ -402,42 +397,62 @@ export default function GalleryPage() {
       // Enhanced prompt function to match character generation quality
       const getEnhancedPrompt = (userPrompt: string, style: string) => {
         const stylePrompts = {
-          'anime': 'lazypos, masterpiece, best quality, ultra-detailed, high quality anime art, illustration, clean lines, vibrant colors, solo character, single person, only one character',
-          'realistic': 'lazypos, masterpiece, best quality, ultra-realistic, photorealistic, professional photography, detailed, high resolution, 8k, solo character, single person, only one character',
-          'artistic': 'lazypos, masterpiece, best quality, artistic, digital painting, concept art, detailed, stunning, high quality, solo character, single person, only one character',
+          'anime': 'masterpiece, best quality, highres, very aesthetic, absurdres, lazypos, anime art, illustration, clean lineart, vibrant colors, solo, full body',
+          'realistic': 'masterpiece, best quality, highres, very aesthetic, absurdres, lazypos, photorealistic, professional photography, sharp focus, solo, full body',
+          'artistic': 'masterpiece, best quality, highres, very aesthetic, absurdres, lazypos, digital painting, concept art, detailed, solo, full body',
         };
         
         const stylePrefix = stylePrompts[style as keyof typeof stylePrompts] || stylePrompts.realistic;
-        return `${stylePrefix}, ${userPrompt}`;
-      };
 
-      const getDimensionsFromAspectRatio = (aspectRatio: string) => {
-      switch (aspectRatio) {
-        case 'portrait':
-        case '9:16':
-          return { width: 768, height: 1024 };
-        case 'landscape':
-        case '16:9':
-          return { width: 1024, height: 768 };
-        case 'square':
-        case '1:1':
-          return { width: 896, height: 896 };
-        case 'cinematic':
-        case '21:9':
-          return { width: 1216, height: 704 };
-        case 'mobile':
-        case '9:19':
-          return { width: 832, height: 1216 };
-        default:
-          return { width: 768, height: 1024 };
-      }
-    };
+        const cleaned = String(userPrompt || '').trim();
+        const isCentaur = /(^|\b)(centaur|taur)(\b|$)/i.test(cleaned);
+        const centaurAnatomy = isCentaur ? 'equine lower body, horse body, four legs, four hooves' : '';
+
+        return joinAndDedupeTags(stylePrefix, centaurAnatomy, cleaned);
+      };
 
       const dimensions = getDimensionsFromAspectRatio(generationSettings.aspectRatio || 'portrait');
       const resolvedModel = automatic1111API.getModelForStyle(generationSettings.style);
+
+      const cleanedPrompt = String(prompt || '').trim();
+      const isCentaur = /(^|\b)(centaur|taur)(\b|$)/i.test(cleanedPrompt);
+
+      const baseNegative = joinAndDedupeTags(
+        'lazyneg',
+        'low quality',
+        'worst quality',
+        'jpeg artifacts',
+        'watermark',
+        'signature',
+        'text',
+        'blurry',
+        'bad anatomy',
+        'bad hands',
+        'missing fingers',
+        'extra fingers',
+        'extra digit',
+        'fewer digits',
+        'extra limbs',
+        'missing limbs',
+        'fused fingers',
+        'too many fingers',
+        'cropped',
+        'out of frame'
+      );
+
+      const centaurNegative = isCentaur
+        ? 'bipedal, human legs, human lower body, only two legs, two-legged centaur, missing hind legs, missing horse legs'
+        : '';
+
+      const finalNegativePrompt = joinAndDedupeTags(
+        baseNegative,
+        centaurNegative,
+        generationSettings.negativePrompt || ''
+      );
+
       const payload = {
         prompt: getEnhancedPrompt(prompt, generationSettings.style),
-        negative_prompt: `lazyneg, ${generationSettings.negativePrompt || 'low quality, worst quality, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry, artist name, deformed, disfigured, malformed, mutated, ugly, disgusting, distorted, bad proportions, extra limbs, missing limbs, fused fingers, too many fingers, long neck'}`,
+        negative_prompt: finalNegativePrompt,
         width: dimensions.width,
         height: dimensions.height,
         steps: generationSettings.steps || 30,
@@ -739,10 +754,14 @@ export default function GalleryPage() {
               onChange={(e) => setGenerationSettings(prev => ({ ...prev, aspectRatio: e.target.value }))}
               className="w-full p-2 text-sm bg-dark-900 text-white rounded-lg border border-dark-700 focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
             >
-              <option value="1:1">Square (1:1)</option>
-              <option value="16:9">Landscape (16:9)</option>
-              <option value="9:16">Portrait (9:16)</option>
-              <option value="4:3">Wide (4:3)</option>
+              {ASPECT_RATIO_OPTIONS.map((option) => {
+                const dims = getDimensionsFromAspectRatio(option.id);
+                return (
+                  <option key={option.id} value={option.id}>
+                    {option.label} ({dims.width}x{dims.height})
+                  </option>
+                );
+              })}
             </select>
           </div>
 

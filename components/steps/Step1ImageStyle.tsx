@@ -50,6 +50,7 @@ export const Step1ImageStyle: React.FC = () => {
       loraNames: undefined,
       loraWeight: null,
       specialPrompt: undefined,
+      specialNegativePrompt: undefined,
     });
   };
 
@@ -64,6 +65,7 @@ export const Step1ImageStyle: React.FC = () => {
       loraNames: preset.loraNames && preset.loraNames.length > 0 ? preset.loraNames : undefined,
       loraWeight: typeof preset.loraWeight === 'number' ? preset.loraWeight : null,
       specialPrompt: preset.specialPrompt || undefined,
+      specialNegativePrompt: 'specialNegativePrompt' in preset ? (preset as { specialNegativePrompt?: string }).specialNegativePrompt : undefined,
     });
   };
 
