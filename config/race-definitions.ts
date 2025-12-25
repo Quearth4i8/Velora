@@ -64,7 +64,7 @@ export const RACE_DEFINITIONS: Record<CharacterStyle, { races: Record<string, Ra
         label: 'Goblin Girl',
         mainTag: 'goblin girl',
         specialPrompt:
-          'female goblin, colored skin, green skin, freckles, long pointed ears, wide hips, large breasts, sharp teeth, beautiful detailed eyes, perfect symmetrical eyes, clear pupils, sharp eye details, expressive eyes',
+          'female goblin, colored skin, freckles, long pointed ears, wide hips, large breasts, sharp teeth, beautiful detailed eyes, perfect symmetrical eyes, clear pupils, sharp eye details, expressive eyes',
         loraName: 'goblina.safetensors',
         loraWeight: 0.9,
       },
@@ -84,11 +84,21 @@ export const RACE_DEFINITIONS: Record<CharacterStyle, { races: Record<string, Ra
         loraName: 'fairy.safetensors',
         loraWeight: 1,
       },
+      arachne: {
+        label: 'Arachne',
+        mainTag: 'arachne',
+        specialPrompt:
+          'arachnecpt, arachne, spider girl, monster girl, human upper body, spider lower body, taur, arthropod abdomen, (eight legs:1.4), (multiple legs:1.3), (spider legs:1.3), visible hind legs, detailed carapace, black widow markings optional, pedipalps, fangs, extra eyes optional, silk threads, beautiful detailed eyes, perfect symmetrical eyes, clear pupils, sharp eye details, expressive eyes',
+        specialNegativePrompt:
+          'human legs, extra human limbs, fused legs, missing legs, deformed legs, extra abdomen, multiple abdomens, human lower body, asymmetrical body, duplicated torso',
+        loraName: 'arachne.safetensors',
+        loraWeight: 1,
+      },
       demon: {
         label: 'Demon',
         mainTag: 'demon',
         specialPrompt:
-          'demonmge, demon girl, monster girl, (demon horns:1.25), (bat wings:1.15), (spade-tipped tail:1.2), prehensile tail, claws, sharp fangs, slit pupils, colored skin, red skin, dark aura, gothic fantasy, high detail, beautiful detailed eyes, perfect symmetrical eyes, clear pupils, sharp eye details, expressive eyes',
+          'demonmge, demon girl, monster girl, (demon horns:1.25), horns match skin, same color horns, (bat wings:1.15), (spade-tipped tail:1.2), prehensile tail, claws, sharp fangs, slit pupils, colored skin, dark aura, gothic fantasy, high detail, beautiful detailed eyes, perfect symmetrical eyes, clear pupils, sharp eye details, expressive eyes',
         specialNegativePrompt:
           'extra horns, multiple horns, deformed horns, missing horns, extra wings, multiple wings, extra tail, multiple tails, duplicated limbs, asymmetrical face',
         loraName: 'demon.safetensors',
@@ -98,7 +108,7 @@ export const RACE_DEFINITIONS: Record<CharacterStyle, { races: Record<string, Ra
         label: 'Succubus',
         mainTag: 'succubus',
         specialPrompt:
-          'succubus, demon girl, monster girl, pointy ears, demon tail, demon horns, colored skin, blue skin, colored sclera, black sclera, spade-tipped tail, prehensile tail, claws, dark purple tail, no wings, small horns, womb tattoo, beautiful detailed eyes, perfect symmetrical eyes, clear pupils, sharp eye details, expressive eyes',
+          'succubus, demon girl, monster girl, pointy ears, demon tail, demon horns, colored skin, colored sclera, black sclera, spade-tipped tail, prehensile tail, claws, dark purple tail, no wings, small horns, womb tattoo, beautiful detailed eyes, perfect symmetrical eyes, clear pupils, sharp eye details, expressive eyes',
         loraNames: ['demon.safetensors', 'womb_tattoo.safetensors'],
         loraName: undefined,
         loraWeight: 0.8,
@@ -135,7 +145,7 @@ export const RACE_DEFINITIONS: Record<CharacterStyle, { races: Record<string, Ra
         label: 'Goblin Girl',
         mainTag: 'goblin girl',
         specialPrompt:
-          'female goblin, colored skin, green skin, freckles, long pointed ears, wide hips, large breasts, sharp teeth, beautiful detailed eyes, perfect symmetrical eyes, clear pupils, sharp eye details, expressive eyes',
+          'female goblin, colored skin, freckles, long pointed ears, wide hips, large breasts, sharp teeth, beautiful detailed eyes, perfect symmetrical eyes, clear pupils, sharp eye details, expressive eyes',
         loraName: 'goblina.safetensors',
         loraWeight: 0.9,
       },
@@ -159,7 +169,7 @@ export const RACE_DEFINITIONS: Record<CharacterStyle, { races: Record<string, Ra
         label: 'Demon',
         mainTag: 'demon',
         specialPrompt:
-          'demonmge, demon girl, monster girl, (demon horns:1.25), (bat wings:1.15), (spade-tipped tail:1.2), prehensile tail, claws, sharp fangs, slit pupils, colored skin, red skin, dark aura, gothic fantasy, high detail, beautiful detailed eyes, perfect symmetrical eyes, clear pupils, sharp eye details, expressive eyes',
+          'demonmge, demon girl, monster girl, (demon horns:1.25), horns match skin, same color horns, (bat wings:1.15), (spade-tipped tail:1.2), prehensile tail, claws, sharp fangs, slit pupils, colored skin, dark aura, gothic fantasy, high detail, beautiful detailed eyes, perfect symmetrical eyes, clear pupils, sharp eye details, expressive eyes',
         specialNegativePrompt:
           'extra horns, multiple horns, deformed horns, missing horns, extra wings, multiple wings, extra tail, multiple tails, duplicated limbs, asymmetrical face',
         loraName: 'demon.safetensors',
@@ -169,7 +179,7 @@ export const RACE_DEFINITIONS: Record<CharacterStyle, { races: Record<string, Ra
         label: 'Succubus',
         mainTag: 'succubus',
         specialPrompt:
-          'succubus, demon girl, monster girl, pointy ears, demon tail, demon horns, colored skin, blue skin, colored sclera, black sclera, spade-tipped tail, prehensile tail, claws, dark purple tail, no wings, small horns, womb tattoo, beautiful detailed eyes, perfect symmetrical eyes, clear pupils, sharp eye details, expressive eyes',
+          'succubus, demon girl, monster girl, pointy ears, demon tail, demon horns, colored skin, colored sclera, black sclera, spade-tipped tail, prehensile tail, claws, dark purple tail, no wings, small horns, womb tattoo, beautiful detailed eyes, perfect symmetrical eyes, clear pupils, sharp eye details, expressive eyes',
         loraNames: ['demon.safetensors', 'womb_tattoo.safetensors'],
         loraName: undefined,
         loraWeight: 0.8,

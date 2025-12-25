@@ -14,6 +14,45 @@ type LoraPreset = {
   imageSrc?: string;
 };
 
+export const DEFAULT_SKIN_TONE_OPTIONS = [
+  '#FFFFFF',
+  '#FFF4E8',
+  '#FFE0BD',
+  '#FFCD94',
+  '#EAC086',
+  '#E0AC69',
+  '#D99E6C',
+  '#C58C6B',
+  '#B97C4B',
+  '#A57C5A',
+  '#8D5524',
+  '#6B4423',
+  '#4A2C1A',
+];
+
+export const RACE_SKIN_TONE_OPTIONS: Record<string, string[]> = {
+  demon: ['#FFFFFF', '#FF0000', '#DC143C', '#800000', '#800080', '#4B0082', '#2F4F4F', '#000000'],
+  succubus: ['#FFFFFF', '#800080', '#4B0082', '#0000FF', '#191970', '#DC143C', '#000000'],
+  'goblin-girl': ['#FFFFFF', '#00FF00', '#008000', '#008080', '#2F4F4F', '#A52A2A'],
+};
+
+export const getSkinToneOptionsForRace = (raceId?: string, mainTag?: string): string[] => {
+  const normalizedRaceId = typeof raceId === 'string' ? raceId.trim().toLowerCase() : '';
+  if (normalizedRaceId && RACE_SKIN_TONE_OPTIONS[normalizedRaceId]) {
+    return RACE_SKIN_TONE_OPTIONS[normalizedRaceId];
+  }
+
+  const normalizedMainTag = typeof mainTag === 'string' ? mainTag.trim().toLowerCase() : '';
+  if (normalizedMainTag) {
+    if (RACE_SKIN_TONE_OPTIONS[normalizedMainTag]) return RACE_SKIN_TONE_OPTIONS[normalizedMainTag];
+    if (normalizedMainTag === 'goblin girl' || normalizedMainTag.includes('goblin')) {
+      return RACE_SKIN_TONE_OPTIONS['goblin-girl'];
+    }
+  }
+
+  return DEFAULT_SKIN_TONE_OPTIONS;
+};
+
 export const CHARACTER_CONFIG = {
   ageGroups: [
     { label: '18+', value: AgeGroup.EIGHTEEN_PLUS },

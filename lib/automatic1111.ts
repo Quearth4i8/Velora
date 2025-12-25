@@ -281,9 +281,6 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
     [CharacterStyle.ARTISTIC]: 'masterpiece, best quality, highres, very aesthetic, absurdres, lazypos, digital painting, concept art, detailed, solo, full body',
   };
 
-  const loraNames = normalizeLoraNames(draft);
-  const hasSpecialFields = Boolean(draft.mainTag?.trim() || loraNames.length > 0 || draft.specialPrompt?.trim());
-  const isSpecialCharacter = draft.characterType === 'special' || hasSpecialFields;
   const mainTag = draft.mainTag?.trim();
   const specialPrompt = draft.specialPrompt?.trim();
 
@@ -291,10 +288,26 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
   const specialPromptLower = specialPrompt?.toLowerCase() || '';
   const isCentaur =
     mainTagLower.includes('centaur') || specialPromptLower.includes('centaur') || mainTagLower.includes('taur') || specialPromptLower.includes('taur');
+  const isDemonish =
+    mainTagLower.includes('demon') ||
+    mainTagLower.includes('succubus') ||
+    specialPromptLower.includes('demon horns') ||
+    specialPromptLower.includes('demonmge') ||
+    specialPromptLower.includes('succubus');
+  const hasFangs =
+    mainTagLower.includes('vampire') ||
+    specialPromptLower.includes('vampire') ||
+    mainTagLower.includes('fang') ||
+    specialPromptLower.includes('fang');
 
-  // Basic characteristics
+  const loraNamesBase = normalizeLoraNames(draft);
+  const loraNames = hasFangs ? Array.from(new Set([...loraNamesBase, 'fangs.safetensors'])) : loraNamesBase;
+  const hasSpecialFields = Boolean(draft.mainTag?.trim() || loraNames.length > 0 || draft.specialPrompt?.trim());
+  const isSpecialCharacter = draft.characterType === 'special' || hasSpecialFields;
+
   const ageNumber = typeof identity.age === 'number' && Number.isFinite(identity.age) ? identity.age : null;
   const age = ageNumber !== null ? `${ageNumber} years old` : '';
+
   const isMinor = ageNumber !== null && ageNumber < 18;
   const subjectDescriptor = isMinor ? 'loli' : 'woman';
   const ageDescriptor =
@@ -374,10 +387,16 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
   };
 
   const loraTags =
-    loraNames.length > 0 ? loraNames.map((name) => buildLoraTag(name, draft.loraWeight)).join(', ') : '';
+    loraNames.length > 0
+      ? loraNames
+          .map((name) => (name === 'fangs.safetensors' ? buildLoraTag(name, 1) : buildLoraTag(name, draft.loraWeight)))
+          .join(', ')
+      : '';
   const loraEyes = loraNames.includes('Eyes.safetensors') ? 'loraeyes' : '';
 
   const skinToneTag = skinTone ? `${hexToColorName(skinTone)} skin` : '';
+  const hornColorTag = skinTone && isDemonish ? `${hexToColorName(skinTone)} horns` : '';
+  const fangsActivationTags = hasFangs ? 'fangs, teeth, mouth, open mouth, perfect teeth, detailed teeth' : '';
   const clothingTag = clothing ? `wearing detailed ${getClothingDetails(clothing, false, draft)}` : '';
   const hairColorTag = hairColor ? `${hexToColorName(hairColor)} hair` : '';
   const eyeColorTag = eyeColor ? `${eyeColor} eyes` : '';
@@ -396,6 +415,8 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
     age,
     ethnicity,
     skinToneTag,
+    hornColorTag,
+    fangsActivationTags,
     subjectDescriptor,
     ageDescriptor,
     height,

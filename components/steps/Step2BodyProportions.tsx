@@ -4,6 +4,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { useCharacterBuilder } from '@/lib/store';
 import { Ethnicity, Height } from '@/lib/types';
+import { getSkinToneOptionsForRace } from '@/config/character-config';
 import { ImageOptionCard } from '../ui/ImageOptionCard';
 import { OptionPill } from '../ui/OptionPill';
 
@@ -16,25 +17,20 @@ const ethnicityOptions = [
   { id: Ethnicity.MIXED, label: 'Mixed', image: '/images/ethnicity-mixed.jpg' },
 ];
 
-const skinToneOptions = [
-  '#FFF4E8',
-  '#FFE0BD',
-  '#FFCD94',
-  '#EAC086',
-  '#E0AC69',
-  '#D99E6C',
-  '#C58C6B',
-  '#B97C4B',
-  '#A57C5A',
-  '#8D5524',
-  '#6B4423',
-  '#4A2C1A',
-];
-
 const heightOptions = [Height.TINY, Height.CHILDLIKE, Height.PETITE, Height.SMALL, Height.AVERAGE, Height.TALL];
 
 export const Step2BodyProportions: React.FC = () => {
   const { draft, setIdentity, setBody } = useCharacterBuilder();
+
+  const skinToneOptions = React.useMemo(() => {
+    return getSkinToneOptionsForRace(draft.stylePreset, draft.mainTag);
+  }, [draft.mainTag, draft.stylePreset]);
+
+  React.useEffect(() => {
+    if (!draft.identity.skinTone) return;
+    if (skinToneOptions.includes(draft.identity.skinTone)) return;
+    setIdentity({ skinTone: skinToneOptions[0] });
+  }, [draft.identity.skinTone, setIdentity, skinToneOptions]);
 
   const handleEthnicitySelect = (ethnicity: Ethnicity) => {
     setIdentity({ ethnicity });
