@@ -11,9 +11,10 @@ import { automatic1111API } from '@/lib/automatic1111';
 interface ChatInterfaceProps {
   character: CharacterDraft;
   onBack: () => void;
+  onCharacterUpdate?: (character: CharacterDraft) => void;
 }
 
-export function ChatInterface({ character, onBack }: ChatInterfaceProps) {
+export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -78,6 +79,29 @@ export function ChatInterface({ character, onBack }: ChatInterfaceProps) {
     
     setCurrentCharacter(updatedCharacter);
     setShowWardrobe(false);
+    
+    // Save to database using direct update
+    if (currentCharacter.id) {
+      try {
+        const result = await characterAPI.updateCharacterDirect(currentCharacter.id, {
+          clothing: clothing
+        });
+        
+        if (!result.success) {
+          console.error('Failed to save outfit to database:', result.error);
+        } else {
+          // Refresh character data from database to clear any cache
+          const refreshedCharacter = await characterAPI.getCharacter(currentCharacter.id);
+          if (refreshedCharacter.success && refreshedCharacter.data) {
+            setCurrentCharacter(refreshedCharacter.data);
+            // Update parent component state
+            onCharacterUpdate?.(refreshedCharacter.data);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to save outfit to database:', error);
+      }
+    }
     
     // Add a message about the outfit change
     const outfitMessage: ChatMessage = {
@@ -166,6 +190,29 @@ export function ChatInterface({ character, onBack }: ChatInterfaceProps) {
     setCurrentCharacter(updatedCharacter);
     setShowEnvironment(false);
     
+    // Save to database using direct update
+    if (currentCharacter.id) {
+      try {
+        const result = await characterAPI.updateCharacterDirect(currentCharacter.id, {
+          environment: environment
+        });
+        
+        if (!result.success) {
+          console.error('Failed to save environment to database:', result.error);
+        } else {
+          // Refresh character data from database to clear any cache
+          const refreshedCharacter = await characterAPI.getCharacter(currentCharacter.id);
+          if (refreshedCharacter.success && refreshedCharacter.data) {
+            setCurrentCharacter(refreshedCharacter.data);
+            // Update parent component state
+            onCharacterUpdate?.(refreshedCharacter.data);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to save environment to database:', error);
+      }
+    }
+    
     // Add a message about the environment change
     const environmentMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -206,7 +253,7 @@ export function ChatInterface({ character, onBack }: ChatInterfaceProps) {
         <div className="flex h-screen bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950 relative">
           {/* Static Character Image - Full Right Side */}
           {currentCharacter.generation?.generatedImage && (
-            <div className="absolute right-0 top-0 w-[450px] h-full z-10 lg:opacity-100 lg:translate-x-0 opacity-0 translate-x-full transition-all duration-500 ease-in-out">
+            <div className="absolute right-0 top-0 z-10 w-full h-[45vh] md:h-[55vh] lg:w-[450px] lg:h-full lg:opacity-100 lg:translate-x-0 opacity-100 translate-x-0 transition-all duration-500 ease-in-out">
               <div className="relative group h-full p-4">
                 <div className="relative h-full overflow-hidden rounded-3xl border-2 border-pink-500/20 shadow-2xl shadow-pink-500/10">
                   <img
@@ -228,7 +275,7 @@ export function ChatInterface({ character, onBack }: ChatInterfaceProps) {
           )}
 
           {/* Chat Area - Left Side Only */}
-          <div className="flex-1 flex flex-col bg-gradient-to-b from-dark-900/30 to-dark-800/30 lg:mr-[450px] mr-0">
+          <div className="flex-1 flex flex-col bg-gradient-to-b from-dark-900/30 to-dark-800/30 lg:mr-[450px] mr-0 mt-[45vh] md:mt-[55vh] lg:mt-0">
             {/* Chat Header */}
             <div className="px-8 py-6 border-b border-dark-700/50 backdrop-blur-sm">
               <div className="flex items-center">
@@ -414,13 +461,13 @@ export function ChatInterface({ character, onBack }: ChatInterfaceProps) {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {[
                     { id: 'casual', label: 'Casual', image: '/images/clothing-casual.jpg', description: 'Flirty everyday look - tight low-rise jeans hugging curves, cropped tank top showing a hint of midriff, casual yet teasingly sexy' },
-{ id: 'formal', label: 'Formal', image: '/images/clothing-formal.jpg', description: 'Sultry evening elegance - form-fitting cocktail dress with deep V-neckline, thigh-high slit, paired with strappy heels for a sophisticated allure' },
-{ id: 'sporty', label: 'Sporty', image: '/images/clothing-sporty.jpg', description: 'Sexy athletic vibe - high-waisted leggings that accentuate the hips and thighs, supportive sports bra with plunging neckline, perfect for a confident workout glow' },
-{ id: 'elegant', label: 'Elegant', image: '/images/clothing-elegant.jpg', description: 'Graceful sensuality - sleek satin gown that drapes beautifully over curves, subtle backless design, delicate straps, and tasteful side slit for refined allure' },
-{ id: 'cute', label: 'Cute', image: '/images/clothing-cute.jpg', description: 'Playful and flirty - short pleated skirt with a fitted off-shoulder top, soft pastel colors, and a touch of lace for an irresistibly sweet yet teasing charm' },
-{ id: 'edgy', label: 'Edgy', image: '/images/clothing-edgy.jpg', description: 'Bold and provocative - cropped leather jacket over a lace bralette, distressed skinny jeans with strategic rips, combat boots for a fierce, seductive edge' },
-{ id: 'traditional', label: 'Traditional', image: '/images/clothing-traditional.jpg', description: 'Timeless beauty with allure - elegantly draped traditional attire that flatters the figure, subtle sheer accents and intricate embroidery highlighting graceful curves' },
-{ id: 'fantasy', label: 'Fantasy', image: '/images/clothing-fantasy.jpg', description: 'Enchanting seduction - flowing ethereal dress with delicate sheer layers, corset-style bodice accentuating the waist, mystical jewelry for a captivating otherworldly charm' }
+                    { id: 'formal', label: 'Formal', image: '/images/clothing-formal.jpg', description: 'Sultry evening elegance - form-fitting cocktail dress with deep V-neckline, thigh-high slit, paired with strappy heels for a sophisticated allure' },
+                    { id: 'sporty', label: 'Sporty', image: '/images/clothing-sporty.jpg', description: 'Sexy athletic vibe - high-waisted leggings that accentuate the hips and thighs, supportive sports bra with plunging neckline, perfect for a confident workout glow' },
+                    { id: 'elegant', label: 'Elegant', image: '/images/clothing-elegant.jpg', description: 'Graceful sensuality - sleek satin gown that drapes beautifully over curves, subtle backless design, delicate straps, and tasteful side slit for refined allure' },
+                    { id: 'cute', label: 'Cute', image: '/images/clothing-cute.jpg', description: 'Playful and flirty - short pleated skirt with a fitted off-shoulder top, soft pastel colors, and a touch of lace for an irresistibly sweet yet teasing charm' },
+                    { id: 'edgy', label: 'Edgy', image: '/images/clothing-edgy.jpg', description: 'Bold and provocative - cropped leather jacket over a lace bralette, distressed skinny jeans with strategic rips, combat boots for a fierce, seductive edge' },
+                    { id: 'traditional', label: 'Traditional', image: '/images/clothing-traditional.jpg', description: 'Timeless beauty with allure - elegantly draped traditional attire that flatters the figure, subtle sheer accents and intricate embroidery highlighting graceful curves' },
+                    { id: 'fantasy', label: 'Fantasy', image: '/images/clothing-fantasy.jpg', description: 'Enchanting seduction - flowing ethereal dress with delicate sheer layers, corset-style bodice accentuating the waist, mystical jewelry for a captivating otherworldly charm' }
                   ].map((outfit) => (
                     <motion.button
                       key={outfit.id}
@@ -477,7 +524,9 @@ export function ChatInterface({ character, onBack }: ChatInterfaceProps) {
                     { id: 'bikini', label: 'Bikini', image: '/images/clothing-bikini.jpg', description: 'Beach ready - revealing bikini perfect for sunny days' },
                     { id: 'underwear', label: 'Underwear', image: '/images/clothing-underwear.jpg', description: 'Intimate wear - sexy underwear set for private moments' },
                     { id: 'revealing', label: 'Revealing', image: '/images/clothing-revealing.jpg', description: 'Bold style - daring outfit that shows more skin' },
-                    { id: 'bodysuit', label: 'Bodysuit', image: '/images/clothing-bodysuit.jpg', description: 'Form fitting - tight bodysuit that accentuates curves' }
+                    { id: 'bodysuit', label: 'Bodysuit', image: '/images/clothing-bodysuit.jpg', description: 'Form fitting - tight bodysuit that accentuates curves' },
+                    { id: 'bunny-suit', label: 'Bunny Suit', image: '/images/clothing-bunny-suit.jpg', description: 'Ultra provocative - skimpy bunny suit with plunging neckline, extreme high-cut thighs, corset cinch, fishnets, and bunny ears for ultimate seduction' },
+                    { id: 'harness', label: 'Harness', image: '/images/clothing-harness.jpg', description: 'Edgy straps - provocative leather or strap harness for a dominant look' }
                   ].map((outfit) => (
                     <motion.button
                       key={outfit.id}

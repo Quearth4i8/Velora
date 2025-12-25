@@ -24,7 +24,8 @@ export default function CharacterDetail() {
           return;
         }
 
-        const result = await characterAPI.getCharacter(characterId);
+        // Force fresh fetch from database to avoid caching issues
+        const result = await characterAPI.getCharacterFresh(characterId);
         if (result.success && result.data) {
           setCharacter(result.data);
         } else {
@@ -67,5 +68,5 @@ export default function CharacterDetail() {
     );
   }
 
-  return <ChatInterface character={character} onBack={handleBack} />;
+  return <ChatInterface character={character} onBack={handleBack} onCharacterUpdate={setCharacter} />;
 }

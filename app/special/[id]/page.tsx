@@ -24,7 +24,8 @@ export default function SpecialCharacterDetail() {
           return;
         }
 
-        const result = await characterAPI.getCharacter(characterId);
+        // Force fresh fetch from database to avoid caching issues
+        const result = await characterAPI.getCharacterFresh(characterId);
         if (result.success && result.data) {
           if (result.data.characterType !== 'special') {
             setError('Special Character Not Found');
@@ -71,5 +72,5 @@ export default function SpecialCharacterDetail() {
     );
   }
 
-  return <ChatInterface character={character} onBack={handleBack} />;
+  return <ChatInterface character={character} onBack={handleBack} onCharacterUpdate={setCharacter} />;
 }

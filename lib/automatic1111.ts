@@ -96,10 +96,10 @@ const getDimensionsFromAspectRatio = (aspectRatio: string) => {
       return { width: 896, height: 896 };
     case 'cinematic':
     case '21:9':
-      return { width: 1216, height: 512 };
+      return { width: 1216, height: 704 };
     case 'mobile':
     case '9:19':
-      return { width: 720, height: 1280 };
+      return { width: 832, height: 1216 };
     default:
       return { width: 768, height: 1024 };
   }
@@ -178,9 +178,9 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
   const { identity, body, appearance, personality } = draft;
 
   const stylePrompts = {
-    [CharacterStyle.ANIME]: 'high quality, best quality, masterpiece, highres, very aesthetic, absurdres, lazypos, ultra-detailed, high quality anime art, illustration, clean lines, vibrant colors, solo character, single person, only one character, one girl, individual, alone, perfect hands, detailed fingers, full body portrait, beautiful face, symmetrical eyes, perfect smile, natural teeth, soft lips, well-proportioned facial features',
-    [CharacterStyle.REALISTIC]: 'high quality, best quality, masterpiece, highres, very aesthetic, absurdres, lazypos, ultra-realistic, photorealistic, professional photography, detailed, high resolution, 8k, solo character, single person, only one character, one girl, individual, alone, perfect hands, detailed fingers, full body portrait, beautiful face, symmetrical eyes, perfect smile, natural teeth, soft lips, well-proportioned facial features, perfect facial anatomy',
-    [CharacterStyle.ARTISTIC]: 'high quality, best quality, masterpiece, highres, very aesthetic, absurdres, lazypos, artistic, digital painting, detailed, stunning, solo character, single person, only one character, one girl, individual, alone, perfect hands, detailed fingers, full body portrait, beautiful face, symmetrical eyes, perfect smile, natural teeth, soft lips, well-proportioned facial features',
+    [CharacterStyle.ANIME]: 'high quality, best quality, masterpiece, highres, very aesthetic, absurdres, lazypos, ultra-detailed, high quality anime art, illustration, clean lines, vibrant colors, solo character, single person, only one character, one girl, individual, alone, perfect hands, detailed fingers, full body portrait, beautiful face, symmetrical eyes,  natural teeth, soft lips, well-proportioned facial features',
+    [CharacterStyle.REALISTIC]: 'high quality, best quality, masterpiece, highres, very aesthetic, absurdres, lazypos, ultra-realistic, photorealistic, professional photography, detailed, high resolution, 8k, solo character, single person, only one character, one girl, individual, alone, perfect hands, detailed fingers, full body portrait, beautiful face, symmetrical eyes, natural teeth, soft lips, well-proportioned facial features, perfect facial anatomy',
+    [CharacterStyle.ARTISTIC]: 'high quality, best quality, masterpiece, highres, very aesthetic, absurdres, lazypos, artistic, digital painting, detailed, stunning, solo character, single person, only one character, one girl, individual, alone, perfect hands, detailed fingers, full body portrait, beautiful face, symmetrical eyes, natural teeth, soft lips, well-proportioned facial features',
   };
 
   const loraNames = normalizeLoraNames(draft);
@@ -320,7 +320,7 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
 };
 
 const buildNegativePrompt = (draft?: CharacterDraft): string => {
-  let negativePrompt = 'lazyneg, low quality, worst quality, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry, artist name, deformed, disfigured, malformed, mutated, ugly, disgusting, distorted, bad proportions, extra limbs, missing limbs, fused fingers, too many fingers, long neck, multiple characters, two characters, group, couple, duo, pair, more than one person, multiple people, crowd, friends, 2 girls, 2 women, two girls, two women, double, duplicate, twins, sisters, together, side by side, multiple subjects, 2 subjects, two subjects, deformed eyes, ugly teeth, distorted mouth, unnatural pupils, bad teeth, crooked teeth, misaligned eyes, cross-eyed, wall-eyed, bug eyes, asymmetrical eyes, distorted face, malformed mouth, weird tongue, unnatural tongue, bad lip shape, distorted lips, asymmetrical face, facial deformity, eye deformity, mouth deformity';
+  let negativePrompt = 'lazyneg, low quality, worst quality, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry, artist name, deformed, disfigured, malformed, mutated, ugly, disgusting, distorted, bad proportions, extra limbs, missing limbs, fused fingers, too many fingers, long neck, multiple characters, two characters, group, couple, duo, pair, more than one person, multiple people, crowd, friends, 2girls, 2 girls, 2 women, two girls, two women, double, duplicate, twins, sisters, together, side by side, multiple subjects, 2 subjects, two subjects, deformed eyes, ugly teeth, distorted mouth, unnatural pupils, bad teeth, crooked teeth, misaligned eyes, cross-eyed, wall-eyed, bug eyes, asymmetrical eyes, distorted face, malformed mouth, weird tongue, unnatural tongue, bad lip shape, distorted lips, asymmetrical face, facial deformity, eye deformity, mouth deformity';
 
   const extraNegativePrompts: string[] = [];
 
@@ -334,6 +334,21 @@ const buildNegativePrompt = (draft?: CharacterDraft): string => {
     } else if (ageNumber <= 45) {
       extraNegativePrompts.push('elderly, deep wrinkles, aged');
     }
+  }
+
+  // Add specific negative prompts for lamia characters
+  const mainTag = draft?.mainTag?.toLowerCase() || '';
+  const specialPrompt = draft?.specialPrompt?.toLowerCase() || '';
+  const isLamia = mainTag.includes('lamia') || specialPrompt.includes('lamia') || mainTag.includes('snake') || specialPrompt.includes('snake');
+  const isSlimeGirl = mainTag.includes('slime girl') || specialPrompt.includes('slime girl') || mainTag.includes('slime') || specialPrompt.includes('slime');
+
+  if (isLamia) {
+    extraNegativePrompts.push('feet, legs, knees, ankles, toes, foot, leg, knee, ankle, toe, human legs, human feet, walking, standing, shoes, socks, sandals, boots, footwear, lower body, human lower body, bipedal, two legs, two feet');
+    extraNegativePrompts.push('human legs, human feet, human lower body, human lower limbs, bipedal stance, standing on feet, walking on feet');
+  }
+
+  if (isSlimeGirl) {
+    extraNegativePrompts.push('opaque skin, solid skin, human skin, white skin, pale skin, skin patches, peeling skin, opaque patches, inconsistent texture, normal skin, flesh tone, bad anatomy, artifacts, blurry texture');
   }
 
   if (draft?.generation?.negativePrompt) extraNegativePrompts.push(draft.generation.negativePrompt);

@@ -115,10 +115,10 @@ export default function GalleryPage() {
             return { width: 896, height: 896 };
           case 'cinematic':
           case '21:9':
-            return { width: 832, height: 1216 };
+            return { width: 1216, height: 704 };
           case 'mobile':
           case '9:19':
-            return { width: 720, height: 1280 };
+            return { width: 832, height: 1216 };
           default:
             return { width: 768, height: 1024 };
         }
@@ -424,10 +424,10 @@ export default function GalleryPage() {
           return { width: 896, height: 896 };
         case 'cinematic':
         case '21:9':
-          return { width: 832, height: 1216 };
+          return { width: 1216, height: 704 };
         case 'mobile':
         case '9:19':
-          return { width: 720, height: 1280 };
+          return { width: 832, height: 1216 };
         default:
           return { width: 768, height: 1024 };
       }

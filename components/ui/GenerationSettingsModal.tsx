@@ -102,8 +102,8 @@ export function GenerationSettingsModal({
                   <option value="portrait">Portrait (768x1024)</option>
                   <option value="landscape">Landscape (1024x576)</option>
                   <option value="square">Square (896x896)</option>
-                  <option value="cinematic">Cinematic (1216x512)</option>
-                  <option value="mobile">Mobile (720x1280)</option>
+                  <option value="cinematic">Cinematic (1216x704)</option>
+                  <option value="mobile">Mobile (832x1216)</option>
                 </select>
               </div>
               

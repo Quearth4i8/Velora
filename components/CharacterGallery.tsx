@@ -25,6 +25,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
   const [isZoomed, setIsZoomed] = useState(false);
   const [showImageDropdown, setShowImageDropdown] = useState<string | null>(null);
   const [showNavbarDropdown, setShowNavbarDropdown] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
   const [zoomedImageIndex, setZoomedImageIndex] = useState(0);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showGenerationSettingsModal, setShowGenerationSettingsModal] = useState(false);
@@ -92,7 +93,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
       if (!(target instanceof Element)) return;
       
       // Close navbar dropdown if clicking outside
-      if (showNavbarDropdown && !target.closest('.navbar-dropdown')) {
+      if (showNavbarDropdown && !target.closest('.navbar-dropdown') && !target.closest('.navbar-dropdown-menu')) {
         setShowNavbarDropdown(false);
       }
       
@@ -241,6 +242,35 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
     }
   };
 
+  const handleDeleteCharacter = async () => {
+    const ok = await dialog.confirm({
+      title: 'Delete Character?',
+      message: `Are you sure you want to delete "${character.name || 'this character'}" and all their images? This action cannot be undone.`,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      destructive: true,
+    });
+
+    if (!ok) return;
+    
+    try {
+      if (!character.id) {
+        throw new Error('Character ID not found');
+      }
+
+      const result = await characterAPI.deleteCharacter(character.id);
+      if (result.success) {
+        // Navigate back to character list or main page
+        onBack();
+      } else {
+        throw new Error('Failed to delete character');
+      }
+    } catch (error) {
+      console.error('Error deleting character:', error);
+      await dialog.alert({ title: 'Error', message: 'Failed to delete character. Please try again.' });
+    }
+  };
+
   const handleInputChange = (field: string, value: string) => {
     setEditedCharacter((prev: CharacterDraft) => {
       const updated = { ...prev };
@@ -262,8 +292,42 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
 
   return (
     <div className="h-screen bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950">
+      {/* Dropdown Menu - Rendered at root level */}
+      {showNavbarDropdown && (
+        <div 
+          className="fixed bg-dark-800 border border-dark-600 rounded-lg shadow-xl z-[9999] min-w-[120px] navbar-dropdown-menu"
+          style={{
+            top: `${dropdownPosition.top}px`,
+            right: `${dropdownPosition.right}px`
+          }}
+        >
+          <div className="py-1">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowEditModal(true);
+                setShowNavbarDropdown(false);
+              }}
+              className="w-full px-3 py-2 text-left text-sm text-dark-200 hover:bg-dark-700 transition-colors"
+            >
+              Edit
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeleteCharacter();
+                setShowNavbarDropdown(false);
+              }}
+              className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-dark-700 transition-colors"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      )}
+      
       {/* Gallery Header */}
-      <div className="px-8 py-6 border-b border-dark-700/50 backdrop-blur-sm">
+      <div className="px-8 py-6 border-b border-dark-700/50 backdrop-blur-sm overflow-visible">
         <div className="flex items-center">
           <button
             onClick={onBack}
@@ -286,16 +350,23 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
             </div>
           </div>
           
-          {/* Edit Button */}
+          {/* 3-dot Menu Button */}
           <div className="relative navbar-dropdown">
             <button
-              onClick={() => {
-                setShowEditModal(true);
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                setDropdownPosition({
+                  top: rect.bottom + window.scrollY,
+                  right: window.innerWidth - rect.right
+                });
+                setShowNavbarDropdown(!showNavbarDropdown);
               }}
               className="w-8 h-8 flex items-center justify-center text-pink-400 hover:text-pink-300 transition-colors"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <circle cx="12" cy="5" r="2"/>
+                <circle cx="12" cy="12" r="2"/>
+                <circle cx="12" cy="19" r="2"/>
               </svg>
             </button>
           </div>

@@ -55,6 +55,17 @@ export const characterAPI = {
     }
   },
 
+  async getCharacterFresh(id: string) {
+    try {
+      const result = await characterService.getCharacter(id);
+      const deserialized = deserializeCharacter(result);
+      return { success: true, data: deserialized };
+    } catch (error) {
+      console.error('Failed to get character:', error);
+      return { success: false, error };
+    }
+  },
+
   async getCharacters() {
     try {
       const results = await characterService.listCharactersCached(50);
