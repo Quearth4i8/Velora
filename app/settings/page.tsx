@@ -55,7 +55,7 @@ export default function SettingsPage() {
   const getEmptySpecialCharacterForm = (): SpecialCharacterFormState => ({
     name: '',
     age: '22',
-    ethnicity: Ethnicity.CAUCASIAN,
+    ethnicity: Ethnicity.EAST_ASIAN,
     style: CharacterStyle.ANIME,
     mainTag: '',
     loraName: '',
@@ -68,6 +68,21 @@ export default function SettingsPage() {
 
   const ethnicityOptions = useMemo(() => Object.values(Ethnicity) as Ethnicity[], []);
   const styleOptions = useMemo(() => Object.values(CharacterStyle) as CharacterStyle[], []);
+
+  const ethnicityLabelMap: Record<Ethnicity, string> = {
+    [Ethnicity.EAST_ASIAN]: 'East Asian',
+    [Ethnicity.KOREAN]: 'Korean',
+    [Ethnicity.JAPANESE]: 'Japanese',
+    [Ethnicity.BRAZILIAN]: 'Brazilian',
+    [Ethnicity.COLOMBIAN]: 'Colombian',
+    [Ethnicity.LATIN_AMERICAN]: 'Latin American',
+    [Ethnicity.RUSSIAN]: 'Russian',
+    [Ethnicity.UKRAINIAN]: 'Ukrainian',
+    [Ethnicity.SCANDINAVIAN]: 'Scandinavian',
+    [Ethnicity.ITALIAN]: 'Italian',
+    [Ethnicity.LEBANESE]: 'Lebanese',
+    [Ethnicity.MIXED_EXOTIC]: 'Mixed / Exotic',
+  };
 
   const invalidateCharacterCaches = (characterId?: string) => {
     try {
@@ -120,7 +135,7 @@ export default function SettingsPage() {
     setSpecialForm({
       name: character.name || '',
       age: character.identity?.age ? String(character.identity.age) : '22',
-      ethnicity: (character.identity?.ethnicity || Ethnicity.CAUCASIAN) as Ethnicity,
+      ethnicity: (character.identity?.ethnicity || Ethnicity.EAST_ASIAN) as Ethnicity,
       style: (character.generation?.style || CharacterStyle.ANIME) as CharacterStyle,
       mainTag: character.mainTag || '',
       loraName: character.loraName || '',
@@ -522,7 +537,7 @@ export default function SettingsPage() {
                 >
                   {ethnicityOptions.map((eth) => (
                     <option key={eth} value={eth}>
-                      {eth}
+                      {ethnicityLabelMap[eth] || eth}
                     </option>
                   ))}
                 </select>

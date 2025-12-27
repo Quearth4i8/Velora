@@ -64,8 +64,41 @@ export const normalizeAspectRatioId = (aspectRatio: string | undefined | null): 
   return 'portrait';
 };
 
-export const getDimensionsFromAspectRatio = (aspectRatio: string | undefined | null): { width: number; height: number } => {
+export const MODEL_SPECIFIC_RESOLUTIONS: Record<string, Partial<Record<AspectRatioId, { width: number; height: number }>>> = {
+  'oneObsession_v18.safetensors': {
+    portrait: { width: 768, height: 1344 },
+    mobile: { width: 832, height: 1216 },
+    landscape: { width: 1344, height: 768 },
+    cinematic: { width: 1536, height: 1024 },
+    wide: { width: 1280, height: 768 },
+    square: { width: 1024, height: 1024 },
+  },
+  'perfectdeliberate_v30.safetensors': {
+    portrait: { width: 960, height: 1440 },
+    mobile: { width: 832, height: 1216 },
+    landscape: { width: 1440, height: 960 },
+    cinematic: { width: 1536, height: 1024 },
+    wide: { width: 1216, height: 832 },
+    square: { width: 1024, height: 1024 },
+  },
+};
+
+export const MODEL_DEFAULT_SETTINGS: Record<string, { steps: number; cfgScale: number; sampler: string }> = {
+  'perfectdeliberate_v30.safetensors': {
+    steps: 35,
+    cfgScale: 6,
+    sampler: 'Euler a',
+  },
+};
+
+export const getDimensionsFromAspectRatio = (aspectRatio: string | undefined | null, model?: string | null): { width: number; height: number } => {
   const id = normalizeAspectRatioId(aspectRatio);
+
+  // Check for model-specific overrides
+  if (model && MODEL_SPECIFIC_RESOLUTIONS[model] && MODEL_SPECIFIC_RESOLUTIONS[model][id]) {
+    return MODEL_SPECIFIC_RESOLUTIONS[model][id]!;
+  }
+
   return { width: ASPECT_RATIOS[id].width, height: ASPECT_RATIOS[id].height };
 };
 
@@ -111,6 +144,6 @@ export const NON_HUMAN_LEGS_LANDSCAPE_CINEMATIC_VARIED_POSES: string[] = [
 ];
 
 export const NON_HUMAN_LEGS_LANDSCAPE_CINEMATIC_EXTRA_NEGATIVE_PROMPT =
-  'standing, standing up, upright, vertical pose, standing position, on legs, walking, running, jumping, sitting, sitting up, partial view, cropped, close-up, upper body only, lower body only, missing parts, incomplete body, cut off, out of frame';
+  'standing, standing up, upright, vertical pose, standing position, on legs, walking, running, jumping, sitting, sitting up, partial view, cropped, close-up, upper body only, lower body only, missing parts, incomplete body, cut off, out of frame, hands on ground, all fours, crawling pose, crouching with hands down, kneeling on hands, hands touching floor, on all fours pose, quadruped stance';
 
 export const NON_HUMAN_LEGS_LANDSCAPE_CINEMATIC_PROMPT_SUFFIX = 'full body, complete view, entire form';

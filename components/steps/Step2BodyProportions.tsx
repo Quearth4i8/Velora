@@ -9,12 +9,18 @@ import { ImageOptionCard } from '../ui/ImageOptionCard';
 import { OptionPill } from '../ui/OptionPill';
 
 const ethnicityOptions = [
-  { id: Ethnicity.CAUCASIAN, label: 'Caucasian', image: '/images/ethnicity-caucasian.jpg' },
-  { id: Ethnicity.AFRICAN, label: 'African', image: '/images/ethnicity-african.jpg' },
-  { id: Ethnicity.ASIAN, label: 'Asian', image: '/images/ethnicity-asian.jpg' },
-  { id: Ethnicity.MIDDLE_EASTERN, label: 'Middle Eastern', image: '/images/ethnicity-middle-eastern.jpg' },
-  { id: Ethnicity.LATIN, label: 'Latin', image: '/images/ethnicity-latin.jpg' },
-  { id: Ethnicity.MIXED, label: 'Mixed', image: '/images/ethnicity-mixed.jpg' },
+  { id: Ethnicity.EAST_ASIAN, label: 'East Asian', image: '/images/ethnicity-asian.jpg' },
+  { id: Ethnicity.KOREAN, label: 'Korean', image: '/images/ethnicity-asian.jpg' },
+  { id: Ethnicity.JAPANESE, label: 'Japanese', image: '/images/ethnicity-asian.jpg' },
+  { id: Ethnicity.BRAZILIAN, label: 'Brazilian', image: '/images/ethnicity-latin.jpg' },
+  { id: Ethnicity.COLOMBIAN, label: 'Colombian', image: '/images/ethnicity-latin.jpg' },
+  { id: Ethnicity.LATIN_AMERICAN, label: 'Latin American', image: '/images/ethnicity-latin.jpg' },
+  { id: Ethnicity.RUSSIAN, label: 'Russian', image: '/images/ethnicity-caucasian.jpg' },
+  { id: Ethnicity.UKRAINIAN, label: 'Ukrainian', image: '/images/ethnicity-caucasian.jpg' },
+  { id: Ethnicity.SCANDINAVIAN, label: 'Scandinavian', image: '/images/ethnicity-caucasian.jpg' },
+  { id: Ethnicity.ITALIAN, label: 'Italian', image: '/images/ethnicity-caucasian.jpg' },
+  { id: Ethnicity.LEBANESE, label: 'Lebanese', image: '/images/ethnicity-middle-eastern.jpg' },
+  { id: Ethnicity.MIXED_EXOTIC, label: 'Mixed / Exotic', image: '/images/ethnicity-mixed.jpg' },
 ];
 
 const heightOptions = [Height.TINY, Height.CHILDLIKE, Height.PETITE, Height.SMALL, Height.AVERAGE, Height.TALL];

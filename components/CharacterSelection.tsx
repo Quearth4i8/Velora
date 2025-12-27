@@ -53,16 +53,16 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
   const loadCharacters = async () => {
     try {
       setIsLoading(true);
-      
+
       // Check cache first with error handling
       const cacheKey = 'characters_selection';
       try {
         const cached = localStorage.getItem(cacheKey);
-        
+
         if (cached) {
           const { data, timestamp } = JSON.parse(cached);
-          // Cache for 3 minutes
-          if (Date.now() - timestamp < 180000) {
+          // Cache for 5 seconds
+          if (Date.now() - timestamp < 5000) {
             setCharacters(data);
             setIsLoading(false);
             return;
@@ -85,12 +85,12 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
           console.warn('localStorage access failed:', storageError);
         }
       }
-      
+
       const result = await characterAPI.getCharacters();
       if (result.success) {
         const characterData = result.data || [];
         setCharacters(characterData);
-        
+
         // Cache the result with error handling
         try {
           localStorage.setItem(cacheKey, JSON.stringify({
@@ -118,19 +118,19 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
 
   const handleFilterChange = (filters: CharacterTraits) => {
     setActiveFilters(filters);
-    
+
     let filtered = characters;
-    
+
     // Filter by hair color
     if (filters.appearance?.hairColor) {
       filtered = filtered.filter(char => char.appearance?.hairColor === filters.appearance?.hairColor);
     }
-    
+
     // Filter by personality archetype
     if (filters.personality?.archetype) {
       filtered = filtered.filter(char => char.personality?.archetype === filters.personality?.archetype);
     }
-    
+
     setFilteredCharacters(filtered);
   };
 
@@ -152,7 +152,7 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
 
     try {
       const imageUrl = await automatic1111API.generateCharacterImage(character);
-      
+
       // The image is now automatically uploaded to storage and the database is updated
       // So we just need to reload the characters to get the updated data
       await loadCharacters();
@@ -216,7 +216,7 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
     <div className="py-8 px-4">
       <div className="max-w-7xl mx-auto">
         <TraitFilter onFilterChange={handleFilterChange} />
-        
+
         {filteredCharacters.length === 0 ? (
           <motion.div
             className="text-center py-16"
@@ -268,8 +268,8 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
                   <div className="relative h-full min-h-96 bg-gradient-to-br from-purple-600/10 to-purple-500/10 overflow-hidden">
                     {character.generation?.generatedImage ? (
                       <>
-                        <img 
-                          src={character.generation.generatedImage} 
+                        <img
+                          src={character.generation.generatedImage}
                           alt={character.name || 'Character'}
                           className="w-full h-full object-cover character-image"
                           loading="lazy"
@@ -290,49 +290,49 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
                         </div>
                       </div>
                     )}
-                    
+
                     {/* Character Info Overlay at bottom */}
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/60 to-transparent p-4">
-                    <div className="text-white">
-                      <h3 className="text-lg font-semibold mb-1">
-                        {character.name || 'Character'}
-                      </h3>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-white/80">
-                          {character.identity?.ethnicity || 'Unknown'} • {character.identity?.age ? `${character.identity.age} years old` : 'Age not set'}
-                        </span>
-                        <span className="text-white/60 text-xs capitalize">
-                          {character.generation?.style === 'anime' ? 'Anime' : 
-                           character.generation?.style === 'realistic' ? 'Realistic' : 
-                           character.generation?.style === 'artistic' ? 'Artistic' : 
-                           'Unknown'}
-                        </span>
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/60 to-transparent p-4">
+                      <div className="text-white">
+                        <h3 className="text-lg font-semibold mb-1">
+                          {character.name || 'Character'}
+                        </h3>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-white/80">
+                            {character.identity?.ethnicity || 'Unknown'} • {character.identity?.age ? `${character.identity.age} years old` : 'Age not set'}
+                          </span>
+                          <span className="text-white/60 text-xs capitalize">
+                            {character.generation?.style === 'anime' ? 'Anime' :
+                              character.generation?.style === 'realistic' ? 'Realistic' :
+                                character.generation?.style === 'artistic' ? 'Artistic' :
+                                  'Unknown'}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  
-                  {/* Generate Image Button for characters without images */}
-                  {!character.generation?.generatedImage && character.generation?.style && character.generation?.model && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                      <div onClick={(e) => e.stopPropagation()}>
-                        <PrimaryCTAButton
-                          label={generatingImages.has(character.id!) ? "Generating..." : "Generate Image"}
-                          onClick={() => handleGenerateImage(character)}
-                          disabled={generatingImages.has(character.id!)}
-                          className="text-sm py-2.5"
-                        />
+
+                    {/* Generate Image Button for characters without images */}
+                    {!character.generation?.generatedImage && character.generation?.style && character.generation?.model && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <PrimaryCTAButton
+                            label={generatingImages.has(character.id!) ? "Generating..." : "Generate Image"}
+                            onClick={() => handleGenerateImage(character)}
+                            disabled={generatingImages.has(character.id!)}
+                            className="text-sm py-2.5"
+                          />
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
                   </div>
-                  
+
                   {/* Hover Effect */}
                   <div className="absolute inset-0 bg-gradient-to-t from-purple-600/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
                 </motion.div>
               ))}
             </div>
 
-            </>
+          </>
         )}
       </div>
     </div>

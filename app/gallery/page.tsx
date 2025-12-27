@@ -172,7 +172,7 @@ export default function GalleryPage() {
               currentStep: 7,
               identity: {
                 age: 25,
-                ethnicity: Ethnicity.MIXED,
+                ethnicity: Ethnicity.MIXED_EXOTIC,
                 skinTone: '#ffe0bd',
               },
               body: {
@@ -502,7 +502,7 @@ export default function GalleryPage() {
               currentStep: 7,
               identity: {
                 age: 25,
-                ethnicity: Ethnicity.MIXED,
+                ethnicity: Ethnicity.MIXED_EXOTIC,
                 skinTone: '#ffe0bd'
               },
               body: {

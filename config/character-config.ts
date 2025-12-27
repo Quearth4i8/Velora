@@ -28,6 +28,8 @@ export const DEFAULT_SKIN_TONE_OPTIONS = [
   '#8D5524',
   '#6B4423',
   '#4A2C1A',
+  '#C0C0C0',
+  '#808080',
 ];
 
 export const RACE_SKIN_TONE_OPTIONS: Record<string, string[]> = {
@@ -64,12 +66,18 @@ export const CHARACTER_CONFIG = {
   ],
 
   ethnicities: [
-    { label: 'Caucasian', value: Ethnicity.CAUCASIAN },
-    { label: 'African', value: Ethnicity.AFRICAN },
-    { label: 'Asian', value: Ethnicity.ASIAN },
-    { label: 'Middle Eastern', value: Ethnicity.MIDDLE_EASTERN },
-    { label: 'Latin', value: Ethnicity.LATIN },
-    { label: 'Mixed', value: Ethnicity.MIXED },
+    { label: 'East Asian', value: Ethnicity.EAST_ASIAN },
+    { label: 'Korean', value: Ethnicity.KOREAN },
+    { label: 'Japanese', value: Ethnicity.JAPANESE },
+    { label: 'Brazilian', value: Ethnicity.BRAZILIAN },
+    { label: 'Colombian', value: Ethnicity.COLOMBIAN },
+    { label: 'Latin American', value: Ethnicity.LATIN_AMERICAN },
+    { label: 'Russian', value: Ethnicity.RUSSIAN },
+    { label: 'Ukrainian', value: Ethnicity.UKRAINIAN },
+    { label: 'Scandinavian', value: Ethnicity.SCANDINAVIAN },
+    { label: 'Italian', value: Ethnicity.ITALIAN },
+    { label: 'Lebanese', value: Ethnicity.LEBANESE },
+    { label: 'Mixed / Exotic', value: Ethnicity.MIXED_EXOTIC },
   ],
 
   heights: [

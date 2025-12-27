@@ -1,4 +1,4 @@
-import { CharacterDraft, Height, Physique } from './types';
+import { CharacterDraft, Height, Physique, Ethnicity } from './types';
 
 export const serializeCharacter = (draft: CharacterDraft): Record<string, any> => {
   // Debug logging
@@ -108,6 +108,24 @@ export const deserializeCharacter = (data: Record<string, any>): CharacterDraft 
     return null;
   };
 
+  const normalizeEthnicity = (value: any): Ethnicity | null => {
+    if (!value) return null;
+    if ((Object.values(Ethnicity) as string[]).includes(value)) return value as Ethnicity;
+
+    const normalized = String(value).trim().toLowerCase();
+    const legacyMap: Record<string, Ethnicity> = {
+      caucasian: Ethnicity.RUSSIAN,
+      african: Ethnicity.BRAZILIAN,
+      asian: Ethnicity.EAST_ASIAN,
+      middle_eastern: Ethnicity.LEBANESE,
+      latin: Ethnicity.LATIN_AMERICAN,
+      mixed: Ethnicity.MIXED_EXOTIC,
+    };
+
+    if (legacyMap[normalized]) return legacyMap[normalized];
+    return null;
+  };
+
   return {
     id: data.id,
     name: data.name,
@@ -122,7 +140,7 @@ export const deserializeCharacter = (data: Record<string, any>): CharacterDraft 
     currentStep: 5,
     identity: {
       age: data.age,
-      ethnicity: data.ethnicity,
+      ethnicity: normalizeEthnicity(data.ethnicity),
       skinTone: data.skin_tone,
     },
     body: {

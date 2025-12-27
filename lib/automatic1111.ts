@@ -1,12 +1,31 @@
-import { CharacterDraft, CharacterStyle, AIModel } from './types';
+import { CharacterDraft, CharacterStyle, AIModel, Ethnicity } from './types';
 import { characterAPI } from './api';
 import {
-  getDimensionsFromAspectRatio,
-  isLandscapeOrCinematicAspectRatio,
   NON_HUMAN_LEGS_LANDSCAPE_CINEMATIC_VARIED_POSES,
   NON_HUMAN_LEGS_LANDSCAPE_CINEMATIC_EXTRA_NEGATIVE_PROMPT,
   NON_HUMAN_LEGS_LANDSCAPE_CINEMATIC_PROMPT_SUFFIX,
+  normalizeAspectRatioId,
+  getDimensionsFromAspectRatio,
+  isLandscapeOrCinematicAspectRatio,
 } from '@/config/aspect-ratios';
+import {
+  getRandomRacePose,
+  hasCustomPoses,
+  HAND_POSE_VARIATIONS_ARACHNE,
+  HAND_POSE_VARIATIONS_GENERIC,
+} from '@/config/race-poses';
+import { ETHNICITY_PROMPT_MAP } from '@/config/ethnicity-prompts';
+import { hexToColorName } from '@/config/color-mappings';
+import { EYE_TYPE_DESCRIPTIONS } from '@/config/eye-type-descriptions';
+import { STYLE_PROMPTS } from '@/config/style-prompts';
+import {
+  REGULAR_HUMANOID_CLOTHING_MAP,
+  REGULAR_CENTAUR_CLOTHING_MAP,
+  REGULAR_LEGLESS_CLOTHING_MAP,
+  NSFW_HUMANOID_CLOTHING_MAP,
+  NSFW_CENTAUR_CLOTHING_MAP,
+  NSFW_LEGLESS_CLOTHING_MAP,
+} from '@/config/clothing-prompts';
 
 const AUTOMATIC1111_URL = process.env.AUTOMATIC1111_URL || 'http://127.0.0.1:7860';
 
@@ -16,88 +35,7 @@ const STYLE_TO_MODEL_MAP: Record<CharacterStyle, AIModel> = {
   [CharacterStyle.ARTISTIC]: AIModel.PERFECTDELIBERATE,
 };
 
-const hexToColorName = (hex: string): string => {
-  const colorMap: Record<string, string> = {
-    '#fff4e8': 'porcelain',
-    '#ffe0bd': 'light beige',
-    '#ffcd94': 'light tan',
-    '#eac086': 'warm beige',
-    '#e0ac69': 'tan',
-    '#d99e6c': 'medium tan',
-    '#c58c6b': 'deep tan',
-    '#b97c4b': 'caramel',
-    '#a57c5a': 'brown',
-    '#8d5524': 'deep brown',
-    '#6b4423': 'dark brown',
-    '#4a2c1a': 'very dark brown',
-    '#800080': 'purple',
-    '#c0c0c0': 'silver',
-    '#ffd700': 'blonde',
-    '#000000': 'black',
-    '#ffffff': 'white',
-    '#ff0000': 'red',
-    '#dc143c': 'red',
-    '#800000': 'maroon',
-    '#ff69b4': 'pink',
-    '#00ff00': 'green',
-    '#0000ff': 'blue',
-    '#ffff00': 'yellow',
-    '#ff00ff': 'magenta',
-    '#ff6347': 'tomato red',
-    '#ff4500': 'orange red',
-    '#daa520': 'goldenrod',
-    '#b8860b': 'dark goldenrod',
-    '#d2691e': 'chocolate',
-    '#cd853f': 'peru',
-    '#8b4513': 'brown',
-    '#2c1b0f': 'dark brown',
-    '#c68642': 'light brown',
-    '#f8f6e7': 'platinum blonde',
-    '#ff8c00': 'orange',
-    '#40e0d0': 'turquoise',
-    '#a52a2a': 'auburn',
-    '#008000': 'green',
-    '#008080': 'teal',
-    '#808080': 'gray',
-    '#a0522d': 'sienna',
-    '#708090': 'slate gray',
-    '#778899': 'light slate gray',
-    '#b0c4de': 'light steel blue',
-    '#4682b4': 'steel blue',
-    '#6495ed': 'cornflower blue',
-    '#191970': 'midnight blue',
-    '#4b0082': 'indigo',
-    '#8a2be2': 'blue violet',
-    '#9400d3': 'dark violet',
-    '#9932cc': 'dark orchid',
-    '#ba55d3': 'medium orchid',
-    '#da70d6': 'orchid',
-    '#ee82ee': 'violet',
-    '#d8bfd8': 'thistle',
-    '#c71585': 'medium violet red',
-    '#db7093': 'pale violet red',
-    '#ffb6c1': 'light pink',
-    '#ffdab9': 'peach puff',
-    '#ffe4b5': 'moccasin',
-    '#ffdead': 'navajo white',
-    '#f0e68c': 'khaki',
-    '#e6e6fa': 'lavender',
-    '#dcdcdc': 'light gray',
-    '#d3d3d3': 'light gray',
-    '#696969': 'dim gray',
-    '#2f4f4f': 'dark slate gray',
-  };
-  return colorMap[hex.toLowerCase()] || hex;
-};
 
-const hashStringToSeed = (input: string): number => {
-  let hash = 0;
-  for (let i = 0; i < input.length; i += 1) {
-    hash = (hash << 5) - hash + input.charCodeAt(i);
-    hash |= 0;
-  }
-  return hash >>> 0;
-};
 
 const dedupeCommaTags = (input: string): string => {
   const parts = String(input || '')
@@ -123,6 +61,52 @@ const joinAndDedupeTags = (...pieces: Array<string | undefined | null | false>):
   return dedupeCommaTags(joined);
 };
 
+const sanitizeCommaTags = (input: string, removeTagsLower: Set<string>): string => {
+  const parts = String(input || '')
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  const result: string[] = [];
+  for (const part of parts) {
+    const key = part.toLowerCase();
+    if (removeTagsLower.has(key)) continue;
+    result.push(part);
+  }
+
+  return result.join(', ');
+};
+
+const sanitizeSpecialPrompt = (mainTagLower: string, specialPrompt?: string | null): string => {
+  const baseRemove = new Set<string>([
+    'beautiful detailed eyes',
+    'perfect symmetrical eyes',
+    'clear pupils',
+    'sharp eye details',
+    'expressive eyes',
+    'extra eyes optional',
+    'black widow markings optional',
+  ]);
+
+  const isArachne = mainTagLower.includes('arachne') || mainTagLower.includes('spider girl');
+  if (isArachne) {
+    baseRemove.add('taur');
+    baseRemove.add('equine lower body');
+    baseRemove.add('horse body');
+    baseRemove.add('four legs');
+    baseRemove.add('four hooves');
+    baseRemove.add('fangs');
+    baseRemove.add('subtle fangs');
+  }
+
+  return sanitizeCommaTags(specialPrompt || '', baseRemove);
+};
+
+const poseMentionsHandsOrArms = (pose: string): boolean => {
+  const p = String(pose || '').toLowerCase();
+  return p.includes('hand') || p.includes('hands') || p.includes('arm') || p.includes('arms');
+};
+
 const getClothingDetails = (
   clothing: string,
   isCharacterGeneration: boolean = true,
@@ -143,78 +127,12 @@ const getClothingDetails = (
     mainTag.includes('naga') ||
     specialPrompt.includes('naga');
 
-  const regularHumanoidClothingMap: Record<string, string> = {
-    casual: 'jeans and t-shirt',
-    formal: 'elegant dress and high heels',
-    sporty: 'athletic shorts and sports bra',
-    elegant: 'evening gown and jewelry',
-    cute: 'colorful sundress and sandals',
-    edgy: 'leather jacket and ripped jeans',
-    traditional: 'cultural dress with traditional accessories',
-    fantasy: 'magical robes and mystical accessories',
-  };
-
-  const regularCentaurClothingMap: Record<string, string> = {
-    casual: 'comfortable tunic top with belt, light cloak, and decorative tack accents',
-    formal: 'elegant fitted bodice with flowing drapes and ornate jewelry, refined ceremonial tack',
-    sporty: 'supportive athletic top with wrap straps, lightweight harness, and practical accessories',
-    elegant: 'flowing gown-like drapes over the upper body with luxurious jewelry and embroidered fabric',
-    cute: 'colorful dress-like top with ribbons, soft shawl, and playful accessories',
-    edgy: 'leather jacket and rugged accessories, arm wraps, and bold metal details',
-    traditional: 'traditional upper garments with cultural accessories and patterned fabrics',
-    fantasy: 'enchanted robes and mystical accessories, ornamental barding and charms',
-  };
-
-  const regularLeglessClothingMap: Record<string, string> = {
-    casual: 'relaxed top with layered wraps and simple accessories',
-    formal: 'elegant upper outfit with flowing fabric wraps and refined jewelry',
-    sporty: 'supportive athletic top with streamlined wraps and practical accessories',
-    elegant: 'luxurious draped outfit with ornate jewelry and flowing fabrics',
-    cute: 'colorful outfit with ribbons and decorative accessories',
-    edgy: 'leather jacket with bold accessories and layered wraps',
-    traditional: 'cultural garments with traditional accessories and patterned fabrics',
-    fantasy: 'magical robes and mystical accessories with flowing fabric and charms',
-  };
-
-  const nsfwHumanoidClothingMap: Record<string, string> = {
-    lingerie:
-      'ultra-sheer lace lingerie, completely transparent babydoll, open-cup bra, crotchless garter belt with stockings, tiny g-string thong barely covering anything, nipples and pussy visible through fabric, extreme see-through material',
-    naked: 'completely nude, fully naked body, no clothing whatsoever, totally exposed breasts and genitals, bare skin only, explicit nudity',
-    bikini:
-      'extreme micro bikini, strings-only bikini, pasties and g-string, massive sideboob and underboob, thong bottom disappearing between labia, sheer wet fabric clinging to nipples and pussy outline, practically nude',
-    underwear:
-      'open-cup sheer bra with exposed nipples, crotchless lace panties, transparent cupless teddy, fishnet crotchless set, labia and nipples fully visible, barely-there straps, erotic intimate apparel leaving nothing to imagination',
-    revealing:
-      'completely see-through outfit, transparent mesh dress with no underwear, extreme deep plunging neckline to navel, massive cleavage spill, sideboob and underboob fully exposed, backless and crotchless design, clothing optionally dissolved or torn for extra exposure',
-    bodysuit:
-      'ultra-transparent sheer bodysuit, full fishnet bodysuit with large holes exposing nipples and pussy, crotchless and open-chest design, strategic cutouts over breasts and genitals, glossy wet-look latex bodysuit clinging to every curve, nipples and labia clearly outlined',
-    crotchless:
-      'crotchless lace panties with sheer straps, revealing lingerie details, explicit open-crotch design, sensual intimate wear',
-    'nipple-pasties':
-      'nipple pasties covering nipples only, otherwise topless, minimal straps and accessories, provocative minimalist lingerie',
-  };
-
-  const nsfwCentaurClothingMap: Record<string, string> = {
-    lingerie: 'sheer lace lingerie for the upper body, decorative harness straps, jewelry, and elegant draped fabric accents',
-    naked: 'completely nude body, no clothing whatsoever, bare skin only',
-    bikini: 'minimal string bikini top, decorative straps, and stylish body jewelry with draped fabric accents',
-    underwear: 'revealing lingerie top with delicate straps, decorative harness, and jewelry accents',
-    revealing: 'extremely revealing sheer outfit with translucent fabric and bold cutouts, decorative straps and jewelry',
-    bodysuit: 'sheer bodysuit-like upper garment with cutouts, glossy fabric, and decorative harness straps',
-    crotchless: 'decorative harness straps and revealing lingerie accents for the upper body, bold jewelry and draped fabric',
-    'nipple-pasties': 'nipple pasties covering nipples only, otherwise topless upper body, minimal straps, body jewelry',
-  };
-
-  const nsfwLeglessClothingMap: Record<string, string> = {
-    lingerie: 'sheer lace lingerie for the upper body with delicate straps, jewelry, and elegant wrap accents',
-    naked: 'completely nude body, no clothing whatsoever, bare skin only',
-    bikini: 'minimal string bikini top with decorative straps and stylish jewelry accents',
-    underwear: 'revealing lingerie top with delicate straps and jewelry accents',
-    revealing: 'extremely revealing sheer outfit with translucent fabric and bold cutouts, accent jewelry and wraps',
-    bodysuit: 'sheer bodysuit-like upper garment with cutouts and glossy fabric, paired with wrap accents',
-    crotchless: 'revealing lingerie top with delicate straps and jewelry, paired with decorative wrap accents',
-    'nipple-pasties': 'nipple pasties covering nipples only, otherwise topless upper body, minimal straps and jewelry accents',
-  };
+  const regularHumanoidClothingMap = REGULAR_HUMANOID_CLOTHING_MAP;
+  const regularCentaurClothingMap = REGULAR_CENTAUR_CLOTHING_MAP;
+  const regularLeglessClothingMap = REGULAR_LEGLESS_CLOTHING_MAP;
+  const nsfwHumanoidClothingMap = NSFW_HUMANOID_CLOTHING_MAP;
+  const nsfwCentaurClothingMap = NSFW_CENTAUR_CLOTHING_MAP;
+  const nsfwLeglessClothingMap = NSFW_LEGLESS_CLOTHING_MAP;
 
   const regularClothingMap = isCentaur
     ? regularCentaurClothingMap
@@ -275,14 +193,10 @@ const normalizeLoraNames = (draft: CharacterDraft): string[] => {
 const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
   const { identity, body, appearance, personality } = draft;
 
-  const stylePrompts = {
-    [CharacterStyle.ANIME]: 'masterpiece, best quality, highres, very aesthetic, absurdres, lazypos, anime art, illustration, clean lineart, vibrant colors, solo, full body',
-    [CharacterStyle.REALISTIC]: 'masterpiece, best quality, highres, very aesthetic, absurdres, lazypos, photorealistic, professional photography, sharp focus, solo, full body',
-    [CharacterStyle.ARTISTIC]: 'masterpiece, best quality, highres, very aesthetic, absurdres, lazypos, digital painting, concept art, detailed, solo, full body',
-  };
+  const stylePrompts = STYLE_PROMPTS;
 
   const mainTag = draft.mainTag?.trim();
-  const specialPrompt = draft.specialPrompt?.trim();
+  const specialPrompt = sanitizeSpecialPrompt((mainTag || '').toLowerCase(), draft.specialPrompt).trim();
 
   const mainTagLower = mainTag?.toLowerCase() || '';
   const specialPromptLower = specialPrompt?.toLowerCase() || '';
@@ -294,7 +208,12 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
     specialPromptLower.includes('demon horns') ||
     specialPromptLower.includes('demonmge') ||
     specialPromptLower.includes('succubus');
+  const isLamia =
+    mainTagLower.includes('lamia') || specialPromptLower.includes('lamia') || mainTagLower.includes('snake woman') || specialPromptLower.includes('snake woman');
+  const isArachne =
+    mainTagLower.includes('arachne') || specialPromptLower.includes('arachne') || mainTagLower.includes('spider girl') || specialPromptLower.includes('spider girl');
   const hasFangs =
+    isArachne ||
     mainTagLower.includes('vampire') ||
     specialPromptLower.includes('vampire') ||
     mainTagLower.includes('fang') ||
@@ -324,7 +243,12 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
               : ageNumber <= 44
                 ? 'mature adult'
                 : 'older adult';
-  const ethnicity = identity.ethnicity?.toLowerCase() || '';
+  const ethnicity =
+    identity.ethnicity && ETHNICITY_PROMPT_MAP[identity.ethnicity]
+      ? isMinor
+        ? ETHNICITY_PROMPT_MAP[identity.ethnicity].minor
+        : ETHNICITY_PROMPT_MAP[identity.ethnicity].adult
+      : '';
   const skinTone = identity.skinTone?.toLowerCase() || '';
 
   // Body characteristics
@@ -367,36 +291,29 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
 
   const personalityDescription = personalityTraits.length > 0 ? personalityTraits.join(', ') : archetype;
 
-  const eyeTypeDescriptions: Record<string, string> = {
-    'normal': 'standard eyes, natural eye shape, balanced proportions, beautiful detailed eyes, perfect symmetrical eyes, clear pupils, sharp eye details, expressive eyes',
-    'siren': 'siren eyes, sultry elongated almond-shaped eyes, seductive smoky eyeliner, lifted outer corners, dramatic winged liner extending inward and outward, smudged dark eyeshadow, intense captivating gaze, mysterious alluring expression, beautiful detailed eyes, perfect symmetrical eyes, clear pupils, sharp eye details',
-    'fox': 'fox eyes, sharp upturned almond-shaped eyes, clever feline gaze, lifted outer corners with straight angled eyeliner, elongated eye shape, sly seductive expression, high arched brows, beautiful detailed eyes, perfect symmetrical eyes, clear pupils, sharp eye details',
-    'cat': 'cat eyes, sharp upturned eyes with dramatic winged eyeliner, feline slanted shape, alluring playful gaze, thick eyeliner flick, beautiful detailed eyes, perfect symmetrical eyes, clear pupils, sharp eye details',
-    'doe': 'doe eyes, large round wide-open eyes, innocent gentle gaze, big rounded shape with soft eyeliner, fluttery lashes, youthful wide-eyed look, beautiful detailed eyes, perfect symmetrical eyes, clear pupils, sharp eye details',
-    'wolf': 'wolf eyes, intense narrow piercing eyes, sharp slanted shape, predatory fierce gaze, glowing or amber tones optional, wild untamed expression, beautiful detailed eyes, perfect symmetrical eyes, clear pupils, sharp eye details',
-    'eagle': 'eagle eyes, sharp keen hawk-like eyes, narrow focused gaze, high detail with strong brow emphasis, piercing vigilant expression, beautiful detailed eyes, perfect symmetrical eyes, clear pupils, sharp eye details',
-    'dragon': 'dragon eyes, mystical slit pupils, reptilian vertical pupils, powerful intense gaze, glowing irises optional, sharp angular shape, ancient mythical expression, beautiful detailed eyes, perfect symmetrical eyes, clear pupils, sharp eye details',
-    'big_round': 'big round anime eyes, large circular eyes, oversized sparkling round pupils, cute expressive anime style, highly detailed highlights, beautiful detailed eyes, perfect symmetrical eyes',
-    'tareme': 'tareme eyes, droopy downturned eyes, soft gentle downward-slanting outer corners, moe innocent look, rounded drooping shape, beautiful detailed eyes, perfect symmetrical eyes',
-    'tsurime': 'tsurime eyes, sharp upturned eyes, upward-slanting outer corners with pointed ends, confident strong-willed look, angular fierce shape, beautiful detailed eyes, perfect symmetrical eyes',
-    'half_lidded': 'half-lidded eyes, lazy seductive partially closed eyelids, relaxed sleepy gaze, heavy lids covering part of iris, beautiful detailed eyes, perfect symmetrical eyes',
-    'sleepy': 'sleepy eyes, droopy heavy-lidded eyes, tired relaxed expression, narrow half-closed shape with soft downward curve, beautiful detailed eyes, perfect symmetrical eyes',
-    'sparkly': 'sparkly eyes, shining glittering highlights, multiple star-shaped sparkles in pupils, vibrant expressive anime-style gleam, beautiful detailed eyes with radiant reflections, perfect symmetrical eyes',
-    'narrow': 'narrow eyes, slim slitted eye shape, suspicious or calm intense gaze, thin elongated lids, beautiful detailed eyes, perfect symmetrical eyes',
-    'piercing': 'piercing eyes, sharp intense staring gaze, focused penetrating look, high contrast highlights on pupils, beautiful detailed eyes, perfect symmetrical eyes, clear sharp pupils',
-  };
+  const eyeTypeDescriptions = EYE_TYPE_DESCRIPTIONS;
 
+  const useEyesLora = style === CharacterStyle.ANIME && loraNames.includes('Eyes.safetensors');
   const loraTags =
     loraNames.length > 0
       ? loraNames
-          .map((name) => (name === 'fangs.safetensors' ? buildLoraTag(name, 1) : buildLoraTag(name, draft.loraWeight)))
-          .join(', ')
+        .map((name) => {
+          if (name === 'Eyes.safetensors' && !useEyesLora) return null;
+          if (name === 'Eyes.safetensors') return buildLoraTag(name, 0.7);
+          if (name === 'fangs.safetensors') return buildLoraTag(name, 1);
+          return buildLoraTag(name, draft.loraWeight);
+        })
+        .filter((tag): tag is string => typeof tag === 'string' && tag.trim().length > 0)
+        .join(', ')
       : '';
-  const loraEyes = loraNames.includes('Eyes.safetensors') ? 'loraeyes' : '';
+  const loraEyes = useEyesLora ? 'loraeyes' : '';
 
   const skinToneTag = skinTone ? `${hexToColorName(skinTone)} skin` : '';
   const hornColorTag = skinTone && isDemonish ? `${hexToColorName(skinTone)} horns` : '';
-  const fangsActivationTags = hasFangs ? 'fangs, teeth, mouth, open mouth, perfect teeth, detailed teeth' : '';
+  const tailColorTag = hairColor && (isLamia || isArachne) ? `${hexToColorName(hairColor)} tail` : '';
+  const fangsActivationTags = hasFangs
+    ? 'sharp fangs, visible fangs, clean sharp teeth, symmetrical teeth, slightly parted lips'
+    : '';
   const clothingTag = clothing ? `wearing detailed ${getClothingDetails(clothing, false, draft)}` : '';
   const hairColorTag = hairColor ? `${hexToColorName(hairColor)} hair` : '';
   const eyeColorTag = eyeColor ? `${eyeColor} eyes` : '';
@@ -405,18 +322,19 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
 
   const centaurAnatomy = isCentaur ? 'equine lower body, horse body, four legs, four hooves' : '';
 
-  return joinAndDedupeTags(
+  const prompt = joinAndDedupeTags(
     stylePrompts[style],
     isSpecialCharacter ? mainTag : '',
     isSpecialCharacter ? loraTags : '',
     isSpecialCharacter ? loraEyes : '',
+    fangsActivationTags,
     isSpecialCharacter ? specialPrompt : '',
     centaurAnatomy,
     age,
     ethnicity,
     skinToneTag,
     hornColorTag,
-    fangsActivationTags,
+    tailColorTag,
     subjectDescriptor,
     ageDescriptor,
     height,
@@ -430,6 +348,8 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
     environmentTag,
     personalityDescription ? `${personalityDescription} personality` : ''
   );
+
+  return prompt;
 };
 
 const buildNegativePrompt = (draft?: CharacterDraft): string => {
@@ -443,6 +363,16 @@ const buildNegativePrompt = (draft?: CharacterDraft): string => {
     'text',
     'blurry',
     'bad anatomy',
+    'bad eyes',
+    'asymmetrical eyes',
+    'misaligned eyes',
+    'cross-eyed',
+    'strabismus',
+    'multiple pupils',
+    'deformed pupils',
+    'deformed iris',
+    'missing eye',
+    'lazy eye',
     'bad hands',
     'missing fingers',
     'extra fingers',
@@ -489,8 +419,6 @@ const buildNegativePrompt = (draft?: CharacterDraft): string => {
   const isSlimeGirl = mainTag.includes('slime girl') || specialPrompt.includes('slime girl') || mainTag.includes('slime') || specialPrompt.includes('slime');
   const isCentaur = mainTag.includes('centaur') || specialPrompt.includes('centaur') || mainTag.includes('taur') || specialPrompt.includes('taur');
   const isHarpy = mainTag.includes('harpy') || specialPrompt.includes('harpy');
-
-  // Characters with non-human legs need special handling for landscape/cinematic views
   const hasNonHumanLegs = isCentaur || isLamia || isHarpy || isSlimeGirl;
 
   if (hasNonHumanLegs) {
@@ -511,14 +439,73 @@ const buildNegativePrompt = (draft?: CharacterDraft): string => {
     );
   }
 
+  // Add arachne-specific negative prompts
+  const isArachne = mainTag.includes('arachne') || specialPrompt.includes('arachne') || mainTag.includes('spider') || specialPrompt.includes('spider');
+  if (isArachne) {
+    extraNegativePrompts.push(
+      'hands on ground, all fours, crawling pose, crouching with hands down, kneeling on hands, hands touching floor, on all fours pose, quadruped stance, upside down, inverted, hanging, bottom view, underside view, from below, looking up at camera, head at bottom, feet at top, reversed orientation, flipped'
+    );
+  }
+
   if (draft?.generation?.negativePrompt) extraNegativePrompts.push(draft.generation.negativePrompt);
   if (draft?.specialNegativePrompt) extraNegativePrompts.push(draft.specialNegativePrompt);
+
+  const hasFangs =
+    mainTag.includes('arachne') ||
+    specialPrompt.includes('arachne') ||
+    mainTag.includes('vampire') ||
+    specialPrompt.includes('vampire') ||
+    mainTag.includes('fang') ||
+    specialPrompt.includes('fang');
+
+  if (hasFangs) {
+    extraNegativePrompts.push(
+      'bad teeth, deformed teeth, messy teeth, jagged teeth, extra teeth, duplicated teeth, melted teeth, teeth blur, teeth artifacts, crooked teeth'
+    );
+  }
 
   if (extraNegativePrompts.length > 0) {
     negativePrompt = joinAndDedupeTags(negativePrompt, extraNegativePrompts.join(', '));
   }
 
   return dedupeCommaTags(negativePrompt);
+};
+
+const pickVariant = (variants: string[], seed?: number): string => {
+  if (!Array.isArray(variants) || variants.length === 0) return '';
+  if (typeof seed === 'number' && Number.isFinite(seed)) {
+    const idx = Math.abs(seed) % variants.length;
+    return variants[idx];
+  }
+  return variants[Math.floor(Math.random() * variants.length)];
+};
+
+const buildHandPoseVariation = (draft: CharacterDraft, settings?: any): string => {
+  if (settings?.lockPose === true) return '';
+
+  const mainTagLower = draft?.mainTag?.toLowerCase() || '';
+  const specialPromptLower = draft?.specialPrompt?.toLowerCase() || '';
+  const isArachne =
+    mainTagLower.includes('arachne') ||
+    specialPromptLower.includes('arachne') ||
+    mainTagLower.includes('spider girl') ||
+    specialPromptLower.includes('spider girl');
+
+  const seedFromSettings =
+    typeof settings?.seed === 'number' && Number.isFinite(settings.seed) && settings.seed !== -1 ? settings.seed : undefined;
+
+  // If the user explicitly set a seed, keep pose selection deterministic.
+  // Otherwise (seed = -1 / undefined), allow true random variation between generations.
+  return pickVariant(
+    isArachne ? HAND_POSE_VARIATIONS_ARACHNE : HAND_POSE_VARIATIONS_GENERIC,
+    seedFromSettings
+  );
+};
+
+const buildPromptWithHandPose = (draft: CharacterDraft, style: CharacterStyle, settings?: any): string => {
+  const prompt = buildPrompt(draft, style);
+  const handPoseVariation = buildHandPoseVariation(draft, settings);
+  return joinAndDedupeTags(prompt, handPoseVariation);
 };
 
 export const automatic1111API = {
@@ -584,28 +571,84 @@ export const automatic1111API = {
     const isSlimeGirl = mainTag.includes('slime girl') || specialPrompt.includes('slime girl') || mainTag.includes('slime') || specialPrompt.includes('slime');
     const isCentaur = mainTag.includes('centaur') || specialPrompt.includes('centaur') || mainTag.includes('taur') || specialPrompt.includes('taur');
     const isHarpy = mainTag.includes('harpy') || specialPrompt.includes('harpy');
+    const isArachne = mainTag.includes('arachne') || specialPrompt.includes('arachne') || mainTag.includes('spider girl') || specialPrompt.includes('spider girl');
     const hasNonHumanLegs = isCentaur || isLamia || isHarpy || isSlimeGirl;
 
     const aspectRatio = settings?.aspectRatio || 'portrait';
     const isLandscapeOrCinematic = isLandscapeOrCinematicAspectRatio(aspectRatio);
 
-    // For non-human leg characters in landscape/cinematic, force varied, natural poses
-    if (hasNonHumanLegs && isLandscapeOrCinematic) {
-      const randomPose =
-        NON_HUMAN_LEGS_LANDSCAPE_CINEMATIC_VARIED_POSES[
-          Math.floor(Math.random() * NON_HUMAN_LEGS_LANDSCAPE_CINEMATIC_VARIED_POSES.length)
-        ];
+    // Check if character has custom poses and apply them
+    const aspectRatioId = normalizeAspectRatioId(aspectRatio);
+    const raceType = mainTag || specialPrompt;
 
-      // Create a modified draft with varied laying down pose
+    if (hasCustomPoses(raceType)) {
+      const randomPose = getRandomRacePose(raceType, aspectRatioId);
+      const handPoseVariation = poseMentionsHandsOrArms(randomPose) ? '' : buildHandPoseVariation(draft, settings);
       const modifiedDraft = {
         ...draft,
-        specialPrompt: (draft.specialPrompt || '') + `, ${randomPose}, ${NON_HUMAN_LEGS_LANDSCAPE_CINEMATIC_PROMPT_SUFFIX}`
+        specialPrompt: joinAndDedupeTags(draft.specialPrompt, randomPose, handPoseVariation)
       };
 
       const prompt = buildPrompt(modifiedDraft, style);
       const negativePrompt = buildNegativePrompt(modifiedDraft);
 
-      // Add extra negative prompts to prevent standing and ensure full body
+      const payload = {
+        prompt,
+        negative_prompt: negativePrompt,
+        width: settings?.width || getDimensionsFromAspectRatio(aspectRatio, draft.generation.model).width,
+        height: settings?.height || getDimensionsFromAspectRatio(aspectRatio, draft.generation.model).height,
+        steps: settings?.steps || 30,
+        cfg_scale: settings?.cfgScale || 8,
+        sampler_name: settings?.sampler || 'DPM++ 2M Karras',
+        model_name: model,
+        seed: settings?.seed === undefined || settings?.seed === null || settings?.seed === -1 ? -1 : settings?.seed,
+      };
+
+      return automatic1111API.generateImageWithPayload(payload, modifiedDraft, style, model);
+    }
+
+    if (isArachne) {
+      const randomPose = getRandomRacePose('arachne', aspectRatioId);
+      const handPoseVariation = poseMentionsHandsOrArms(randomPose) ? '' : buildHandPoseVariation(draft, settings);
+      const modifiedDraft = {
+        ...draft,
+        specialPrompt: joinAndDedupeTags(draft.specialPrompt, randomPose, handPoseVariation)
+      };
+
+      const prompt = buildPrompt(modifiedDraft, style);
+      const negativePrompt = buildNegativePrompt(modifiedDraft);
+
+      const payload = {
+        prompt,
+        negative_prompt: negativePrompt,
+        width: settings?.width || getDimensionsFromAspectRatio(aspectRatio).width,
+        height: settings?.height || getDimensionsFromAspectRatio(aspectRatio).height,
+        steps: settings?.steps || 30,
+        cfg_scale: settings?.cfgScale || 8,
+        sampler_name: settings?.sampler || 'DPM++ 2M Karras',
+        model_name: model,
+        seed: settings?.seed === undefined || settings?.seed === null || settings?.seed === -1 ? -1 : settings?.seed,
+      };
+
+      return automatic1111API.generateImageWithPayload(payload, modifiedDraft, style, model);
+    }
+
+    if (hasNonHumanLegs && isLandscapeOrCinematic) {
+      const randomPose = NON_HUMAN_LEGS_LANDSCAPE_CINEMATIC_VARIED_POSES[Math.floor(Math.random() * NON_HUMAN_LEGS_LANDSCAPE_CINEMATIC_VARIED_POSES.length)];
+      const handPoseVariation = poseMentionsHandsOrArms(randomPose) ? '' : buildHandPoseVariation(draft, settings);
+      const modifiedDraft = {
+        ...draft,
+        specialPrompt: joinAndDedupeTags(
+          draft.specialPrompt,
+          randomPose,
+          handPoseVariation,
+          NON_HUMAN_LEGS_LANDSCAPE_CINEMATIC_PROMPT_SUFFIX
+        )
+      };
+
+      const prompt = buildPrompt(modifiedDraft, style);
+      const negativePrompt = buildNegativePrompt(modifiedDraft);
+
       const extraNegativePrompts = NON_HUMAN_LEGS_LANDSCAPE_CINEMATIC_EXTRA_NEGATIVE_PROMPT;
 
       const payload = {
@@ -620,11 +663,10 @@ export const automatic1111API = {
         seed: settings?.seed === undefined || settings?.seed === null || settings?.seed === -1 ? -1 : settings?.seed,
       };
 
-      return automatic1111API.generateImageWithPayload(payload, draft, style, model);
+      return automatic1111API.generateImageWithPayload(payload, modifiedDraft, style, model);
     }
 
-    // Normal generation for other cases
-    const prompt = buildPrompt(draft, style);
+    const prompt = buildPromptWithHandPose(draft, style, settings);
     const negativePrompt = buildNegativePrompt(draft);
 
     const payload = {
@@ -640,7 +682,7 @@ export const automatic1111API = {
     };
 
     return automatic1111API.generateImageWithPayload(payload, draft, style, model);
-  }, // Added a comma here
+  },
 
   async generateImageWithPayload(payload: any, draft: CharacterDraft, style: CharacterStyle, model: string): Promise<string> {
     try {
@@ -664,7 +706,7 @@ export const automatic1111API = {
 
       // Upload the generated image to Supabase storage and add to gallery
       const base64Image = result.images[0];
-      const prompt = buildPrompt(draft, style);
+      const prompt = typeof payload?.prompt === 'string' && payload.prompt.trim().length > 0 ? payload.prompt : buildPrompt(draft, style);
       const uploadResult = await characterAPI.addCharacterImage(
         draft.id!,
         base64Image,

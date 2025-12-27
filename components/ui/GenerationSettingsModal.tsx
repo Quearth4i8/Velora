@@ -20,6 +20,7 @@ interface GenerationSettingsModalProps {
   onGenerate: () => void;
   isGenerating: boolean;
   disabled?: boolean;
+  selectedModel?: string | null;
 }
 
 export function GenerationSettingsModal({
@@ -29,12 +30,13 @@ export function GenerationSettingsModal({
   onSettingsChange,
   onGenerate,
   isGenerating,
-  disabled = false
+  disabled = false,
+  selectedModel
 }: GenerationSettingsModalProps) {
   return (
     <AnimatePresence>
       {isOpen && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -42,7 +44,7 @@ export function GenerationSettingsModal({
           className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-8"
           onClick={onClose}
         >
-          <motion.div 
+          <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
@@ -62,7 +64,7 @@ export function GenerationSettingsModal({
                 </svg>
               </button>
             </div>
-            
+
             {/* Modal Content */}
             <div className="p-6 space-y-4 overflow-y-auto max-h-[60vh]">
               {/* Steps */}
@@ -73,11 +75,11 @@ export function GenerationSettingsModal({
                   min="10"
                   max="100"
                   value={settings.steps}
-                  onChange={(e) => onSettingsChange({...settings, steps: parseInt(e.target.value)})}
+                  onChange={(e) => onSettingsChange({ ...settings, steps: parseInt(e.target.value) })}
                   className="w-full h-2 bg-dark-700 rounded-lg appearance-none cursor-pointer"
                 />
               </div>
-              
+
               {/* CFG Scale */}
               <div>
                 <label className="text-dark-300 text-sm block mb-2">CFG Scale: {settings.cfgScale}</label>
@@ -87,21 +89,21 @@ export function GenerationSettingsModal({
                   max="20"
                   step="0.5"
                   value={settings.cfgScale}
-                  onChange={(e) => onSettingsChange({...settings, cfgScale: parseFloat(e.target.value)})}
+                  onChange={(e) => onSettingsChange({ ...settings, cfgScale: parseFloat(e.target.value) })}
                   className="w-full h-2 bg-dark-700 rounded-lg appearance-none cursor-pointer"
                 />
               </div>
-              
+
               {/* Aspect Ratio */}
               <div>
                 <label className="text-dark-300 text-sm block mb-2">Aspect Ratio</label>
                 <select
                   value={settings.aspectRatio}
-                  onChange={(e) => onSettingsChange({...settings, aspectRatio: e.target.value})}
+                  onChange={(e) => onSettingsChange({ ...settings, aspectRatio: e.target.value })}
                   className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white text-sm"
                 >
                   {ASPECT_RATIO_OPTIONS.map((option) => {
-                    const dims = getDimensionsFromAspectRatio(option.id);
+                    const dims = getDimensionsFromAspectRatio(option.id, selectedModel);
                     return (
                       <option key={option.id} value={option.id}>
                         {option.label} ({dims.width}x{dims.height})
@@ -110,13 +112,13 @@ export function GenerationSettingsModal({
                   })}
                 </select>
               </div>
-              
+
               {/* Sampler */}
               <div>
                 <label className="text-dark-300 text-sm block mb-2">Sampler</label>
                 <select
                   value={settings.sampler}
-                  onChange={(e) => onSettingsChange({...settings, sampler: e.target.value})}
+                  onChange={(e) => onSettingsChange({ ...settings, sampler: e.target.value })}
                   className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white text-sm"
                 >
                   <option value="DPM++ 2M Karras">DPM++ 2M Karras</option>
@@ -126,7 +128,7 @@ export function GenerationSettingsModal({
                   <option value="DDIM">DDIM</option>
                 </select>
               </div>
-              
+
               {/* Seed */}
               <div>
                 <label className="text-dark-300 text-sm block mb-2">Seed</label>
@@ -134,12 +136,12 @@ export function GenerationSettingsModal({
                   <input
                     type="number"
                     value={settings.seed}
-                    onChange={(e) => onSettingsChange({...settings, seed: parseInt(e.target.value) || -1})}
+                    onChange={(e) => onSettingsChange({ ...settings, seed: parseInt(e.target.value) || -1 })}
                     className="flex-1 px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white text-sm"
                     placeholder="-1 for random"
                   />
                   <button
-                    onClick={() => onSettingsChange({...settings, seed: Math.floor(Math.random() * 1000000)})}
+                    onClick={() => onSettingsChange({ ...settings, seed: Math.floor(Math.random() * 1000000) })}
                     className="px-3 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-lg text-sm transition-colors"
                   >
                     Random
@@ -147,7 +149,7 @@ export function GenerationSettingsModal({
                 </div>
               </div>
             </div>
-            
+
             {/* Modal Footer */}
             <div className="px-6 py-4 border-t border-dark-700 flex justify-end space-x-3">
               <button

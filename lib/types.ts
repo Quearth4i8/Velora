@@ -8,12 +8,18 @@ export enum AgeGroup {
 }
 
 export enum Ethnicity {
-  CAUCASIAN = 'caucasian',
-  AFRICAN = 'african',
-  ASIAN = 'asian',
-  MIDDLE_EASTERN = 'middle_eastern',
-  LATIN = 'latin',
-  MIXED = 'mixed',
+  EAST_ASIAN = 'east_asian',
+  KOREAN = 'korean',
+  JAPANESE = 'japanese',
+  BRAZILIAN = 'brazilian',
+  COLOMBIAN = 'colombian',
+  LATIN_AMERICAN = 'latin_american',
+  RUSSIAN = 'russian',
+  UKRAINIAN = 'ukrainian',
+  SCANDINAVIAN = 'scandinavian',
+  ITALIAN = 'italian',
+  LEBANESE = 'lebanese',
+  MIXED_EXOTIC = 'mixed_exotic',
 }
 
 export enum Height {

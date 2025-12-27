@@ -88,9 +88,9 @@ export const RACE_DEFINITIONS: Record<CharacterStyle, { races: Record<string, Ra
         label: 'Arachne',
         mainTag: 'arachne',
         specialPrompt:
-          'arachnecpt, arachne, spider girl, monster girl, human upper body, spider lower body, taur, arthropod abdomen, (eight legs:1.4), (multiple legs:1.3), (spider legs:1.3), visible hind legs, detailed carapace, black widow markings optional, pedipalps, fangs, extra eyes optional, silk threads, beautiful detailed eyes, perfect symmetrical eyes, clear pupils, sharp eye details, expressive eyes',
+          'arachnecpt, arachne, spider girl, monster girl, arthropod abdomen, (eight legs:1.4), (spider legs:1.35), (no human legs:1.3), detailed carapace, silk threads, upright upper body, hands visible and free, (facing viewer:1.2), (normal orientation:1.2)',
         specialNegativePrompt:
-          'human legs, extra human limbs, fused legs, missing legs, deformed legs, extra abdomen, multiple abdomens, human lower body, asymmetrical body, duplicated torso',
+          'human legs, human feet, human lower body, bipedal, two legs, standing on two legs, extra human limbs, fused legs, missing spider legs, deformed legs, extra abdomen, asymmetrical body, duplicated torso, hands on ground, all fours, crawling pose, crouching with hands down, kneeling on hands, hands touching floor, on all fours pose, quadruped stance, upside down, inverted, hanging, bottom view, underside view, from below, looking up at camera, head at bottom, feet at top, reversed orientation, flipped',
         loraName: 'arachne.safetensors',
         loraWeight: 1,
       },
@@ -153,9 +153,9 @@ export const RACE_DEFINITIONS: Record<CharacterStyle, { races: Record<string, Ra
         label: 'Elf',
         mainTag: 'elf',
         specialPrompt:
-          'long pointed ears, longer ears, slender figure, long legs, beautiful detailed eyes, perfect symmetrical eyes, clear pupils, sharp eye details, expressive eyes',
-        loraName: undefined,
-        loraWeight: null,
+          'elf, pointy ears, light skin, elfmge, blue eyes, long hair, green hair, ahoge',
+        loraName: 'elf.safetensors',
+        loraWeight: 0.85,
       },
       fairy: {
         label: 'Fairy',

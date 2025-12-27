@@ -1,0 +1,18 @@
+export const EYE_TYPE_DESCRIPTIONS: Record<string, string> = {
+    normal: 'balanced eye shape, centered pupils, detailed irises, symmetrical eyes, natural gaze',
+    siren: 'mesmerizing siren eyes, elongated almond eyes, captivating gaze, smoky eyeliner, lifted outer corners, alluring expression',
+    fox: 'fox eyes, sharp almond eyes, lifted outer corners, sleek eyeliner, cunning gaze',
+    cat: 'cat eyes, winged eyeliner, upturned eyes, feline gaze, playful expression',
+    doe: 'doe eyes, big round eyes, soft lashes, innocent gaze, gentle expression',
+    wolf: 'wolf eyes, intense narrow eyes, piercing gaze, predatory look',
+    eagle: 'eagle eyes, sharp focused gaze, strong brow, commanding presence',
+    dragon: 'dragon eyes, slit pupils, reptilian gaze, mystical appearance',
+    big_round: 'big round anime eyes, large pupils, bright highlights, expressive gaze, sparkling irises',
+    tareme: 'tareme eyes, droopy downturned eyes, gentle gaze, soft expression',
+    tsurime: 'tsurime eyes, sharp upturned eyes, confident gaze, determined look',
+    half_lidded: 'half-lidded eyes, sleepy seductive gaze, sultry expression',
+    sleepy: 'sleepy eyes, heavy eyelids, relaxed gaze, drowsy look',
+    sparkly: 'sparkly eyes, bright reflections, glitter highlights, magical appearance',
+    narrow: 'narrow eyes, slim eye shape, calm intense gaze, focused expression',
+    piercing: 'piercing eyes, sharp gaze, high contrast pupils, striking appearance',
+};
