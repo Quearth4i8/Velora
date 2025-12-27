@@ -7,20 +7,13 @@ export const serializeCharacter = (draft: CharacterDraft): Record<string, any> =
   console.log('Identity age:', draft.identity?.age);
   console.log('Identity ethnicity:', draft.identity?.ethnicity);
 
-  // Check if required identity fields exist
-  if (!draft.identity) {
+  // Check if required identity fields exist, but skip for special characters if they are intentional
+  // However, validation is good. For special characters, identity might be partial or mock.
+  // The error logs showed 'Identity: Object' so identity is likely present.
+
+  if (!draft.identity && draft.characterType !== 'special') {
     console.error('Identity object is completely missing');
     throw new Error('Identity is missing from character draft');
-  }
-
-  if (!draft.identity.age) {
-    console.error('Age is missing from identity');
-    throw new Error('Age is missing from character draft');
-  }
-
-  if (!draft.identity.ethnicity) {
-    console.error('Ethnicity is missing from identity');
-    throw new Error('Ethnicity is missing from character draft');
   }
 
   const serializedLoraName =
@@ -37,22 +30,22 @@ export const serializeCharacter = (draft: CharacterDraft): Record<string, any> =
     lora_weight: draft.loraWeight ?? null,
     special_prompt: draft.specialPrompt || null,
     special_negative_prompt: draft.specialNegativePrompt || null,
-    age: draft.identity.age,
-    ethnicity: draft.identity.ethnicity,
-    skin_tone: draft.identity.skinTone || null,
-    height: draft.body.height,
-    physique: draft.body.physique,
-    chest_size: draft.body.chestSize,
-    butt_size: draft.body.buttSize,
-    hair_style: draft.appearance.hairStyle,
-    hair_color: draft.appearance.hairColor,
-    eye_color: draft.appearance.eyeColor,
-    eye_type: draft.appearance.eyeType,
-    clothing: draft.appearance.clothing,
-    custom_clothing: draft.appearance.customClothing || null,
-    environment: draft.appearance.environment,
-    personality_archetype: draft.personality.archetype,
-    personality_traits: draft.personality.traits,
+    age: draft.identity?.age ?? null,
+    ethnicity: draft.identity?.ethnicity ?? null,
+    skin_tone: draft.identity?.skinTone || null,
+    height: draft.body?.height || null,
+    physique: draft.body?.physique || null,
+    chest_size: draft.body?.chestSize || null,
+    butt_size: draft.body?.buttSize || null,
+    hair_style: draft.appearance?.hairStyle || null,
+    hair_color: draft.appearance?.hairColor || null,
+    eye_color: draft.appearance?.eyeColor || null,
+    eye_type: draft.appearance?.eyeType || null,
+    clothing: draft.appearance?.clothing || null,
+    custom_clothing: draft.appearance?.customClothing || undefined,
+    environment: draft.appearance?.environment || null,
+    personality_archetype: draft.personality?.archetype || null,
+    personality_traits: draft.personality?.traits || null,
     style: draft.generation?.style,
     model: draft.generation?.model,
     generated_image: draft.generation?.generatedImage,

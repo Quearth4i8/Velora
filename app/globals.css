@@ -180,3 +180,16 @@ nav {
   scrollbar-width: thin;
   scrollbar-color: #ec4899 #0a0a1f;
 }
+
+/* Custom Text Selection */
+::selection {
+  background-color: var(--primary-purple);
+  color: white;
+  text-shadow: 0 0 5px rgba(255, 64, 129, 0.4);
+}
+
+::-moz-selection {
+  background-color: var(--primary-purple);
+  color: white;
+  text-shadow: 0 0 5px rgba(255, 64, 129, 0.4);
+}

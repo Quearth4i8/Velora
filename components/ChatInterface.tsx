@@ -625,27 +625,42 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                 </div>
                 <div className="bg-dark-700/30 rounded-2xl p-4 border border-dark-600">
                   <p className="text-pink-400 text-sm mb-3">Describe your custom outfit in detail:</p>
-                  <div className="flex gap-3">
-                    <input
-                      type="text"
-                      placeholder="e.g., Victorian gothic dress with lace trim and corset..."
-                      className="flex-1 px-4 py-3 bg-dark-800/50 text-white rounded-xl border border-pink-500/50 focus:border-green-500/50 focus:outline-none focus:ring-2 focus:ring-green-500/20 placeholder-pink-400"
-                      id="customOutfitInput"
-                    />
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => {
-                        const input = document.getElementById('customOutfitInput') as HTMLInputElement;
-                        const customOutfit = input.value.trim();
-                        if (customOutfit) {
-                          handleCustomClothing(customOutfit);
-                        }
-                      }}
-                      className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-xl hover:from-green-500 hover:to-green-600 transition-all duration-200 shadow-lg shadow-green-500/20 font-medium"
-                    >
-                      Apply
-                    </motion.button>
+                  <div className="flex flex-col gap-3">
+                    <div className="flex gap-3">
+                      <input
+                        type="text"
+                        placeholder="e.g., Victorian gothic dress with lace trim and corset..."
+                        className="flex-1 px-4 py-3 bg-dark-800/50 text-white rounded-xl border border-pink-500/50 focus:border-green-500/50 focus:outline-none focus:ring-2 focus:ring-green-500/20 placeholder-pink-400"
+                        id="customOutfitInput"
+                        defaultValue={currentCharacter.appearance?.customClothing || ''}
+                      />
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => {
+                          const input = document.getElementById('customOutfitInput') as HTMLInputElement;
+                          const customOutfit = input.value.trim();
+                          if (customOutfit) {
+                            handleCustomClothing(customOutfit);
+                          }
+                        }}
+                        className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-xl hover:from-green-500 hover:to-green-600 transition-all duration-200 shadow-lg shadow-green-500/20 font-medium"
+                      >
+                        Apply
+                      </motion.button>
+                    </div>
+
+                    {currentCharacter.appearance?.customClothing && (
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="text-dark-400 text-sm">Last used:</span>
+                        <button
+                          onClick={() => handleCustomClothing(currentCharacter.appearance.customClothing!)}
+                          className="text-left text-sm text-green-400 hover:text-green-300 hover:underline truncate max-w-xl"
+                        >
+                          "{currentCharacter.appearance.customClothing}"
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
