@@ -80,7 +80,7 @@ export const characterService = {
     // Check cache first
     const cacheKey = `character_${id}`;
     const cached = localStorage.getItem(cacheKey);
-    
+
     if (cached) {
       const { data, timestamp } = JSON.parse(cached);
       // Cache for 5 minutes
@@ -88,10 +88,10 @@ export const characterService = {
         return data;
       }
     }
-    
+
     // Fetch from database
     const data = await this.getCharacter(id);
-    
+
     // Cache the result with error handling
     try {
       localStorage.setItem(cacheKey, JSON.stringify({
@@ -106,7 +106,7 @@ export const characterService = {
         console.warn('Failed to cache character:', cacheError);
       }
     }
-    
+
     return data;
   },
 
@@ -139,7 +139,7 @@ export const characterService = {
     // Check cache first
     const cacheKey = `characters_list_${limit}`;
     const cached = localStorage.getItem(cacheKey);
-    
+
     if (cached) {
       const { data, timestamp } = JSON.parse(cached);
       // Cache for 2 minutes
@@ -147,10 +147,10 @@ export const characterService = {
         return data;
       }
     }
-    
+
     // Fetch from database
     const data = await this.listCharacters(limit);
-    
+
     // Cache the result
     try {
       localStorage.setItem(cacheKey, JSON.stringify({
@@ -180,7 +180,7 @@ export const characterService = {
         console.error('Unexpected error caching characters:', error);
       }
     }
-    
+
     return data;
   },
 
@@ -188,28 +188,28 @@ export const characterService = {
     // Clear cache for this character when updating
     const cacheKey = `character_${id}`;
     localStorage.removeItem(cacheKey);
-    
+
     // Also clear the list cache
     localStorage.removeItem('characters_list_10');
     localStorage.removeItem('characters_list_50');
     localStorage.removeItem('special_characters_list_10');
     localStorage.removeItem('special_characters_list_50');
-    
+
     // Only include name and age in the update payload
     const updatePayload: Record<string, any> = {
       updated_at: new Date().toISOString(),
     };
-    
+
     // Add name if present
     if (draft.name) {
       updatePayload.name = draft.name;
     }
-    
+
     // Add age if present in identity
     if (draft.identity?.age !== undefined) {
       updatePayload.age = draft.identity.age;
     }
-    
+
     const { data, error } = await supabase
       .from('characters')
       .update(updatePayload)
@@ -222,6 +222,20 @@ export const characterService = {
   },
 
   async updateCharacterDirect(id: string, updates: Record<string, any>) {
+    // Clear cache for this character when updating directly
+    try {
+      const cacheKey = `character_${id}`;
+      localStorage.removeItem(cacheKey);
+
+      // Also clear the list cache as specific fields might be shown in lists
+      localStorage.removeItem('characters_list_10');
+      localStorage.removeItem('characters_list_50');
+      localStorage.removeItem('special_characters_list_10');
+      localStorage.removeItem('special_characters_list_50');
+    } catch (e) {
+      // Ignore cache clearing errors
+    }
+
     const { data, error } = await supabase
       .from('characters')
       .update(updates)

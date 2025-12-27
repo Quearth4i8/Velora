@@ -6,18 +6,18 @@ export const serializeCharacter = (draft: CharacterDraft): Record<string, any> =
   console.log('Identity:', draft.identity);
   console.log('Identity age:', draft.identity?.age);
   console.log('Identity ethnicity:', draft.identity?.ethnicity);
-  
+
   // Check if required identity fields exist
   if (!draft.identity) {
     console.error('Identity object is completely missing');
     throw new Error('Identity is missing from character draft');
   }
-  
+
   if (!draft.identity.age) {
     console.error('Age is missing from identity');
     throw new Error('Age is missing from character draft');
   }
-  
+
   if (!draft.identity.ethnicity) {
     console.error('Ethnicity is missing from identity');
     throw new Error('Ethnicity is missing from character draft');
@@ -27,7 +27,7 @@ export const serializeCharacter = (draft: CharacterDraft): Record<string, any> =
     Array.isArray(draft.loraNames) && draft.loraNames.length > 0
       ? draft.loraNames.join(', ')
       : draft.loraName || null;
-  
+
   const serialized = {
     name: draft.name,
     character_type: draft.characterType || 'custom',
@@ -49,6 +49,7 @@ export const serializeCharacter = (draft: CharacterDraft): Record<string, any> =
     eye_color: draft.appearance.eyeColor,
     eye_type: draft.appearance.eyeType,
     clothing: draft.appearance.clothing,
+    custom_clothing: draft.appearance.customClothing || null,
     environment: draft.appearance.environment,
     personality_archetype: draft.personality.archetype,
     personality_traits: draft.personality.traits,
@@ -57,7 +58,7 @@ export const serializeCharacter = (draft: CharacterDraft): Record<string, any> =
     generated_image: draft.generation?.generatedImage,
     is_gallery_only: draft.isGalleryOnly || false,
   };
-  
+
   return serialized;
 };
 
@@ -155,6 +156,7 @@ export const deserializeCharacter = (data: Record<string, any>): CharacterDraft 
       eyeColor: data.eye_color,
       eyeType: data.eye_type,
       clothing: data.clothing,
+      customClothing: data.custom_clothing || undefined,
       environment: data.environment,
     },
     personality: {

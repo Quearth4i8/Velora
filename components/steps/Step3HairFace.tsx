@@ -83,6 +83,7 @@ const clothingOptions = [
   { id: ClothingStyle.EDGY, label: 'Edgy', image: '/images/clothing-edgy.jpg', description: 'Alternative and rebellious look' },
   { id: ClothingStyle.TRADITIONAL, label: 'Traditional', image: '/images/clothing-traditional.jpg', description: 'Cultural and traditional attire' },
   { id: ClothingStyle.FANTASY, label: 'Fantasy', image: '/images/clothing-fantasy.jpg', description: 'Magical and fantasy-themed outfit' },
+  { id: ClothingStyle.CUSTOM, label: 'Custom', image: '/images/clothing-custom.jpg', description: 'Design your own outfit' },
 ];
 
 export const Step3HairFace: React.FC = () => {
@@ -191,7 +192,7 @@ export const Step3HairFace: React.FC = () => {
       <div className="border-t border-dark-700 pt-8">
         <h2 className="text-2xl font-bold text-white mb-2">Clothing Style</h2>
         <p className="text-dark-400 mb-6">Choose clothing style</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {clothingOptions.map((option) => (
             <ImageOptionCard
               key={option.id}
@@ -204,6 +205,36 @@ export const Step3HairFace: React.FC = () => {
             />
           ))}
         </div>
+
+        {draft.appearance.clothing === ClothingStyle.CUSTOM && (
+          <motion.div
+            initial={{ opacity: 0, height: 0, marginTop: 0 }}
+            animate={{ opacity: 1, height: 'auto', marginTop: 24 }}
+            exit={{ opacity: 0, height: 0, marginTop: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="bg-gradient-to-r from-pink-500/10 to-purple-500/10 border border-pink-500/20 rounded-xl p-6 relative">
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-pink-500 to-purple-500" />
+              <div className="flex items-start gap-4">
+                <div className="p-3 bg-dark-800 rounded-lg shrink-0">
+                  <svg className="w-6 h-6 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-white mb-2">Design Your Style</h3>
+                  <p className="text-dark-400 text-sm mb-4">Describe exactly what you want your character to wear.</p>
+                  <textarea
+                    value={draft.appearance.customClothing || ''}
+                    onChange={(e) => setAppearance({ customClothing: e.target.value })}
+                    placeholder="e.g. A futuristic white bodysuit with glowing blue lines, high collar, and tactical boots..."
+                    className="w-full h-24 bg-dark-900/50 border border-dark-700/50 rounded-lg p-4 text-white placeholder-dark-500 focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500/50 outline-none transition-all resize-none"
+                  />
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
       </div>
     </motion.div>
   );

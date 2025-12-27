@@ -80,6 +80,8 @@ export default function GalleryPage() {
         'high quality, best quality, masterpiece, highres, very aesthetic, absurdres, photorealistic, professional photography, high resolution',
       [CharacterStyle.ARTISTIC]:
         'high quality, best quality, masterpiece, highres, very aesthetic, absurdres, artistic, digital painting, concept art, detailed',
+      [CharacterStyle.SPECIAL]:
+        'masterpiece, best quality, amazing quality, absurdres,',
     };
 
     const focusPrefixes: Record<typeof specialFocus, string> = {
@@ -252,7 +254,7 @@ export default function GalleryPage() {
     if (filter === 'nsfw') return isNSFWImage(img);
     return true;
   });
-  
+
   // Generation settings
   const [generationSettings, setGenerationSettings] = useState({
     style: CharacterStyle.REALISTIC,
@@ -319,7 +321,7 @@ export default function GalleryPage() {
     try {
       setIsLoadingImages(true);
       const result = await characterAPI.getAllCharacterImages();
-      
+
       if (result.success && result.data) {
         setCommunityImages(result.data);
       } else {
@@ -362,7 +364,7 @@ export default function GalleryPage() {
 
     try {
       const result = await characterAPI.deleteCharacterImageFromGallery(imageId);
-      
+
       if (result.success) {
         // Refresh the gallery to remove the deleted image
         await fetchAllCharacterImages();
@@ -382,12 +384,12 @@ export default function GalleryPage() {
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
-    
+
     setIsGenerating(true);
     try {
       // Import Automatic1111 API dynamically to avoid SSR issues
       const { automatic1111API } = await import('@/lib/automatic1111');
-      
+
       // Check if Automatic1111 is available
       const isConnected = await automatic1111API.checkConnection();
       if (!isConnected) {
@@ -400,8 +402,9 @@ export default function GalleryPage() {
           'anime': 'masterpiece, best quality, highres, very aesthetic, absurdres, lazypos, anime art, illustration, clean lineart, vibrant colors, solo, full body',
           'realistic': 'masterpiece, best quality, highres, very aesthetic, absurdres, lazypos, photorealistic, professional photography, sharp focus, solo, full body',
           'artistic': 'masterpiece, best quality, highres, very aesthetic, absurdres, lazypos, digital painting, concept art, detailed, solo, full body',
+          'special': 'masterpiece, best quality, amazing quality, absurdres,',
         };
-        
+
         const stylePrefix = stylePrompts[style as keyof typeof stylePrompts] || stylePrompts.realistic;
 
         const cleaned = String(userPrompt || '').trim();
@@ -478,22 +481,22 @@ export default function GalleryPage() {
       }
 
       const result = await response.json();
-      
+
       if (!result.images || result.images.length === 0) {
         throw new Error('No images returned from Automatic1111');
       }
 
       const base64Image = result.images[0];
-      
+
       let targetCharacterId = null;
-      
+
       try {
         const charactersResult = await characterAPI.getCharacters();
         if (charactersResult.success && charactersResult.data) {
-          const existingGalleryChar = charactersResult.data.find((char: any) => 
+          const existingGalleryChar = charactersResult.data.find((char: any) =>
             char.name === 'Gallery Generated'
           );
-          
+
           if (existingGalleryChar) {
             targetCharacterId = existingGalleryChar.id;
           } else {
@@ -536,7 +539,7 @@ export default function GalleryPage() {
               },
               isGalleryOnly: true
             };
-            
+
             const createResult = await characterAPI.createCharacter(galleryCharacter);
             if (createResult.success && createResult.data) {
               targetCharacterId = createResult.data.id;
@@ -546,11 +549,11 @@ export default function GalleryPage() {
       } catch (error) {
         console.error('Error with gallery character:', error);
       }
-      
+
       if (!targetCharacterId) {
         throw new Error('Could not create or find gallery character for image generation');
       }
-      
+
       const uploadResult = await characterAPI.addCharacterImage(
         targetCharacterId,
         base64Image,
@@ -558,14 +561,14 @@ export default function GalleryPage() {
         resolvedModel,
         generationSettings.style
       );
-      
+
       if (!uploadResult.success) {
         throw new Error('Failed to add generated image to gallery');
       }
 
       await fetchAllCharacterImages();
       setPrompt('');
-      
+
       console.log('Image generated and added to gallery successfully');
     } catch (error) {
       console.error('Failed to generate image:', error);
@@ -619,11 +622,10 @@ export default function GalleryPage() {
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => setSpecialFocus('eyes')}
-                  className={`inline-flex items-center gap-2 h-8 px-3 rounded-lg border text-xs transition-colors ${
-                    specialFocus === 'eyes'
-                      ? 'bg-pink-600/20 border-pink-500/40 text-pink-200'
-                      : 'bg-dark-900/40 border-dark-700 text-dark-200 hover:bg-dark-800/60'
-                  }`}
+                  className={`inline-flex items-center gap-2 h-8 px-3 rounded-lg border text-xs transition-colors ${specialFocus === 'eyes'
+                    ? 'bg-pink-600/20 border-pink-500/40 text-pink-200'
+                    : 'bg-dark-900/40 border-dark-700 text-dark-200 hover:bg-dark-800/60'
+                    }`}
                   type="button"
                 >
                   <Eye className="w-4 h-4" />
@@ -631,44 +633,40 @@ export default function GalleryPage() {
                 </button>
                 <button
                   onClick={() => setSpecialFocus('face')}
-                  className={`h-8 px-3 rounded-lg border text-xs transition-colors ${
-                    specialFocus === 'face'
-                      ? 'bg-pink-600/20 border-pink-500/40 text-pink-200'
-                      : 'bg-dark-900/40 border-dark-700 text-dark-200 hover:bg-dark-800/60'
-                  }`}
+                  className={`h-8 px-3 rounded-lg border text-xs transition-colors ${specialFocus === 'face'
+                    ? 'bg-pink-600/20 border-pink-500/40 text-pink-200'
+                    : 'bg-dark-900/40 border-dark-700 text-dark-200 hover:bg-dark-800/60'
+                    }`}
                   type="button"
                 >
                   Face
                 </button>
                 <button
                   onClick={() => setSpecialFocus('scene')}
-                  className={`h-8 px-3 rounded-lg border text-xs transition-colors ${
-                    specialFocus === 'scene'
-                      ? 'bg-pink-600/20 border-pink-500/40 text-pink-200'
-                      : 'bg-dark-900/40 border-dark-700 text-dark-200 hover:bg-dark-800/60'
-                  }`}
+                  className={`h-8 px-3 rounded-lg border text-xs transition-colors ${specialFocus === 'scene'
+                    ? 'bg-pink-600/20 border-pink-500/40 text-pink-200'
+                    : 'bg-dark-900/40 border-dark-700 text-dark-200 hover:bg-dark-800/60'
+                    }`}
                   type="button"
                 >
                   Scene
                 </button>
                 <button
                   onClick={() => setSpecialFocus('object')}
-                  className={`h-8 px-3 rounded-lg border text-xs transition-colors ${
-                    specialFocus === 'object'
-                      ? 'bg-pink-600/20 border-pink-500/40 text-pink-200'
-                      : 'bg-dark-900/40 border-dark-700 text-dark-200 hover:bg-dark-800/60'
-                  }`}
+                  className={`h-8 px-3 rounded-lg border text-xs transition-colors ${specialFocus === 'object'
+                    ? 'bg-pink-600/20 border-pink-500/40 text-pink-200'
+                    : 'bg-dark-900/40 border-dark-700 text-dark-200 hover:bg-dark-800/60'
+                    }`}
                   type="button"
                 >
                   Object
                 </button>
                 <button
                   onClick={() => setSpecialFocus('custom')}
-                  className={`h-8 px-3 rounded-lg border text-xs transition-colors ${
-                    specialFocus === 'custom'
-                      ? 'bg-pink-600/20 border-pink-500/40 text-pink-200'
-                      : 'bg-dark-900/40 border-dark-700 text-dark-200 hover:bg-dark-800/60'
-                  }`}
+                  className={`h-8 px-3 rounded-lg border text-xs transition-colors ${specialFocus === 'custom'
+                    ? 'bg-pink-600/20 border-pink-500/40 text-pink-200'
+                    : 'bg-dark-900/40 border-dark-700 text-dark-200 hover:bg-dark-800/60'
+                    }`}
                   type="button"
                 >
                   Custom
@@ -731,6 +729,7 @@ export default function GalleryPage() {
               <option value={CharacterStyle.REALISTIC}>Realistic</option>
               <option value={CharacterStyle.ANIME}>Anime</option>
               <option value={CharacterStyle.ARTISTIC}>Artistic</option>
+              <option value={CharacterStyle.SPECIAL}>Special</option>
             </select>
           </div>
 
@@ -835,7 +834,7 @@ export default function GalleryPage() {
       <AnimatedBackground />
       <div className="relative z-10">
         <Navbar />
-        
+
         {/* Sidebar Toggle Button */}
         {!isDesktop && (
           <button
@@ -924,65 +923,61 @@ export default function GalleryPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-          <div className={`w-full ${isDesktopSidebarCollapsed ? 'max-w-none' : 'max-w-none'} mx-auto`}>
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
-              <div className="text-center sm:text-left">
-                <h1 className="text-3xl md:text-4xl font-bold text-white">Gallery</h1>
-              </div>
+            <div className={`w-full ${isDesktopSidebarCollapsed ? 'max-w-none' : 'max-w-none'} mx-auto`}>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
+                <div className="text-center sm:text-left">
+                  <h1 className="text-3xl md:text-4xl font-bold text-white">Gallery</h1>
+                </div>
 
-              <div className="flex justify-center sm:justify-end">
-                <div className="inline-flex items-center gap-3">
-                  <button
-                    onClick={toggleBlurNSFW}
-                    className={`h-10 px-4 rounded-lg border transition-colors ${
-                      blurNSFW
+                <div className="flex justify-center sm:justify-end">
+                  <div className="inline-flex items-center gap-3">
+                    <button
+                      onClick={toggleBlurNSFW}
+                      className={`h-10 px-4 rounded-lg border transition-colors ${blurNSFW
                         ? 'bg-pink-600/20 border-pink-500/30 text-pink-200'
                         : 'bg-dark-800/50 border-dark-700 text-dark-200 hover:text-white hover:bg-dark-700'
-                    }`}
-                  >
-                    Blur NSFW: {blurNSFW ? 'On' : 'Off'}
-                  </button>
+                        }`}
+                    >
+                      Blur NSFW: {blurNSFW ? 'On' : 'Off'}
+                    </button>
 
-                  <div className="inline-flex rounded-lg bg-dark-800/50 border border-dark-700 p-1">
-                  <button
-                    onClick={() => setFilter('all')}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
-                      filter === 'all'
-                        ? 'bg-pink-600 text-white'
-                        : 'text-dark-300 hover:text-white hover:bg-dark-700'
-                    }`}
-                  >
-                    All
-                  </button>
-                  <button
-                    onClick={() => setFilter('sfw')}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
-                      filter === 'sfw'
-                        ? 'bg-pink-600 text-white'
-                        : 'text-dark-300 hover:text-white hover:bg-dark-700'
-                    }`}
-                  >
-                    SFW
-                  </button>
-                  <button
-                    onClick={() => setFilter('nsfw')}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
-                      filter === 'nsfw'
-                        ? 'bg-pink-600 text-white'
-                        : 'text-dark-300 hover:text-white hover:bg-dark-700'
-                    }`}
-                  >
-                    NSFW
-                  </button>
+                    <div className="inline-flex rounded-lg bg-dark-800/50 border border-dark-700 p-1">
+                      <button
+                        onClick={() => setFilter('all')}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${filter === 'all'
+                          ? 'bg-pink-600 text-white'
+                          : 'text-dark-300 hover:text-white hover:bg-dark-700'
+                          }`}
+                      >
+                        All
+                      </button>
+                      <button
+                        onClick={() => setFilter('sfw')}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${filter === 'sfw'
+                          ? 'bg-pink-600 text-white'
+                          : 'text-dark-300 hover:text-white hover:bg-dark-700'
+                          }`}
+                      >
+                        SFW
+                      </button>
+                      <button
+                        onClick={() => setFilter('nsfw')}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${filter === 'nsfw'
+                          ? 'bg-pink-600 text-white'
+                          : 'text-dark-300 hover:text-white hover:bg-dark-700'
+                          }`}
+                      >
+                        NSFW
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div className="bg-dark-800/30 backdrop-blur-sm border border-dark-700 rounded-xl p-6 sm:p-8">
-              <h2 className="text-2xl font-bold text-white mb-8">Community Images</h2>
+              <div className="bg-dark-800/30 backdrop-blur-sm border border-dark-700 rounded-xl p-6 sm:p-8">
+                <h2 className="text-2xl font-bold text-white mb-8">Community Images</h2>
 
-              <div className="masonry-grid">
+                <div className="masonry-grid">
                   {isLoadingImages ? (
                     <div className="col-span-full text-center py-16">
                       <div className="w-20 h-20 mx-auto bg-gradient-to-br from-blue-600/20 to-blue-500/20 rounded-full flex items-center justify-center mb-6 border border-blue-500/30">
@@ -1023,7 +1018,7 @@ export default function GalleryPage() {
                             loading="lazy"
                           />
                         </div>
-                        
+
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300">
                           <div className="absolute bottom-0 left-0 right-0 p-3 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
                             <p className="text-white text-sm font-medium truncate mb-2">{image.characterName || 'Unknown'}</p>
@@ -1043,10 +1038,10 @@ export default function GalleryPage() {
                       </div>
                     ))
                   )}
+                </div>
               </div>
-            </div>
 
-            <style jsx>{`
+              <style jsx>{`
               .masonry-grid {
                 column-count: 1;
                 column-gap: 1rem;
@@ -1119,7 +1114,7 @@ export default function GalleryPage() {
                 }
               }
             `}</style>
-          </div>
+            </div>
           </motion.div>
         </div>
 
@@ -1150,9 +1145,8 @@ export default function GalleryPage() {
                     exit={{ scale: 0.9 }}
                     src={filteredImages[zoomedImageIndex]?.imageUrl}
                     alt={`Zoomed image ${zoomedImageIndex + 1}`}
-                    className={`max-w-full max-h-full object-contain rounded-lg ${
-                      blurNSFW && filteredImages[zoomedImageIndex] && isNSFWImage(filteredImages[zoomedImageIndex]) ? 'blur-lg' : ''
-                    }`}
+                    className={`max-w-full max-h-full object-contain rounded-lg ${blurNSFW && filteredImages[zoomedImageIndex] && isNSFWImage(filteredImages[zoomedImageIndex]) ? 'blur-lg' : ''
+                      }`}
                   />
 
                   {filteredImages.length > 1 && (

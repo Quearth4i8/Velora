@@ -1,4 +1,4 @@
-import { CharacterDraft, CharacterStyle, AIModel, Ethnicity } from './types';
+import { CharacterDraft, CharacterStyle, AIModel, Ethnicity, ClothingStyle } from './types';
 import { characterAPI } from './api';
 import {
   NON_HUMAN_LEGS_LANDSCAPE_CINEMATIC_VARIED_POSES,
@@ -33,6 +33,7 @@ const STYLE_TO_MODEL_MAP: Record<CharacterStyle, AIModel> = {
   [CharacterStyle.ANIME]: AIModel.ONEOBSESSION,
   [CharacterStyle.REALISTIC]: AIModel.CYBERREALISTIC,
   [CharacterStyle.ARTISTIC]: AIModel.PERFECTDELIBERATE,
+  [CharacterStyle.SPECIAL]: AIModel.PREFECT_ILLUSTRIOUS,
 };
 
 
@@ -228,7 +229,7 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
   const age = ageNumber !== null ? `${ageNumber} years old` : '';
 
   const isMinor = ageNumber !== null && ageNumber < 18;
-  const subjectDescriptor = isMinor ? 'loli' : 'woman';
+  const subjectDescriptor = isMinor ? 'loli, small, mini size, tiny size, petite size, small legs, small hands' : 'woman';
   const ageDescriptor =
     ageNumber === null
       ? ''
@@ -314,7 +315,11 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
   const fangsActivationTags = hasFangs
     ? 'sharp fangs, visible fangs, clean sharp teeth, symmetrical teeth, slightly parted lips'
     : '';
-  const clothingTag = clothing ? `wearing detailed ${getClothingDetails(clothing, false, draft)}` : '';
+  const clothingTag = clothing === ClothingStyle.CUSTOM && appearance.customClothing
+    ? `wearing ${appearance.customClothing}`
+    : clothing
+      ? `wearing detailed ${getClothingDetails(clothing, false, draft)}`
+      : '';
   const hairColorTag = hairColor ? `${hexToColorName(hairColor)} hair` : '';
   const eyeColorTag = eyeColor ? `${eyeColor} eyes` : '';
   const eyeTypeTag = eyeType ? (eyeTypeDescriptions[eyeType] || `${eyeType} eyes`) : '';
@@ -395,7 +400,13 @@ const buildNegativePrompt = (draft?: CharacterDraft): string => {
     'multiple characters',
     'twins',
     '2girls',
-    'two people'
+    'two people',
+    'split view',
+    'multiple views',
+    'multiple panels',
+    'collage',
+    '2 girls',
+    'two girls'
   );
 
   const extraNegativePrompts: string[] = [];
@@ -466,6 +477,14 @@ const buildNegativePrompt = (draft?: CharacterDraft): string => {
 
   if (extraNegativePrompts.length > 0) {
     negativePrompt = joinAndDedupeTags(negativePrompt, extraNegativePrompts.join(', '));
+  }
+
+  // Add specific negative prompts for SPECIAL style/model
+  if (draft?.generation?.style === CharacterStyle.SPECIAL) {
+    negativePrompt = joinAndDedupeTags(
+      negativePrompt,
+      'bad quality,worst quality,worst detail,sketch,censored,watermark, signature, artist name'
+    );
   }
 
   return dedupeCommaTags(negativePrompt);
@@ -598,8 +617,8 @@ export const automatic1111API = {
         width: settings?.width || getDimensionsFromAspectRatio(aspectRatio, draft.generation.model).width,
         height: settings?.height || getDimensionsFromAspectRatio(aspectRatio, draft.generation.model).height,
         steps: settings?.steps || 30,
-        cfg_scale: settings?.cfgScale || 8,
-        sampler_name: settings?.sampler || 'DPM++ 2M Karras',
+        cfg_scale: settings?.cfgScale || (style === CharacterStyle.SPECIAL ? 6 : 8),
+        sampler_name: settings?.sampler || (style === CharacterStyle.SPECIAL ? 'Euler a' : 'DPM++ 2M Karras'),
         model_name: model,
         seed: settings?.seed === undefined || settings?.seed === null || settings?.seed === -1 ? -1 : settings?.seed,
       };
@@ -624,8 +643,8 @@ export const automatic1111API = {
         width: settings?.width || getDimensionsFromAspectRatio(aspectRatio).width,
         height: settings?.height || getDimensionsFromAspectRatio(aspectRatio).height,
         steps: settings?.steps || 30,
-        cfg_scale: settings?.cfgScale || 8,
-        sampler_name: settings?.sampler || 'DPM++ 2M Karras',
+        cfg_scale: settings?.cfgScale || (style === CharacterStyle.SPECIAL ? 6 : 8),
+        sampler_name: settings?.sampler || (style === CharacterStyle.SPECIAL ? 'Euler a' : 'DPM++ 2M Karras'),
         model_name: model,
         seed: settings?.seed === undefined || settings?.seed === null || settings?.seed === -1 ? -1 : settings?.seed,
       };
@@ -657,8 +676,8 @@ export const automatic1111API = {
         width: settings?.width || getDimensionsFromAspectRatio(aspectRatio).width,
         height: settings?.height || getDimensionsFromAspectRatio(aspectRatio).height,
         steps: settings?.steps || 30,
-        cfg_scale: settings?.cfgScale || 8,
-        sampler_name: settings?.sampler || 'DPM++ 2M Karras',
+        cfg_scale: settings?.cfgScale || (style === CharacterStyle.SPECIAL ? 6 : 8),
+        sampler_name: settings?.sampler || (style === CharacterStyle.SPECIAL ? 'Euler a' : 'DPM++ 2M Karras'),
         model_name: model,
         seed: settings?.seed === undefined || settings?.seed === null || settings?.seed === -1 ? -1 : settings?.seed,
       };
@@ -675,8 +694,8 @@ export const automatic1111API = {
       width: settings?.width || getDimensionsFromAspectRatio(aspectRatio).width,
       height: settings?.height || getDimensionsFromAspectRatio(aspectRatio).height,
       steps: settings?.steps || 30,
-      cfg_scale: settings?.cfgScale || 8,
-      sampler_name: settings?.sampler || 'DPM++ 2M Karras',
+      cfg_scale: settings?.cfgScale || (style === CharacterStyle.SPECIAL ? 6 : 8),
+      sampler_name: settings?.sampler || (style === CharacterStyle.SPECIAL ? 'Euler a' : 'DPM++ 2M Karras'),
       model_name: model,
       seed: settings?.seed === undefined || settings?.seed === null || settings?.seed === -1 ? -1 : settings?.seed,
     };

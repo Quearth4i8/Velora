@@ -135,6 +135,7 @@ export enum ClothingStyle {
   UNDERWEAR = 'underwear',
   REVEALING = 'revealing',
   BODYSUIT = 'bodysuit',
+  CUSTOM = 'custom',
 }
 
 export enum Environment {
@@ -187,6 +188,7 @@ export interface CharacterAppearance {
   eyeColor: EyeColor | null;
   eyeType: EyeType | null;
   clothing: ClothingStyle | null;
+  customClothing?: string;
   environment: Environment | null;
 }
 
@@ -224,12 +226,14 @@ export enum CharacterStyle {
   ANIME = 'anime',
   REALISTIC = 'realistic',
   ARTISTIC = 'artistic',
+  SPECIAL = 'special',
 }
 
 export enum AIModel {
   CYBERREALISTIC = 'cyberrealisticPony_v140.safetensors',
   ONEOBSESSION = 'oneObsession_v18.safetensors',
   PERFECTDELIBERATE = 'perfectdeliberate_v30.safetensors',
+  PREFECT_ILLUSTRIOUS = 'prefectIllustriousXL_v3.safetensors',
 }
 
 export interface CharacterImage {

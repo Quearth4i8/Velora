@@ -76,17 +76,17 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
         clothing: clothing
       }
     };
-    
+
     setCurrentCharacter(updatedCharacter);
     setShowWardrobe(false);
-    
+
     // Save to database using direct update
     if (currentCharacter.id) {
       try {
         const result = await characterAPI.updateCharacterDirect(currentCharacter.id, {
           clothing: clothing
         });
-        
+
         if (!result.success) {
           console.error('Failed to save outfit to database:', result.error);
         } else {
@@ -102,7 +102,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
         console.error('Failed to save outfit to database:', error);
       }
     }
-    
+
     // Add a message about the outfit change
     const outfitMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -111,7 +111,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
       sender: 'character',
       timestamp: new Date(),
     };
-    
+
     setMessages(prev => [...prev, outfitMessage]);
   };
 
@@ -121,13 +121,37 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
       ...currentCharacter,
       appearance: {
         ...currentCharacter.appearance,
-        clothing: customOutfit as ClothingStyle
+        clothing: ClothingStyle.CUSTOM,
+        customClothing: customOutfit
       }
     };
-    
+
     setCurrentCharacter(updatedCharacter);
     setShowWardrobe(false);
-    
+
+    // Save to database using direct update
+    if (currentCharacter.id) {
+      try {
+        const result = await characterAPI.updateCharacterDirect(currentCharacter.id, {
+          clothing: ClothingStyle.CUSTOM,
+          custom_clothing: customOutfit
+        });
+
+        if (!result.success) {
+          console.error('Failed to save custom outfit to database:', result.error);
+        } else {
+          // Refresh to ensure sync
+          const refreshedCharacter = await characterAPI.getCharacterFresh(currentCharacter.id);
+          if (refreshedCharacter.success && refreshedCharacter.data) {
+            setCurrentCharacter(refreshedCharacter.data);
+            onCharacterUpdate?.(refreshedCharacter.data);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to save custom outfit to database:', error);
+      }
+    }
+
     // Add a message about custom outfit change
     const outfitMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -136,20 +160,20 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
       sender: 'character',
       timestamp: new Date(),
     };
-    
+
     setMessages(prev => [...prev, outfitMessage]);
   };
 
   const handleWardrobeImageGeneration = async () => {
     if (!currentCharacter.id) return;
-    
+
     try {
       setIsTyping(true);
       setShowWardrobe(false);
-      
+
       // Generate new image with current clothing (including NSFW options)
       const imageUrl = await automatic1111API.generateCharacterImage(currentCharacter);
-      
+
       if (imageUrl) {
         const generationMessage: ChatMessage = {
           id: Date.now().toString(),
@@ -158,7 +182,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
           sender: 'character',
           timestamp: new Date(),
         };
-        
+
         setMessages(prev => [...prev, generationMessage]);
       }
     } catch (error) {
@@ -170,7 +194,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
         sender: 'character',
         timestamp: new Date(),
       };
-      
+
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsTyping(false);
@@ -186,17 +210,17 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
         environment: environment
       }
     };
-    
+
     setCurrentCharacter(updatedCharacter);
     setShowEnvironment(false);
-    
+
     // Save to database using direct update
     if (currentCharacter.id) {
       try {
         const result = await characterAPI.updateCharacterDirect(currentCharacter.id, {
           environment: environment
         });
-        
+
         if (!result.success) {
           console.error('Failed to save environment to database:', result.error);
         } else {
@@ -212,7 +236,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
         console.error('Failed to save environment to database:', error);
       }
     }
-    
+
     // Add a message about the environment change
     const environmentMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -221,14 +245,14 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
       sender: 'character',
       timestamp: new Date(),
     };
-    
+
     setMessages(prev => [...prev, environmentMessage]);
   };
 
   const generateCharacterResponse = (userMessage: string, character: CharacterDraft): string => {
     const personality = character.personality;
     const traits = personality.traits;
-    
+
     // Simple response generation based on personality traits
     const responses = [
       "That's interesting! Tell me more about that.",
@@ -288,10 +312,10 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                   </svg>
                   <span className="text-sm font-medium">Back to Selection</span>
                 </button>
-                
+
                 {/* Character Name - Center */}
                 <div className="flex-1 flex justify-center">
-                  <div className="flex items-center space-x-3">              
+                  <div className="flex items-center space-x-3">
                     {/* Character Info */}
                     <div className="flex flex-col items-center">
                       <h1 className="text-xl font-semibold text-white">{currentCharacter.name || 'Character'}</h1>
@@ -299,7 +323,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Empty space to match gallery layout */}
                 <div className="w-8 h-8"></div>
               </div>
@@ -319,11 +343,10 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                     >
                       <div className={`max-w-md ${message.sender === 'user' ? 'order-2' : 'order-1'}`}>
                         <div
-                          className={`px-5 py-3 rounded-2xl ${
-                            message.sender === 'user'
-                              ? 'bg-gradient-to-r from-pink-600 to-pink-500 text-white shadow-lg shadow-pink-500/20'
-                              : 'bg-dark-800/50 text-dark-200 border border-dark-700/50 backdrop-blur-sm'
-                          }`}
+                          className={`px-5 py-3 rounded-2xl ${message.sender === 'user'
+                            ? 'bg-gradient-to-r from-pink-600 to-pink-500 text-white shadow-lg shadow-pink-500/20'
+                            : 'bg-dark-800/50 text-dark-200 border border-dark-700/50 backdrop-blur-sm'
+                            }`}
                         >
                           <p className="text-sm leading-relaxed">{message.content}</p>
                         </div>
@@ -333,7 +356,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                       </div>
                     </motion.div>
                   ))}
-                  
+
                   {isTyping && (
                     <motion.div
                       initial={{ opacity: 0, y: 20 }}
@@ -369,7 +392,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                   </button>
-                  
+
                   {/* Wardrobe Button */}
                   <button
                     onClick={() => setShowWardrobe(true)}
@@ -380,7 +403,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                     </svg>
                   </button>
-                  
+
                   {/* Environment Button */}
                   <button
                     onClick={() => setShowEnvironment(true)}
@@ -393,7 +416,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                     </svg>
                   </button>
                 </div>
-                
+
                 {/* Input with Send Button */}
                 <div className="relative">
                   <input
@@ -404,7 +427,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                     placeholder="Type your message..."
                     className="w-full px-5 py-3 pr-16 bg-dark-800/50 text-dark-200 rounded-2xl border border-pink-500/50 focus:border-pink-500/50 focus:outline-none focus:ring-2 focus:ring-pink-500/20 backdrop-blur-sm placeholder-pink-400"
                   />
-                  
+
                   {/* Send Button */}
                   <button
                     onClick={handleSendMessage}
@@ -419,7 +442,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
           </div>
         </div>
       )}
-      
+
       {/* Wardrobe Modal */}
       <AnimatePresence>
         {showWardrobe && (
@@ -451,7 +474,33 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                   </svg>
                 </button>
               </div>
-              
+
+              {/* Current Outfit Display */}
+              <div className="mb-8 p-4 bg-dark-700/30 rounded-2xl border border-pink-500/20">
+                <div className="flex items-start gap-4">
+                  <div className="p-3 bg-pink-500/10 rounded-xl">
+                    <svg className="w-6 h-6 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-pink-400 mb-1">Current Outfit</h3>
+                    <div className="text-lg text-white font-medium">
+                      {currentCharacter.appearance?.clothing === ClothingStyle.CUSTOM ? (
+                        <div className="flex flex-col">
+                          <span className="text-green-400">Custom Outfit</span>
+                          <span className="text-sm text-dark-300 font-normal mt-1 italic">
+                            "{currentCharacter.appearance?.customClothing || 'No description provided'}"
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="capitalize">{currentCharacter.appearance?.clothing || 'Default'}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Regular Outfits Section */}
               <div className="mb-8">
                 <div className="flex items-center mb-4">
@@ -459,7 +508,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                   <h3 className="text-xl font-semibold text-pink-300">Regular Outfits</h3>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {[ 
+                  {[
                     { id: 'casual', label: 'Casual', image: '/images/clothing-casual.jpg', description: 'Relaxed everyday style - comfortable and approachable look' },
                     { id: 'formal', label: 'Formal', image: '/images/clothing-formal.jpg', description: 'Classic evening elegance - refined and sophisticated outfit' },
                     { id: 'sporty', label: 'Sporty', image: '/images/clothing-sporty.jpg', description: 'Active and energetic - athletic vibe with practical details' },
@@ -474,15 +523,14 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => handleOutfitChange(outfit.id as ClothingStyle)}
-                      className={`relative overflow-hidden rounded-2xl border-2 transition-all duration-200 ${
-                        currentCharacter.appearance?.clothing === outfit.id
-                          ? 'border-pink-500 bg-pink-500/20 shadow-lg shadow-pink-500/30'
-                          : 'border-dark-600 bg-dark-700/50 hover:border-pink-500/50 hover:bg-pink-500/10'
-                      }`}
+                      className={`relative overflow-hidden rounded-2xl border-2 transition-all duration-200 ${currentCharacter.appearance?.clothing === outfit.id
+                        ? 'border-pink-500 bg-pink-500/20 shadow-lg shadow-pink-500/30'
+                        : 'border-dark-600 bg-dark-700/50 hover:border-pink-500/50 hover:bg-pink-500/10'
+                        }`}
                     >
                       <div className="aspect-video bg-gradient-to-br from-dark-600 to-dark-700 relative">
-                        <img 
-                          src={outfit.image} 
+                        <img
+                          src={outfit.image}
                           alt={outfit.label}
                           className="w-full h-full object-cover opacity-80"
                           onError={(e) => {
@@ -496,7 +544,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                           <span className="text-white text-sm font-medium">Select</span>
                         </div>
                         {/* Fallback placeholder */}
-                        <div className="absolute inset-0 flex items-center justify-center" style={{display: 'none'}}>
+                        <div className="absolute inset-0 flex items-center justify-center" style={{ display: 'none' }}>
                           <svg className="w-12 h-12 text-dark-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                           </svg>
@@ -533,15 +581,14 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => handleOutfitChange(outfit.id as ClothingStyle)}
-                      className={`relative overflow-hidden rounded-2xl border-2 transition-all duration-200 ${
-                        currentCharacter.appearance?.clothing === outfit.id
-                          ? 'border-pink-500 bg-pink-500/20 shadow-lg shadow-pink-500/30'
-                          : 'border-dark-600 bg-dark-700/50 hover:border-pink-500/50 hover:bg-pink-500/10'
-                      }`}
+                      className={`relative overflow-hidden rounded-2xl border-2 transition-all duration-200 ${currentCharacter.appearance?.clothing === outfit.id
+                        ? 'border-pink-500 bg-pink-500/20 shadow-lg shadow-pink-500/30'
+                        : 'border-dark-600 bg-dark-700/50 hover:border-pink-500/50 hover:bg-pink-500/10'
+                        }`}
                     >
                       <div className="aspect-video bg-gradient-to-br from-dark-600 to-dark-700 relative">
-                        <img 
-                          src={outfit.image} 
+                        <img
+                          src={outfit.image}
                           alt={outfit.label}
                           className="w-full h-full object-cover opacity-80"
                           onError={(e) => {
@@ -555,7 +602,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                           <span className="text-white text-sm font-medium">Select</span>
                         </div>
                         {/* Fallback placeholder */}
-                        <div className="absolute inset-0 flex items-center justify-center" style={{display: 'none'}}>
+                        <div className="absolute inset-0 flex items-center justify-center" style={{ display: 'none' }}>
                           <svg className="w-12 h-12 text-dark-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                           </svg>
@@ -606,7 +653,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
           </motion.div>
         )}
       </AnimatePresence>
-      
+
       {/* Environment Modal */}
       <AnimatePresence>
         {showEnvironment && (
@@ -635,17 +682,16 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                   </svg>
                 </button>
               </div>
-              
+
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                 {Object.values(Environment).map((env) => (
                   <button
                     key={env}
                     onClick={() => handleEnvironmentChange(env)}
-                    className={`p-3 rounded-xl border-2 transition-all duration-200 ${
-                      currentCharacter.appearance?.environment === env
-                        ? 'border-green-500 bg-green-500/20 text-green-300'
-                        : 'border-dark-600 bg-dark-700/50 text-dark-200 hover:border-green-500/50 hover:bg-green-500/10'
-                    }`}
+                    className={`p-3 rounded-xl border-2 transition-all duration-200 ${currentCharacter.appearance?.environment === env
+                      ? 'border-green-500 bg-green-500/20 text-green-300'
+                      : 'border-dark-600 bg-dark-700/50 text-dark-200 hover:border-green-500/50 hover:bg-green-500/10'
+                      }`}
                   >
                     <div className="text-sm font-medium capitalize mb-1">
                       {env.replace('_', ' ')}

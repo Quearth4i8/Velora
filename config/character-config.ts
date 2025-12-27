@@ -271,6 +271,10 @@ export const CHARACTER_CONFIG = {
       id,
       ...def,
     })) as LoraPreset[],
+    [CharacterStyle.SPECIAL]: Object.entries(RACE_DEFINITIONS[CharacterStyle.SPECIAL].races).map(([id, def]) => ({
+      id,
+      ...def,
+    })) as LoraPreset[],
   },
 };
 

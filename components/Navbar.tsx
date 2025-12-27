@@ -42,7 +42,7 @@ export function Navbar() {
     { href: '/', label: 'Home' },
     { href: '/create', label: 'Create' },
     { href: '/gallery', label: 'Gallery' },
-    { href: '/community', label: 'Community' },
+    { href: '/my-characters', label: 'My Characters' },
   ];
 
   return (
@@ -51,9 +51,9 @@ export function Navbar() {
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center">
             <Link href="/" className="flex items-center space-x-3 group">
-              <img 
-                src="/images/velora.png" 
-                alt="Velora Logo" 
+              <img
+                src="/images/velora.png"
+                alt="Velora Logo"
                 className="w-10 h-10 rounded-lg transition-transform group-hover:scale-105"
               />
               <span className="text-xl font-bold bg-gradient-to-r from-pink-400 to-pink-500 bg-clip-text text-transparent">
@@ -67,11 +67,10 @@ export function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                  isActive(link.href)
-                    ? 'text-pink-400 bg-pink-400/10'
-                    : 'text-dark-300 hover:text-white hover:bg-dark-800'
-                }`}
+                className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${isActive(link.href)
+                  ? 'text-pink-400 bg-pink-400/10'
+                  : 'text-dark-300 hover:text-white hover:bg-dark-800'
+                  }`}
               >
                 {link.label}
               </Link>
@@ -104,6 +103,16 @@ export function Navbar() {
 
               {showProfileDropdown && (
                 <div className="absolute right-0 mt-2 w-48 bg-dark-800 border border-dark-700 rounded-lg shadow-xl overflow-hidden">
+                  <Link
+                    href="/manage-characters"
+                    className="flex items-center space-x-3 px-4 py-3 text-dark-300 hover:text-white hover:bg-dark-700 transition-colors duration-150"
+                    onClick={() => setShowProfileDropdown(false)}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                    </svg>
+                    <span className="text-sm">Manage Characters</span>
+                  </Link>
                   <Link
                     href="/settings"
                     className="flex items-center space-x-3 px-4 py-3 text-dark-300 hover:text-white hover:bg-dark-700 transition-colors duration-150"
@@ -158,11 +167,10 @@ export function Navbar() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
-                    isActive(link.href)
-                      ? 'text-pink-400 bg-pink-400/10'
-                      : 'text-dark-300 hover:text-white hover:bg-dark-800'
-                  }`}
+                  className={`px-4 py-3 rounded-lg font-medium transition-all duration-200 ${isActive(link.href)
+                    ? 'text-pink-400 bg-pink-400/10'
+                    : 'text-dark-300 hover:text-white hover:bg-dark-800'
+                    }`}
                   onClick={() => setShowMobileMenu(false)}
                 >
                   {link.label}
