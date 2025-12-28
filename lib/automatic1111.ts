@@ -608,8 +608,14 @@ export const automatic1111API = {
         specialPrompt: joinAndDedupeTags(draft.specialPrompt, randomPose, handPoseVariation)
       };
 
-      const prompt = buildPrompt(modifiedDraft, style);
-      const negativePrompt = buildNegativePrompt(modifiedDraft);
+      let prompt = buildPrompt(modifiedDraft, style);
+      let negativePrompt = buildNegativePrompt(modifiedDraft);
+
+      // Apply model-specific score tags for gallery/settings-based generation
+      if (settings && model === AIModel.CYBERREALISTIC) {
+        prompt = `score_9, score_8_up, score_7_up, ${prompt}`;
+        negativePrompt = `score_6, score_5, score_4, (worst quality:1.2), (low quality:1.2), (normal quality:1.2), ${negativePrompt}`;
+      }
 
       const payload = {
         prompt,
@@ -634,14 +640,20 @@ export const automatic1111API = {
         specialPrompt: joinAndDedupeTags(draft.specialPrompt, randomPose, handPoseVariation)
       };
 
-      const prompt = buildPrompt(modifiedDraft, style);
-      const negativePrompt = buildNegativePrompt(modifiedDraft);
+      let prompt = buildPrompt(modifiedDraft, style);
+      let negativePrompt = buildNegativePrompt(modifiedDraft);
+
+      // Apply model-specific score tags for gallery/settings-based generation
+      if (settings && model === AIModel.CYBERREALISTIC) {
+        prompt = `score_9, score_8_up, score_7_up, ${prompt}`;
+        negativePrompt = `score_6, score_5, score_4, (worst quality:1.2), (low quality:1.2), (normal quality:1.2), ${negativePrompt}`;
+      }
 
       const payload = {
         prompt,
         negative_prompt: negativePrompt,
-        width: settings?.width || getDimensionsFromAspectRatio(aspectRatio).width,
-        height: settings?.height || getDimensionsFromAspectRatio(aspectRatio).height,
+        width: settings?.width || getDimensionsFromAspectRatio(aspectRatio, model).width,
+        height: settings?.height || getDimensionsFromAspectRatio(aspectRatio, model).height,
         steps: settings?.steps || 30,
         cfg_scale: settings?.cfgScale || (style === CharacterStyle.SPECIAL ? 6 : 8),
         sampler_name: settings?.sampler || (style === CharacterStyle.SPECIAL ? 'Euler a' : 'DPM++ 2M Karras'),
@@ -665,16 +677,23 @@ export const automatic1111API = {
         )
       };
 
-      const prompt = buildPrompt(modifiedDraft, style);
-      const negativePrompt = buildNegativePrompt(modifiedDraft);
+      let prompt = buildPrompt(modifiedDraft, style);
+      let negativePrompt = buildNegativePrompt(modifiedDraft);
 
       const extraNegativePrompts = NON_HUMAN_LEGS_LANDSCAPE_CINEMATIC_EXTRA_NEGATIVE_PROMPT;
+      negativePrompt = joinAndDedupeTags(negativePrompt, extraNegativePrompts);
+
+      // Apply model-specific score tags for gallery/settings-based generation
+      if (settings && model === AIModel.CYBERREALISTIC) {
+        prompt = `score_9, score_8_up, score_7_up, ${prompt}`;
+        negativePrompt = `score_6, score_5, score_4, (worst quality:1.2), (low quality:1.2), (normal quality:1.2), ${negativePrompt}`;
+      }
 
       const payload = {
         prompt,
-        negative_prompt: joinAndDedupeTags(negativePrompt, extraNegativePrompts),
-        width: settings?.width || getDimensionsFromAspectRatio(aspectRatio).width,
-        height: settings?.height || getDimensionsFromAspectRatio(aspectRatio).height,
+        negative_prompt: negativePrompt,
+        width: settings?.width || getDimensionsFromAspectRatio(aspectRatio, model).width,
+        height: settings?.height || getDimensionsFromAspectRatio(aspectRatio, model).height,
         steps: settings?.steps || 30,
         cfg_scale: settings?.cfgScale || (style === CharacterStyle.SPECIAL ? 6 : 8),
         sampler_name: settings?.sampler || (style === CharacterStyle.SPECIAL ? 'Euler a' : 'DPM++ 2M Karras'),
@@ -685,14 +704,20 @@ export const automatic1111API = {
       return automatic1111API.generateImageWithPayload(payload, modifiedDraft, style, model);
     }
 
-    const prompt = buildPromptWithHandPose(draft, style, settings);
-    const negativePrompt = buildNegativePrompt(draft);
+    let prompt = buildPromptWithHandPose(draft, style, settings);
+    let negativePrompt = buildNegativePrompt(draft);
+
+    // Apply model-specific score tags for gallery/settings-based generation
+    if (settings && model === AIModel.CYBERREALISTIC) {
+      prompt = `score_9, score_8_up, score_7_up, ${prompt}`;
+      negativePrompt = `score_6, score_5, score_4, (worst quality:1.2), (low quality:1.2), (normal quality:1.2), ${negativePrompt}`;
+    }
 
     const payload = {
       prompt,
       negative_prompt: negativePrompt,
-      width: settings?.width || getDimensionsFromAspectRatio(aspectRatio).width,
-      height: settings?.height || getDimensionsFromAspectRatio(aspectRatio).height,
+      width: settings?.width || getDimensionsFromAspectRatio(aspectRatio, model).width,
+      height: settings?.height || getDimensionsFromAspectRatio(aspectRatio, model).height,
       steps: settings?.steps || 30,
       cfg_scale: settings?.cfgScale || (style === CharacterStyle.SPECIAL ? 6 : 8),
       sampler_name: settings?.sampler || (style === CharacterStyle.SPECIAL ? 'Euler a' : 'DPM++ 2M Karras'),

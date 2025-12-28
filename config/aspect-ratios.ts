@@ -81,6 +81,14 @@ export const MODEL_SPECIFIC_RESOLUTIONS: Record<string, Partial<Record<AspectRat
     wide: { width: 1216, height: 832 },
     square: { width: 1024, height: 1024 },
   },
+  'cyberrealisticPony_v140.safetensors': {
+    portrait: { width: 832, height: 1216 },
+    mobile: { width: 896, height: 1152 },
+    landscape: { width: 1216, height: 832 },
+    cinematic: { width: 1344, height: 768 },
+    wide: { width: 1152, height: 896 },
+    square: { width: 1024, height: 1024 },
+  },
 };
 
 export const MODEL_DEFAULT_SETTINGS: Record<string, { steps: number; cfgScale: number; sampler: string }> = {
@@ -88,6 +96,11 @@ export const MODEL_DEFAULT_SETTINGS: Record<string, { steps: number; cfgScale: n
     steps: 35,
     cfgScale: 6,
     sampler: 'Euler a',
+  },
+  'cyberrealisticPony_v140.safetensors': {
+    steps: 30,
+    cfgScale: 5,
+    sampler: 'DPM++ 2M Karras',
   },
 };
 
