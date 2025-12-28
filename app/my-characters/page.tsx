@@ -46,7 +46,6 @@ export default function MyCharactersPage() {
             <Link href={`/chat/${character.id}`}>
                 <motion.div
                     className={`group relative bg-dark-800/40 border border-dark-700/50 hover:border-pink-500/30 rounded-2xl p-4 transition-all duration-300 hover:shadow-xl hover:shadow-pink-500/10 flex ${featured ? 'flex-col items-center text-center gap-4' : 'flex-row items-center gap-4'}`}
-                    whileHover={{ y: -2 }}
                 >
                     {/* Circular Image Icon */}
                     <div className={`relative overflow-hidden rounded-full border-2 border-dark-600 group-hover:border-pink-500/50 transition-colors shrink-0 ${featured ? 'w-24 h-24' : 'w-16 h-16'}`}>
@@ -108,7 +107,7 @@ export default function MyCharactersPage() {
             >
                 <div className="max-w-7xl mx-auto">
                     <div className="mb-8">
-                        <h1 className="text-3xl font-extrabold bg-gradient-to-r from-pink-300 via-pink-400 to-fuchsia-400 bg-clip-text text-transparent">
+                        <h1 className="text-3xl font-extrabold bg-gradient-to-r from-pink-300 via-pink-400 to-pink-500 bg-clip-text text-transparent">
                             My Characters
                         </h1>
                         <p className="text-dark-300 mt-2">Resume your chats and manage your creations</p>
@@ -129,7 +128,7 @@ export default function MyCharactersPage() {
                             </p>
                             <Link
                                 href="/create"
-                                className="px-6 py-2.5 bg-gradient-to-r from-pink-600 to-fuchsia-500 hover:from-pink-500 hover:to-fuchsia-400 text-white font-medium rounded-xl transition-all shadow-lg shadow-pink-500/20"
+                                className="px-6 py-2.5 bg-gradient-to-r from-pink-600 to-pink-700 hover:from-pink-500 hover:to-pink-600 text-white font-medium rounded-xl transition-all shadow-lg shadow-pink-500/20"
                             >
                                 Create Character
                             </Link>
@@ -152,7 +151,7 @@ export default function MyCharactersPage() {
                             {/* All Characters Section */}
                             <div>
                                 <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
-                                    <span className="w-1.5 h-6 bg-purple-500 rounded-full" />
+                                    <span className="w-1.5 h-6 bg-pink-500 rounded-full" />
                                     All Characters
                                 </h2>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">

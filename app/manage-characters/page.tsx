@@ -341,7 +341,7 @@ export default function ManageCharactersPage() {
                     {/* Header */}
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
                         <div>
-                            <h1 className="text-3xl font-extrabold bg-gradient-to-r from-pink-300 via-pink-400 to-fuchsia-400 bg-clip-text text-transparent">
+                            <h1 className="text-3xl font-extrabold bg-gradient-to-r from-pink-300 via-pink-400 to-pink-500 bg-clip-text text-transparent">
                                 Manage Characters
                             </h1>
                             <p className="text-dark-300 mt-2">Create, edit, and manage your special character collection</p>
@@ -372,7 +372,7 @@ export default function ManageCharactersPage() {
                             </div>
                             <button
                                 onClick={openCreateSpecialCharacter}
-                                className="px-6 py-2.5 bg-gradient-to-r from-pink-600 to-fuchsia-500 hover:from-pink-500 hover:to-fuchsia-400 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg shadow-pink-500/20 whitespace-nowrap transform hover:scale-105"
+                                className="px-6 py-2.5 bg-gradient-to-r from-pink-600 to-pink-700 hover:from-pink-500 hover:to-pink-600 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg shadow-pink-500/20 whitespace-nowrap transform hover:scale-105"
                             >
                                 + New Character
                             </button>

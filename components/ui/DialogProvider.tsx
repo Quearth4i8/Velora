@@ -6,38 +6,38 @@ import { Modal } from '@/components/ui/Modal';
 type AlertInput =
   | string
   | {
-      title?: string;
-      message: string;
-      confirmText?: string;
-    };
+    title?: string;
+    message: string;
+    confirmText?: string;
+  };
 
 type ConfirmInput =
   | string
   | {
-      title?: string;
-      message: string;
-      confirmText?: string;
-      cancelText?: string;
-      destructive?: boolean;
-    };
+    title?: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    destructive?: boolean;
+  };
 
 type DialogRequest =
   | {
-      type: 'alert';
-      title: string;
-      message: string;
-      confirmText: string;
-      resolve: () => void;
-    }
+    type: 'alert';
+    title: string;
+    message: string;
+    confirmText: string;
+    resolve: () => void;
+  }
   | {
-      type: 'confirm';
-      title: string;
-      message: string;
-      confirmText: string;
-      cancelText: string;
-      destructive: boolean;
-      resolve: (value: boolean) => void;
-    };
+    type: 'confirm';
+    title: string;
+    message: string;
+    confirmText: string;
+    cancelText: string;
+    destructive: boolean;
+    resolve: (value: boolean) => void;
+  };
 
 interface DialogApi {
   alert: (input: AlertInput) => Promise<void>;
@@ -174,7 +174,7 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
               className={
                 active?.type === 'confirm' && active.destructive
                   ? 'px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors duration-200'
-                  : 'px-4 py-2 bg-gradient-to-r from-pink-600 via-pink-500 to-purple-600 text-white rounded-lg font-semibold hover:from-pink-500 hover:via-pink-400 hover:to-purple-500 transition-all duration-300 shadow-xl shadow-pink-500/30 border border-pink-500/30'
+                  : 'px-4 py-2 bg-gradient-to-r from-pink-600 via-pink-500 to-pink-700 text-white rounded-lg font-semibold hover:from-pink-500 hover:via-pink-400 hover:to-pink-600 transition-all duration-300 shadow-xl shadow-pink-500/30 border border-pink-500/30'
               }
             >
               {active?.confirmText ?? 'OK'}

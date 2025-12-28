@@ -161,7 +161,7 @@ export function GenerationSettingsModal({
               <button
                 onClick={onGenerate}
                 disabled={isGenerating || disabled}
-                className="relative px-6 py-3 bg-gradient-to-r from-pink-600 via-pink-500 to-purple-600 text-white rounded-full text-sm font-bold hover:from-pink-500 hover:via-pink-400 hover:to-purple-500 disabled:from-dark-600 disabled:via-dark-700 disabled:to-dark-800 disabled:cursor-not-allowed transition-all duration-300 shadow-xl shadow-pink-500/40 hover:shadow-pink-500/60 hover:scale-105 border border-pink-500/30"
+                className="relative px-6 py-3 bg-gradient-to-r from-pink-600 via-pink-500 to-pink-700 text-white rounded-full text-sm font-bold hover:from-pink-500 hover:via-pink-400 hover:to-pink-600 disabled:from-dark-600 disabled:via-dark-700 disabled:to-dark-800 disabled:cursor-not-allowed transition-all duration-300 shadow-xl shadow-pink-500/40 hover:shadow-pink-500/60 hover:scale-105 border border-pink-500/30"
               >
                 {isGenerating ? (
                   <span className="flex items-center">

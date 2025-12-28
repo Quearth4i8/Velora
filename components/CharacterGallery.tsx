@@ -489,11 +489,11 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
 
             {/* Generate Button - Floating Effect */}
             <div className="relative group">
-              <div className="absolute -inset-1 bg-gradient-to-r from-pink-600 via-purple-600 to-pink-600 rounded-2xl blur-lg opacity-60 group-hover:opacity-100 transition duration-300 animate-pulse"></div>
+              <div className="absolute -inset-1 bg-gradient-to-r from-pink-600 via-pink-400 to-pink-600 rounded-2xl blur-lg opacity-60 group-hover:opacity-100 transition duration-300 animate-pulse"></div>
               <button
                 onClick={() => setShowGenerationSettingsModal(true)}
                 disabled={isGenerating || !editedCharacter.generation?.style}
-                className="relative px-6 py-3 bg-gradient-to-r from-pink-600 via-pink-500 to-purple-600 text-white rounded-2xl text-sm font-bold hover:from-pink-500 hover:via-pink-400 hover:to-purple-500 disabled:from-dark-700 disabled:via-dark-800 disabled:to-dark-700 disabled:cursor-not-allowed transition-all duration-300 shadow-xl hover:scale-105 disabled:scale-100"
+                className="relative px-6 py-3 bg-gradient-to-r from-pink-600 via-pink-500 to-pink-700 text-white rounded-2xl text-sm font-bold hover:from-pink-500 hover:via-pink-400 hover:to-pink-600 disabled:from-dark-700 disabled:via-dark-800 disabled:to-dark-700 disabled:cursor-not-allowed transition-all duration-300 shadow-xl hover:scale-105 disabled:scale-100"
               >
                 <span className="flex items-center gap-2">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -538,7 +538,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
                       <div className="relative overflow-hidden rounded-2xl border border-dark-700/30 bg-gradient-to-br from-dark-800/40 to-dark-900/40 cursor-pointer backdrop-blur-sm hover:border-pink-500/30 transition-all duration-300 hover:shadow-2xl hover:shadow-pink-500/10"
                         onClick={() => handleImageClick(index)}>
                         {/* Gradient Border Effect */}
-                        <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-pink-500/0 via-purple-500/0 to-pink-500/0 group-hover:from-pink-500/20 group-hover:via-purple-500/10 group-hover:to-pink-500/20 transition-all duration-500 pointer-events-none"></div>
+                        <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-pink-500/0 via-pink-500/0 to-pink-500/0 group-hover:from-pink-500/20 group-hover:via-pink-400/10 group-hover:to-pink-500/20 transition-all duration-500 pointer-events-none"></div>
 
                         <img
                           src={image.imageUrl}

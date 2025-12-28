@@ -56,19 +56,19 @@ export function CharacterBuilder() {
     const resolvedDraft = draft.generation.model
       ? draft
       : {
-          ...draft,
-          generation: {
-            ...draft.generation,
-            model: resolvedModel,
-          },
-        };
+        ...draft,
+        generation: {
+          ...draft.generation,
+          model: resolvedModel,
+        },
+      };
 
     setIsGenerating(true);
     setError(null);
 
     try {
       console.log('Starting character creation with draft:', draft);
-      
+
       // First create the character in the database
       const createResult = await characterAPI.createCharacter(resolvedDraft);
       if (!createResult.success || !createResult.data) {
@@ -88,7 +88,7 @@ export function CharacterBuilder() {
       console.log('Starting image generation...');
       const imageUrl = await automatic1111API.generateCharacterImage(characterWithId);
       console.log('Image generated successfully:', imageUrl);
-      
+
       // Navigate to the chat interface
       console.log('Navigating to chat page...');
       router.push(`/${createResult.data.id}`);
@@ -195,23 +195,23 @@ export function CharacterBuilder() {
       {/* Progress Bar */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-extrabold bg-gradient-to-r from-pink-300 via-pink-400 to-fuchsia-400 bg-clip-text text-transparent">
+          <h2 className="text-2xl font-extrabold bg-gradient-to-r from-pink-300 via-pink-400 to-pink-500 bg-clip-text text-transparent">
             {getStepTitle()}
           </h2>
           <span className="text-dark-400 text-sm">
             Step {currentStep + 1} of {totalSteps}
           </span>
         </div>
-        
+
         <div className="w-full bg-dark-900/60 rounded-full h-2">
           <motion.div
-            className="bg-gradient-to-r from-pink-600 to-fuchsia-500 h-2 rounded-full"
+            className="bg-gradient-to-r from-pink-600 to-pink-500 h-2 rounded-full"
             initial={{ width: `${((currentStep) / totalSteps) * 100}%` }}
             animate={{ width: `${((currentStep + 1) / totalSteps) * 100}%` }}
             transition={{ duration: 0.5, ease: 'easeInOut' }}
           />
         </div>
-        
+
         <p className="text-dark-400 text-sm mt-2">{getStepDescription()}</p>
       </div>
 
@@ -229,7 +229,7 @@ export function CharacterBuilder() {
       {/* Step Content */}
       <div className="mb-8">
         <div className="relative overflow-hidden rounded-2xl border border-pink-500/10 bg-dark-800/40 backdrop-blur-sm p-6 shadow-2xl shadow-pink-500/5">
-          <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-pink-500/10 via-transparent to-fuchsia-500/10" />
+          <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-pink-500/10 via-transparent to-pink-500/10" />
           <div className="relative">
             <AnimatePresence mode="wait">
               <motion.div
@@ -268,11 +268,10 @@ export function CharacterBuilder() {
               whileTap={{ scale: 0.98 }}
               onClick={handleNext}
               disabled={!canProceed()}
-              className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 ${
-                canProceed()
-                  ? 'bg-gradient-to-r from-pink-600 to-fuchsia-500 text-white hover:from-pink-500 hover:to-fuchsia-400 shadow-lg shadow-pink-500/20'
+              className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 ${canProceed()
+                  ? 'bg-gradient-to-r from-pink-600 to-pink-500 text-white hover:from-pink-500 hover:to-pink-400 shadow-lg shadow-pink-500/20'
                   : 'bg-dark-800 text-dark-400 cursor-not-allowed'
-              }`}
+                }`}
             >
               Next
             </motion.button>
@@ -303,7 +302,7 @@ export function CharacterBuilder() {
               Reset Character
             </button>
           </div>
-          
+
           <div className="text-dark-400 text-sm">
             Already have a character?{' '}
             <button

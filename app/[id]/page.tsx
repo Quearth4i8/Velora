@@ -49,7 +49,7 @@ export default function CharacterDetail() {
     return (
       <div className="flex h-screen bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950 items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-dark-400">Loading character...</p>
         </div>
       </div>

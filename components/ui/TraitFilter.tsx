@@ -68,17 +68,17 @@ export function TraitFilter({ onFilterChange }: TraitFilterProps) {
 
   const handleFilterClick = (categoryKey: string, value: string) => {
     const newFilters = { ...selectedFilters };
-    
+
     if (newFilters[categoryKey] === value) {
       delete newFilters[categoryKey];
     } else {
       newFilters[categoryKey] = value;
     }
-    
+
     setSelectedFilters(newFilters);
-    
+
     const filters: CharacterTraits = {};
-    
+
     Object.entries(newFilters).forEach(([key, val]) => {
       if (key === 'appearance.hairColor') {
         filters.appearance = { hairColor: val as HairColor };
@@ -86,7 +86,7 @@ export function TraitFilter({ onFilterChange }: TraitFilterProps) {
         filters.personality = { archetype: val };
       }
     });
-    
+
     onFilterChange(filters);
   };
 
@@ -157,40 +157,40 @@ export function TraitFilter({ onFilterChange }: TraitFilterProps) {
             >
               <div className="px-4 pb-4 border-t border-dark-700/50 pt-4">
                 <div className="space-y-3">
-                {filterCategories.map((category) => (
-                  <div key={category.name}>
-                    <h4 className="text-xs font-medium text-dark-400 mb-2 uppercase tracking-wider">{category.name}</h4>
-                    <div className="flex flex-wrap gap-1.5">
-                      {category.options.map((option) => {
-                        const isSelected = selectedFilters[category.key] === option.value;
-                        
-                        return (
-                          <motion.button
-                            key={option.value}
-                            onClick={() => handleFilterClick(category.key, option.value)}
-                            className={`
+                  {filterCategories.map((category) => (
+                    <div key={category.name}>
+                      <h4 className="text-xs font-medium text-dark-400 mb-2 uppercase tracking-wider">{category.name}</h4>
+                      <div className="flex flex-wrap gap-1.5">
+                        {category.options.map((option) => {
+                          const isSelected = selectedFilters[category.key] === option.value;
+
+                          return (
+                            <motion.button
+                              key={option.value}
+                              onClick={() => handleFilterClick(category.key, option.value)}
+                              className={`
                               px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200
-                              ${isSelected 
-                                ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white shadow-md' 
-                                : 'bg-dark-800/50 text-dark-300 border border-dark-600/50 hover:border-pink-500/50 hover:bg-dark-700/50'
-                              }
+                              ${isSelected
+                                  ? 'bg-gradient-to-r from-pink-500 to-pink-600 text-white shadow-md'
+                                  : 'bg-dark-800/50 text-dark-300 border border-dark-600/50 hover:border-pink-500/50 hover:bg-dark-700/50'
+                                }
                             `}
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                          >
-                            {option.color && (
-                              <span 
-                                className="inline-block w-2.5 h-2.5 rounded-full mr-1.5 border border-white/20"
-                                style={{ backgroundColor: option.color }}
-                              />
-                            )}
-                            {option.label}
-                          </motion.button>
-                        );
-                      })}
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                            >
+                              {option.color && (
+                                <span
+                                  className="inline-block w-2.5 h-2.5 rounded-full mr-1.5 border border-white/20"
+                                  style={{ backgroundColor: option.color }}
+                                />
+                              )}
+                              {option.label}
+                            </motion.button>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
                 </div>
               </div>
             </motion.div>

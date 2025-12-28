@@ -977,34 +977,41 @@ export default function GalleryPage() {
               <div className="bg-dark-800/30 backdrop-blur-sm border border-dark-700 rounded-xl p-6 sm:p-8">
                 <h2 className="text-2xl font-bold text-white mb-8">Community Images</h2>
 
-                <div className="masonry-grid">
-                  {isLoadingImages ? (
-                    <div className="col-span-full text-center py-16">
-                      <div className="w-20 h-20 mx-auto bg-gradient-to-br from-blue-600/20 to-blue-500/20 rounded-full flex items-center justify-center mb-6 border border-blue-500/30">
-                        <svg className="animate-spin h-10 w-10 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                      </div>
-                      <h3 className="text-xl font-medium text-dark-200 mb-3">Loading Images...</h3>
-                      <p className="text-dark-400 max-w-md mx-auto">
-                        Fetching images from all characters...
-                      </p>
+                {isLoadingImages ? (
+                  <div className="flex flex-col items-center justify-center py-24 text-center">
+                    <div className="w-20 h-20 bg-gradient-to-br from-pink-600/20 to-pink-500/20 rounded-full flex items-center justify-center mb-6 border border-pink-500/30">
+                      <svg className="animate-spin h-10 w-10 text-pink-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
                     </div>
-                  ) : communityImages.length === 0 ? (
-                    <div className="col-span-full text-center py-16">
-                      <div className="w-20 h-20 mx-auto bg-gradient-to-br from-purple-600/20 to-purple-500/20 rounded-full flex items-center justify-center mb-6 border border-purple-500/30">
-                        <svg className="w-10 h-10 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                      </div>
-                      <h3 className="text-xl font-medium text-dark-200 mb-3">No Images Yet</h3>
-                      <p className="text-dark-400 max-w-md mx-auto">
-                        No character images found. Generate some images or create characters to see them here.
-                      </p>
+                    <h3 className="text-xl font-medium text-dark-200 mb-3">Loading Images...</h3>
+                    <p className="text-dark-400 max-w-md mx-auto">
+                      Fetching images from all characters...
+                    </p>
+                  </div>
+                ) : communityImages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-24 text-center">
+                    <div className="w-24 h-24 mx-auto bg-gradient-to-br from-pink-500/10 to-pink-600/10 rounded-3xl flex items-center justify-center mb-8 border border-pink-500/20 relative group">
+                      <div className="absolute inset-0 bg-pink-500/20 blur-2xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                      <svg className="w-12 h-12 text-pink-400 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
                     </div>
-                  ) : (
-                    filteredImages.map((image, index) => (
+                    <h3 className="text-2xl font-bold text-white mb-4 tracking-tight">No Discoveries Yet</h3>
+                    <p className="text-dark-400 max-w-sm mx-auto leading-relaxed mb-8">
+                      Your gallery is waiting for its first masterpiece. Generate some images or create characters to start your collection.
+                    </p>
+                    <button
+                      onClick={() => setIsSidebarOpen(true)}
+                      className="px-8 py-3 bg-pink-600 hover:bg-pink-700 text-white font-semibold rounded-2xl transition-all shadow-lg shadow-pink-500/20 active:scale-95"
+                    >
+                      Start Generating
+                    </button>
+                  </div>
+                ) : (
+                  <div className="masonry-grid">
+                    {filteredImages.map((image, index) => (
                       <div
                         key={image.id || index}
                         className="masonry-item group relative overflow-hidden rounded-xl bg-dark-900/50 border border-dark-600/50 hover:border-pink-500/50 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-pink-500/10 cursor-pointer"
@@ -1036,9 +1043,9 @@ export default function GalleryPage() {
                           </div>
                         </div>
                       </div>
-                    ))
-                  )}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <style jsx>{`

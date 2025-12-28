@@ -56,8 +56,8 @@ export const Step0NameAge: React.FC = () => {
         {/* Age Section */}
         <div className="space-y-4">
           <div className="flex items-center space-x-3 mb-2">
-            <div className="w-8 h-8 bg-fuchsia-500/20 rounded-full flex items-center justify-center">
-              <span className="text-fuchsia-400 font-semibold text-sm">2</span>
+            <div className="w-8 h-8 bg-pink-500/20 rounded-full flex items-center justify-center">
+              <span className="text-pink-400 font-semibold text-sm">2</span>
             </div>
             <h2 className="text-xl font-bold text-white">Age</h2>
           </div>
@@ -67,7 +67,7 @@ export const Step0NameAge: React.FC = () => {
               type="number"
               value={draft.identity.age ?? ''}
               onChange={(e) => handleAgeChange(e.target.value)}
-              className="px-4 py-3 bg-dark-950/60 text-white rounded-lg border border-dark-700 focus:ring-2 focus:ring-fuchsia-500 focus:border-fuchsia-500 outline-none w-full"
+              className="px-4 py-3 bg-dark-950/60 text-white rounded-lg border border-dark-700 focus:ring-2 focus:ring-pink-500 focus:border-pink-500 outline-none w-full"
               placeholder="Age"
             />
             <span className="text-dark-400 text-sm">years old</span>

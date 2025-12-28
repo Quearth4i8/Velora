@@ -202,6 +202,7 @@ export type CharacterType = 'custom' | 'special';
 
 export interface CharacterDraft {
   id?: string;
+  userId?: string;
   name?: string;
   characterType?: CharacterType;
   stylePreset?: string;
@@ -239,6 +240,7 @@ export enum AIModel {
 export interface CharacterImage {
   id: string;
   characterId: string;
+  userId?: string;
   imageUrl: string;
   fileName: string;
   fileSize?: number;
@@ -274,4 +276,12 @@ export interface Character {
   generation: CharacterGeneration;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface Profile {
+  id: string;
+  updated_at?: string;
+  username?: string;
+  full_name?: string;
+  avatar_url?: string;
 }

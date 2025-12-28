@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { CharacterDraft } from './types';
+import { CharacterDraft, Profile } from './types';
 import { serializeCharacter, deserializeCharacter } from './db';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -16,7 +16,14 @@ export const supabase = supabaseClient;
 
 export const characterService = {
   async createCharacter(character: CharacterDraft): Promise<CharacterDraft> {
+    const { data: { session } } = await supabase.auth.getSession();
     const serializedData = serializeCharacter(character);
+
+    // Attach user_id if logged in
+    if (session?.user) {
+      serializedData.user_id = session.user.id;
+    }
+
     const { data, error } = await supabase
       .from('characters')
       .insert(serializedData)
@@ -43,12 +50,15 @@ export const characterService = {
   },
 
   async listSpecialCharactersCached(limit = 10) {
-    const cacheKey = `special_characters_list_${limit}`;
+    const { data: { session } } = await supabase.auth.getSession();
+    const userId = session?.user?.id || 'public';
+    const cacheKey = `special_characters_list_${userId}_${limit}`;
     const cached = localStorage.getItem(cacheKey);
 
     if (cached) {
       const { data, timestamp } = JSON.parse(cached);
-      if (Date.now() - timestamp < 120000) {
+      // Cache special characters for 10 minutes (they are mostly static)
+      if (Date.now() - timestamp < 600000) {
         return data;
       }
     }
@@ -62,14 +72,14 @@ export const characterService = {
       }));
     } catch (error) {
       if (error instanceof Error && error.name === 'QuotaExceededError') {
+        const keysToRemove = [];
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
           if (key && key.startsWith('special_characters_list_')) {
-            localStorage.removeItem(key);
+            keysToRemove.push(key);
           }
         }
-      } else {
-        console.error('Unexpected error caching special characters:', error);
+        keysToRemove.forEach(k => localStorage.removeItem(k));
       }
     }
 
@@ -111,19 +121,34 @@ export const characterService = {
   },
 
   async listCharacters(limit = 10) {
-    const { data, error } = await supabase
+    const { data: { session } } = await supabase.auth.getSession();
+
+    let query = supabase
       .from('characters')
       .select('*')
       .neq('character_type', 'special')
-      .neq('name', 'Gallery Generated') // Exclude gallery-only character by name
+      .neq('name', 'Gallery Generated')
       .order('created_at', { ascending: false })
       .limit(limit);
 
+    // If logged in, only show own characters
+    if (session?.user) {
+      query = query.eq('user_id', session.user.id);
+    } else {
+      // If not logged in, show nothing or only public ones if we had a flag
+      // For now, return empty or show special only
+      return [];
+    }
+
+    const { data, error } = await query;
     if (error) throw error;
     return data;
   },
 
   async listSpecialCharacters(limit = 10) {
+    // Special characters might be global, so we don't necessarily filter by user_id
+    // unless the user specifically wants to create OWN special ones.
+    // For now, special characters remain global presets.
     const { data, error } = await supabase
       .from('characters')
       .select('*')
@@ -135,15 +160,33 @@ export const characterService = {
     return data;
   },
 
+  async listUserCharacters(limit = 50) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return [];
+
+    const { data, error } = await supabase
+      .from('characters')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+    return data;
+  },
+
   async listCharactersCached(limit = 10) {
-    // Check cache first
-    const cacheKey = `characters_list_${limit}`;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return [];
+
+    const userId = session.user.id;
+    const cacheKey = `characters_list_${userId}_${limit}`;
     const cached = localStorage.getItem(cacheKey);
 
     if (cached) {
       const { data, timestamp } = JSON.parse(cached);
-      // Cache for 2 minutes
-      if (Date.now() - timestamp < 120000) {
+      // Cache for 30 seconds (more responsive than 2 mins)
+      if (Date.now() - timestamp < 30000) {
         return data;
       }
     }
@@ -159,25 +202,14 @@ export const characterService = {
       }));
     } catch (error) {
       if (error instanceof Error && error.name === 'QuotaExceededError') {
-        console.warn('Storage quota exceeded, clearing character cache');
-        // Clear existing character cache to make space
+        const keysToRemove = [];
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
           if (key && key.startsWith('characters_list_')) {
-            localStorage.removeItem(key);
+            keysToRemove.push(key);
           }
         }
-        // Try again with smaller cache or skip caching
-        try {
-          localStorage.setItem(cacheKey, JSON.stringify({
-            data: data.slice(0, 10), // Limit cache size
-            timestamp: Date.now()
-          }));
-        } catch (secondError) {
-          console.warn('Failed to cache even with reduced size, skipping cache');
-        }
-      } else {
-        console.error('Unexpected error caching characters:', error);
+        keysToRemove.forEach(k => localStorage.removeItem(k));
       }
     }
 
@@ -189,11 +221,21 @@ export const characterService = {
     const cacheKey = `character_${id}`;
     localStorage.removeItem(cacheKey);
 
-    // Also clear the list cache
-    localStorage.removeItem('characters_list_10');
-    localStorage.removeItem('characters_list_50');
-    localStorage.removeItem('special_characters_list_10');
-    localStorage.removeItem('special_characters_list_50');
+    // Also clear the list cache for this user
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      const userId = session.user.id;
+      localStorage.removeItem(`characters_list_${userId}_10`);
+      localStorage.removeItem(`characters_list_${userId}_50`);
+      localStorage.removeItem(`special_characters_list_${userId}_10`);
+      localStorage.removeItem(`special_characters_list_${userId}_50`);
+    } else {
+      // Clear legacy/public keys
+      localStorage.removeItem('characters_list_10');
+      localStorage.removeItem('characters_list_50');
+      localStorage.removeItem('special_characters_list_10');
+      localStorage.removeItem('special_characters_list_50');
+    }
 
     // Only include name and age in the update payload
     const updatePayload: Record<string, any> = {
@@ -227,11 +269,20 @@ export const characterService = {
       const cacheKey = `character_${id}`;
       localStorage.removeItem(cacheKey);
 
-      // Also clear the list cache as specific fields might be shown in lists
-      localStorage.removeItem('characters_list_10');
-      localStorage.removeItem('characters_list_50');
-      localStorage.removeItem('special_characters_list_10');
-      localStorage.removeItem('special_characters_list_50');
+      // Also clear the list cache for this user
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const userId = session.user.id;
+        localStorage.removeItem(`characters_list_${userId}_10`);
+        localStorage.removeItem(`characters_list_${userId}_50`);
+        localStorage.removeItem(`special_characters_list_${userId}_10`);
+        localStorage.removeItem(`special_characters_list_${userId}_50`);
+      } else {
+        localStorage.removeItem('characters_list_10');
+        localStorage.removeItem('characters_list_50');
+        localStorage.removeItem('special_characters_list_10');
+        localStorage.removeItem('special_characters_list_50');
+      }
     } catch (e) {
       // Ignore cache clearing errors
     }
@@ -255,4 +306,56 @@ export const characterService = {
 
     if (error) throw error;
   },
+};
+
+export const profileService = {
+  async getProfile(userId: string): Promise<Profile | null> {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('Error fetching profile:', error);
+      throw error;
+    }
+
+    return data;
+  },
+
+  async updateProfile(userId: string, updates: { full_name?: string; username?: string; avatar_url?: string }): Promise<Profile> {
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', userId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating profile:', error);
+      throw error;
+    }
+
+    return data;
+  },
+
+  async checkUsernameAvailability(username: string, userId: string): Promise<boolean> {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('username', username)
+      .neq('id', userId)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error checking username availability:', error);
+      return false;
+    }
+
+    return data === null;
+  }
 };

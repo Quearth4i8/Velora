@@ -110,6 +110,17 @@ export const characterAPI = {
     }
   },
 
+  async getUserCharacters(limit = 50) {
+    try {
+      const results = await characterService.listUserCharacters(limit);
+      const deserialized = results.map(deserializeCharacter);
+      return { success: true, data: deserialized };
+    } catch (error) {
+      console.error('Failed to get user characters:', error);
+      return { success: false, error };
+    }
+  },
+
   async updateCharacter(id: string, draft: Partial<CharacterDraft>) {
     try {
       const result = await characterService.updateCharacter(id, draft);
@@ -152,23 +163,23 @@ export const characterAPI = {
     try {
       // Upload image to Supabase storage
       const storageFile = await storageService.uploadImage(characterId, imageData);
-      
+
       if (!storageFile) {
         throw new Error('Failed to upload image to storage');
       }
 
       // Update character with the new image URL
       const result = await this.updateCharacterImage(characterId, storageFile.url);
-      
+
       if (!result.success) {
         // If database update fails, try to clean up the uploaded image
         await storageService.deleteImage(storageFile.name);
         throw new Error('Failed to update character with image URL');
       }
 
-      return { 
-        success: true, 
-        data: { 
+      return {
+        success: true,
+        data: {
           imageUrl: storageFile.url,
           fileName: storageFile.name,
           size: storageFile.size
@@ -193,7 +204,7 @@ export const characterAPI = {
 
       // Update character to remove image URL
       const result = await this.updateCharacterImage(characterId, '');
-      
+
       return { success: true };
     } catch (error) {
       console.error('Failed to delete character image:', error);
@@ -205,24 +216,31 @@ export const characterAPI = {
     try {
       // Upload image to storage
       const storageFile = await storageService.uploadImage(characterId, imageData);
-      
+
       if (!storageFile) {
         throw new Error('Failed to upload image to storage');
       }
 
       // Save image record to database
+      const { data: { session } } = await supabase.auth.getSession();
+      const insertPayload: Record<string, any> = {
+        character_id: characterId,
+        image_url: storageFile.url,
+        file_name: storageFile.name,
+        file_size: storageFile.size,
+        is_primary: false, // New images are not primary by default
+        generation_prompt: prompt,
+        generation_model: model,
+        generation_style: style,
+      };
+
+      if (session?.user) {
+        insertPayload.user_id = session.user.id;
+      }
+
       const { data, error } = await supabase
         .from('character_images')
-        .insert({
-          character_id: characterId,
-          image_url: storageFile.url,
-          file_name: storageFile.name,
-          file_size: storageFile.size,
-          is_primary: false, // New images are not primary by default
-          generation_prompt: prompt,
-          generation_model: model,
-          generation_style: style,
-        })
+        .insert(insertPayload)
         .select()
         .single();
 
@@ -261,14 +279,24 @@ export const characterAPI = {
 
   async getAllCharacterImages(): Promise<{ success: boolean; data?: CharacterImage[]; error?: any }> {
     try {
-      const { data, error } = await supabase
+      const { data: { session } } = await supabase.auth.getSession();
+
+      let query = supabase
         .from('character_images')
         .select(`
           *,
           characters!inner(
-            name
+            name,
+            user_id
           )
         `);
+
+      // Default to filtering by user_id if logged in, to respect "own images only" request
+      if (session?.user) {
+        query = query.eq('user_id', session.user.id);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         throw error;
@@ -281,6 +309,36 @@ export const characterAPI = {
       return { success: true, data: images };
     } catch (error) {
       console.error('Failed to get all character images:', error);
+      return { success: false, error };
+    }
+  },
+
+  async getUserImages(limit = 100): Promise<{ success: boolean; data?: CharacterImage[]; error?: any }> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return { success: true, data: [] };
+
+      const { data, error } = await supabase
+        .from('character_images')
+        .select(`
+          *,
+          characters!inner(
+            name
+          )
+        `)
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) throw error;
+
+      const images = data?.map((img: any) => ({
+        ...this.mapDbImageToCharacterImage(img),
+        characterName: img.characters?.name || 'Unknown'
+      })) || [];
+      return { success: true, data: images };
+    } catch (error) {
+      console.error('Failed to get user images:', error);
       return { success: false, error };
     }
   },
@@ -352,7 +410,7 @@ export const characterAPI = {
       let storageDeleted = false;
       let storageRetries = 0;
       const maxStorageRetries = 3;
-      
+
       while (!storageDeleted && storageRetries < maxStorageRetries) {
         try {
           storageDeleted = await storageService.deleteImage(fileName);
@@ -371,7 +429,7 @@ export const characterAPI = {
           }
         }
       }
-      
+
       if (!storageDeleted) {
         throw new Error('Failed to delete image from storage. Please check storage permissions and bucket access.');
       }
@@ -398,6 +456,7 @@ export const characterAPI = {
       id: dbImage.id,
       characterId: dbImage.character_id,
       imageUrl: dbImage.image_url,
+      userId: dbImage.user_id,
       fileName: dbImage.file_name,
       fileSize: dbImage.file_size,
       isPrimary: dbImage.is_primary,

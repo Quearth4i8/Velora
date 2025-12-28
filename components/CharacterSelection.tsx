@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { characterAPI } from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 import { automatic1111API } from '@/lib/automatic1111';
 import { CharacterDraft, AgeGroup, Ethnicity, Height, Physique, ChestSize, ButtSize, HairStyle, HairColor, EyeColor, CharacterStyle, AIModel } from '@/lib/types';
 import { PrimaryCTAButton } from '@/components/ui/PrimaryCTAButton';
@@ -55,7 +56,9 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
       setIsLoading(true);
 
       // Check cache first with error handling
-      const cacheKey = 'characters_selection';
+      const { data: { session } } = await supabase.auth.getSession();
+      const userId = session?.user?.id || 'public';
+      const cacheKey = `characters_selection_${userId}`;
       try {
         const cached = localStorage.getItem(cacheKey);
 
@@ -172,7 +175,7 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
     return (
       <div className="flex items-center justify-center py-24">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
+          <div className="w-16 h-16 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
           <p className="text-dark-300 text-lg font-medium">Loading characters...</p>
           <p className="text-dark-500 text-sm mt-2">This should only take a moment</p>
         </div>
@@ -227,8 +230,8 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
             {characters.length === 0 ? (
               <>
                 <div className="mb-8">
-                  <div className="w-20 h-20 mx-auto bg-gradient-to-br from-purple-600/20 to-purple-500/20 rounded-full flex items-center justify-center mb-4 border border-purple-500/30">
-                    <svg className="w-10 h-10 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="w-20 h-20 mx-auto bg-gradient-to-br from-pink-600/20 to-pink-500/20 rounded-full flex items-center justify-center mb-4 border border-pink-500/30">
+                    <svg className="w-10 h-10 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                     </svg>
                   </div>
@@ -258,14 +261,14 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
               {filteredCharacters.map((character, index) => (
                 <motion.div
                   key={character.id}
-                  className="group relative bg-gradient-to-br from-dark-800/50 to-dark-900/50 backdrop-blur-sm border border-dark-700/50 rounded-2xl overflow-hidden hover:border-purple-500/50 transition-all duration-300 cursor-pointer character-card"
+                  className="group relative bg-gradient-to-br from-dark-800/50 to-dark-900/50 backdrop-blur-sm border border-dark-700/50 rounded-2xl overflow-hidden hover:border-pink-500/50 transition-all duration-300 cursor-pointer character-card"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.1, duration: 0.5 }}
                   onClick={() => handleSelectCharacter(character)}
                 >
                   {/* Character Image Section - Full height card */}
-                  <div className="relative h-full min-h-96 bg-gradient-to-br from-purple-600/10 to-purple-500/10 overflow-hidden">
+                  <div className="relative h-full min-h-96 bg-gradient-to-br from-pink-600/10 to-pink-500/10 overflow-hidden">
                     {character.generation?.generatedImage ? (
                       <>
                         <img
@@ -327,7 +330,7 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
                   </div>
 
                   {/* Hover Effect */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-purple-600/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-pink-600/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
                 </motion.div>
               ))}
             </div>

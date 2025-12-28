@@ -3,31 +3,28 @@
 @tailwind utilities;
 
 :root {
-  --primary-purple: #ff4081;
-  --primary-purple-hover: #ff80ab;
-  --primary-purple-light: #fce4ec;
-  --primary-purple-dark: #f50057;
-  --primary-purple-rgb: 255, 64, 129;
+  --primary-pink: #ff4081;
+  --primary-pink-hover: #ff80ab;
+  --primary-pink-light: #fce4ec;
+  --primary-pink-dark: #f50057;
+  --primary-pink-rgb: 255, 64, 129;
 }
 
 /* Neon Glow Effect */
 .neon-glow {
-  filter: drop-shadow(0 0 10px rgba(255, 64, 129, 0.8)) 
-          drop-shadow(0 0 20px rgba(255, 64, 129, 0.6))
-          drop-shadow(0 0 30px rgba(255, 64, 129, 0.4));
+  filter: drop-shadow(0 0 10px rgba(255, 64, 129, 0.8)) drop-shadow(0 0 20px rgba(255, 64, 129, 0.6)) drop-shadow(0 0 30px rgba(255, 64, 129, 0.4));
   animation: neon-flicker 2s infinite alternate;
 }
 
 @keyframes neon-flicker {
-  0%, 100% {
-    filter: drop-shadow(0 0 10px rgba(255, 64, 129, 0.8)) 
-            drop-shadow(0 0 20px rgba(255, 64, 129, 0.6))
-            drop-shadow(0 0 30px rgba(255, 64, 129, 0.4));
+
+  0%,
+  100% {
+    filter: drop-shadow(0 0 10px rgba(255, 64, 129, 0.8)) drop-shadow(0 0 20px rgba(255, 64, 129, 0.6)) drop-shadow(0 0 30px rgba(255, 64, 129, 0.4));
   }
+
   50% {
-    filter: drop-shadow(0 0 15px rgba(255, 64, 129, 0.9)) 
-            drop-shadow(0 0 25px rgba(255, 64, 129, 0.7))
-            drop-shadow(0 0 35px rgba(255, 64, 129, 0.5));
+    filter: drop-shadow(0 0 15px rgba(255, 64, 129, 0.9)) drop-shadow(0 0 25px rgba(255, 64, 129, 0.7)) drop-shadow(0 0 35px rgba(255, 64, 129, 0.5));
   }
 }
 
@@ -38,10 +35,13 @@
 }
 
 @keyframes star-twinkle {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 0.3;
     transform: scale(0.8) rotate(0deg);
   }
+
   50% {
     opacity: 1;
     transform: scale(1.2) rotate(180deg);
@@ -51,7 +51,7 @@
 /* Neon Shine Effect for Title */
 .title-shine {
   color: #ff4081;
-  text-shadow: 
+  text-shadow:
     0 0 5px rgba(255, 64, 129, 0.6),
     0 0 10px rgba(255, 64, 129, 0.4),
     0 0 15px rgba(255, 64, 129, 0.2);
@@ -59,14 +59,17 @@
 }
 
 @keyframes neon-pulse {
-  0%, 100% {
-    text-shadow: 
+
+  0%,
+  100% {
+    text-shadow:
       0 0 5px rgba(255, 64, 129, 0.6),
       0 0 10px rgba(255, 64, 129, 0.4),
       0 0 15px rgba(255, 64, 129, 0.2);
   }
+
   50% {
-    text-shadow: 
+    text-shadow:
       0 0 8px rgba(255, 64, 129, 0.8),
       0 0 12px rgba(255, 64, 129, 0.6),
       0 0 18px rgba(255, 64, 129, 0.3);
@@ -92,7 +95,8 @@ body {
   box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
   width: 100%;
@@ -107,8 +111,8 @@ nav {
 
 @layer components {
   .glow-border {
-    border: 2px solid var(--primary-purple);
-    box-shadow: 0 0 20px rgba(var(--primary-purple-rgb), 0.3);
+    border: 2px solid var(--primary-pink);
+    box-shadow: 0 0 20px rgba(var(--primary-pink-rgb), 0.3);
   }
 
   .dark-card {
@@ -116,7 +120,7 @@ nav {
   }
 
   .gradient-text {
-    background: linear-gradient(to right, var(--primary-purple), var(--primary-purple-hover));
+    background: linear-gradient(to right, var(--primary-pink), var(--primary-pink-hover));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -124,17 +128,17 @@ nav {
 }
 
 [data-radix-slider-thumb] {
-  background: var(--primary-purple);
-  border: 2px solid var(--primary-purple);
+  background: var(--primary-pink);
+  border: 2px solid var(--primary-pink);
   border-radius: 50%;
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
 [data-radix-slider-thumb]:hover {
-  background: var(--primary-purple-hover);
-  border-color: var(--primary-purple-hover);
-  box-shadow: 0 0 15px rgba(var(--primary-purple-rgb), 0.4);
+  background: var(--primary-pink-hover);
+  border-color: var(--primary-pink-hover);
+  box-shadow: 0 0 15px rgba(var(--primary-pink-rgb), 0.4);
 }
 
 [data-radix-slider-track] {
@@ -142,7 +146,7 @@ nav {
 }
 
 [data-radix-slider-range] {
-  background: linear-gradient(to right, var(--primary-purple), var(--primary-purple-hover));
+  background: linear-gradient(to right, var(--primary-pink), var(--primary-pink-hover));
 }
 
 /* Custom Cyber Scrollbars */
@@ -183,13 +187,13 @@ nav {
 
 /* Custom Text Selection */
 ::selection {
-  background-color: var(--primary-purple);
+  background-color: var(--primary-pink);
   color: white;
   text-shadow: 0 0 5px rgba(255, 64, 129, 0.4);
 }
 
 ::-moz-selection {
-  background-color: var(--primary-purple);
+  background-color: var(--primary-pink);
   color: white;
   text-shadow: 0 0 5px rgba(255, 64, 129, 0.4);
 }

@@ -50,6 +50,7 @@ export const serializeCharacter = (draft: CharacterDraft): Record<string, any> =
     model: draft.generation?.model,
     generated_image: draft.generation?.generatedImage,
     is_gallery_only: draft.isGalleryOnly || false,
+    user_id: draft.userId || null,
   };
 
   return serialized;
@@ -164,6 +165,7 @@ export const deserializeCharacter = (data: Record<string, any>): CharacterDraft 
       generatedImage: data.generated_image,
     },
     isGalleryOnly: data.is_gallery_only || false,
+    userId: data.user_id,
     createdAt: data.created_at ? new Date(data.created_at) : undefined,
     updatedAt: data.updated_at ? new Date(data.updated_at) : undefined,
   };

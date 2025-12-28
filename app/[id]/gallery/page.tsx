@@ -56,7 +56,7 @@ export default function CharacterGallery() {
     return (
       <div className="flex h-screen bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950 items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-dark-400">Loading character gallery...</p>
         </div>
       </div>
@@ -71,7 +71,7 @@ export default function CharacterGallery() {
           <p className="text-dark-400 mb-6">{error instanceof Error ? error.message : String(error) || 'This character could not be found.'}</p>
           <button
             onClick={handleBack}
-            className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+            className="px-6 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition-colors"
           >
             Back to Character
           </button>

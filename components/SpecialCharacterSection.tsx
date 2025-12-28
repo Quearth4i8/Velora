@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState, useRef } from 'react';
-import { motion, useMotionValue, useSpring, animate, PanInfo, useTransform } from 'framer-motion';
+import { motion, useMotionValue, useSpring, animate, useTransform } from 'framer-motion';
 import { characterAPI } from '@/lib/api';
 import { automatic1111API } from '@/lib/automatic1111';
 import { CharacterDraft } from '@/lib/types';
@@ -22,21 +22,22 @@ export function SpecialCharacterSection({ onSelectCharacter }: SpecialCharacterS
 
   // Slider Refs & Motion Values
   const containerRef = useRef<HTMLDivElement>(null);
-  const scrollX = useMotionValue(0);
-  const [isDragging, setIsDragging] = useState(false);
   const cardWidth = 324; // 300px min-width + 24px gap
+  const baseWidth = useMemo(() => characters.length * cardWidth, [characters.length]);
 
-  const baseWidth = useMemo(() => characters.length * cardWidth, [characters.length, cardWidth]);
+  // Smooth spring for the scroll position
+  const scrollValue = useMotionValue(0);
+  const scrollX = useSpring(scrollValue, {
+    stiffness: 400,
+    damping: 40,
+    mass: 1
+  });
 
-  // The "Infinite Accumulator" magic:
-  // trackX wraps continuously, but scrollX grows/shrinks indefinitely.
-  // This ensures animate() targets are never interrupted.
-  const trackX = useTransform(scrollX, (v: number) => {
+  // True mathematical wrap: ensures the carousel loops seamlessly regardless of how far you scroll
+  const trackX = useTransform(scrollX, (v) => {
     if (baseWidth === 0) return 0;
-    // We stay in the middle set's visual range [-2*baseWidth, -baseWidth]
-    // The modulo ensures that as scrollX grows, trackX wraps instantly without a spring fighting it.
-    const modX = v % baseWidth;
-    return modX - baseWidth;
+    // Maps any accumulated scroll value (v) to a repeating range within [-baseWidth, 0]
+    return ((v % baseWidth) + baseWidth) % baseWidth - baseWidth;
   });
 
   useEffect(() => {
@@ -82,47 +83,29 @@ export function SpecialCharacterSection({ onSelectCharacter }: SpecialCharacterS
     }
   };
 
-  // Triple items for infinite loop: [Set 1][Set 2][Set 3]
-  // We stay in Set 2 and jump back/forth as needed.
+  // Double items for infinite loop: [Set 1][Set 2]
+  // The mathematical wrap handles the seamless transition between them.
   const loopedCharacters = useMemo(() => {
     if (characters.length === 0) return [];
-    return [...characters, ...characters, ...characters];
+    return [...characters, ...characters];
   }, [characters]);
 
 
   useEffect(() => {
     if (characters.length > 0) {
-      scrollX.set(-baseWidth);
+      scrollValue.set(0);
     }
-  }, [characters.length, baseWidth, scrollX]);
-
-  const handleDragEnd = (_: any, info: PanInfo) => {
-    setIsDragging(false);
-    const currentX = scrollX.get();
-    const velocity = info.velocity.x;
-
-    // Calculate target based on velocity (swipe feel)
-    const sweep = velocity * 0.2;
-    const targetX = Math.round((currentX + sweep) / cardWidth) * cardWidth;
-
-    animate(scrollX, targetX, {
-      type: "spring",
-      stiffness: 300,
-      damping: 35,
-      mass: 0.8
-    });
-  };
+  }, [characters.length]);
 
   const scroll = (direction: 'left' | 'right') => {
-    const currentX = scrollX.get();
-    const moveAmount = cardWidth * 2;
+    const currentX = scrollValue.get();
+    const moveAmount = cardWidth * (window.innerWidth < 768 ? 1 : 2);
     const targetX = direction === 'left' ? currentX + moveAmount : currentX - moveAmount;
 
-    animate(scrollX, targetX, {
+    animate(scrollValue, targetX, {
       type: "spring",
-      stiffness: 200, // Slightly softer for button clicks
-      damping: 30,
-      mass: 1
+      stiffness: 150,
+      damping: 25
     });
   };
 
@@ -147,7 +130,7 @@ export function SpecialCharacterSection({ onSelectCharacter }: SpecialCharacterS
             Special <span className="gradient-text">Personalities</span>
           </h2>
           <p className="text-dark-400 text-lg md:text-xl max-w-3xl mx-auto leading-relaxed">
-            Discover our collection of premium presets, each with unique prompts and visual styles.
+            Discover perfectly tuned presets, each with unique prompts and visual styles.
           </p>
         </motion.div>
       </div>
@@ -169,23 +152,16 @@ export function SpecialCharacterSection({ onSelectCharacter }: SpecialCharacterS
         </button>
 
         {/* Carousel Slider */}
-        <div className="relative overflow-visible cursor-grab active:cursor-grabbing" ref={containerRef}>
+        <div className="relative overflow-visible" ref={containerRef}>
           <motion.div
             className="flex gap-6"
             style={{ x: trackX }}
-            drag="x"
-            onDrag={(e, info) => {
-              scrollX.set(scrollX.get() + info.delta.x);
-            }}
-            onDragStart={() => setIsDragging(true)}
-            onDragEnd={handleDragEnd}
           >
             {loopedCharacters.map((character, index) => (
               <motion.div
                 key={`${character.id}-${index}`}
-                className="flex-none w-[280px] md:w-[300px] h-[400px] md:h-[480px] group/card relative rounded-[32px] overflow-hidden border border-white/5 bg-dark-900/40 backdrop-blur-sm hover:border-pink-500/40 transition-all duration-500 shadow-2xl"
-                whileHover={{ y: -8 }}
-                onClick={() => !isDragging && onSelectCharacter(character)}
+                className="flex-none w-[280px] md:w-[300px] h-[400px] md:h-[480px] group/card relative rounded-[32px] overflow-hidden border border-white/5 bg-dark-900/40 backdrop-blur-sm hover:border-pink-500/40 transition-all duration-500 shadow-2xl cursor-pointer"
+                onClick={() => onSelectCharacter(character)}
               >
                 {/* Image Layer */}
                 <div className="absolute inset-0 z-0">
@@ -194,6 +170,7 @@ export function SpecialCharacterSection({ onSelectCharacter }: SpecialCharacterS
                       src={character.generation.generatedImage}
                       alt={character.name || 'Character'}
                       className="w-full h-full object-cover"
+                      loading="lazy"
                     />
                   ) : (
                     <div className="w-full h-full bg-gradient-to-br from-dark-800 to-dark-950 flex items-center justify-center">
@@ -210,25 +187,16 @@ export function SpecialCharacterSection({ onSelectCharacter }: SpecialCharacterS
 
                 {/* Info Container */}
                 <div className="absolute inset-x-0 bottom-0 p-6 md:p-8 z-10">
-                  <div className="space-y-4">
-                    <div className="flex flex-wrap gap-2">
-                      <span className="px-3 py-1 rounded-full bg-pink-500/10 border border-pink-500/20 backdrop-blur-md text-[10px] font-bold text-pink-400 uppercase tracking-widest">
-                        {character.generation?.style || 'Velora AI'}
-                      </span>
-                      {character.identity?.ethnicity && (
-                        <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 backdrop-blur-md text-[10px] font-bold text-white/60 uppercase tracking-widest">
-                          {character.identity.ethnicity}
-                        </span>
-                      )}
-                    </div>
+                  <h3 className="text-2xl md:text-3xl font-bold text-white tracking-tight group-hover/card:text-pink-400 transition-colors duration-300">
+                    {character.name || 'Special Guest'}
+                  </h3>
 
-                    <h3 className="text-2xl md:text-3xl font-bold text-white tracking-tight group-hover/card:text-pink-300 transition-colors duration-300">
-                      {character.name || 'Special Guest'}
-                    </h3>
-
-                    <p className="text-dark-300 text-sm md:text-base line-clamp-2 opacity-0 group-hover/card:opacity-100 translate-y-4 group-hover/card:translate-y-0 transition-all duration-500">
-                      {(character.identity as any)?.description || character.personality?.archetype || 'A unique AI companion designed with premium aesthetics and a deep personality.'}
-                    </p>
+                  <div className="flex items-center gap-2 text-dark-300 text-sm md:text-base font-medium opacity-0 group-hover/card:opacity-100 translate-y-4 group-hover/card:translate-y-0 transition-all duration-500">
+                    <span>{character.generation?.style ? character.generation.style.charAt(0).toUpperCase() + character.generation.style.slice(1) : 'Premium'}</span>
+                    <span className="w-1 h-1 rounded-full bg-pink-500/50" />
+                    <span className="text-white/70">{character.identity?.ethnicity || 'Unique'}</span>
+                    <span className="w-1 h-1 rounded-full bg-pink-500/50" />
+                    <span className="text-pink-400/80">{character.identity?.age || '20s'}Y</span>
                   </div>
                 </div>
 
@@ -253,7 +221,7 @@ export function SpecialCharacterSection({ onSelectCharacter }: SpecialCharacterS
 
       {/* Ambiance Effects */}
       <div className="absolute top-1/2 left-0 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-pink-600/5 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-0 right-0 translate-x-1/2 w-[600px] h-[600px] bg-purple-600/5 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-0 right-0 translate-x-1/2 w-[600px] h-[600px] bg-pink-500/5 rounded-full blur-[120px] pointer-events-none" />
     </div>
   );
 }
