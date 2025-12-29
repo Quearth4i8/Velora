@@ -1,6 +1,6 @@
 import { characterService, supabase } from './supabase';
 import { storageService } from './storage';
-import { CharacterDraft, CharacterImage } from './types';
+import { CharacterDraft, CharacterImage, ChatMessage, Conversation } from './types';
 import { deserializeCharacter } from './db';
 
 const normalizeStoragePath = (value: string): string => {
@@ -474,6 +474,146 @@ export const characterAPI = {
       return { success: true };
     } catch (error) {
       console.error('Failed to delete character:', error);
+      return { success: false, error };
+    }
+  },
+
+  async getConversation(characterId: string) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) throw new Error('Not authenticated');
+
+      // Get all conversations for this character and user, order by most recent
+      const { data, error } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('character_id', characterId)
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        // Create new conversation if doesn't exist
+        const { data: newConv, error: createError } = await supabase
+          .from('conversations')
+          .insert({
+            character_id: characterId,
+            user_id: session.user.id
+          })
+          .select()
+          .single();
+
+        if (createError) throw createError;
+        return { success: true, data: newConv };
+      }
+
+      // Return the most recent conversation
+      return { success: true, data: data[0] };
+    } catch (error) {
+      console.error('Failed to get conversation:', error);
+      return { success: false, error };
+    }
+  },
+
+  async getMessages(conversationId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('conversation_id', conversationId)
+        .order('timestamp', { ascending: true });
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error) {
+      console.error('Failed to get messages:', error);
+      return { success: false, error };
+    }
+  },
+
+  async saveMessage(message: Partial<ChatMessage>) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase
+        .from('messages')
+        .insert({
+          conversation_id: message.conversationId,
+          character_id: message.characterId,
+          user_id: session.user.id,
+          content: message.content,
+          sender: message.sender,
+          image_url: message.imageUrl,
+          timestamp: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error) {
+      console.error('Failed to save message:', error);
+      return { success: false, error };
+    }
+  },
+
+  async deleteMessage(messageId: string) {
+    try {
+      console.log('🗑️ API: Deleting message from Supabase:', messageId);
+      await characterService.deleteMessage(messageId);
+      console.log('✅ API: Message deleted successfully');
+      return { success: true };
+    } catch (error) {
+      console.error('❌ API: Failed to delete message:', error);
+      return { success: false, error };
+    }
+  },
+
+  async updateMessage(messageId: string, updates: Partial<ChatMessage>) {
+    try {
+      if (updates.imageUrl) {
+        const { data, error } = await supabase
+          .from('messages')
+          .update({ image_url: updates.imageUrl })
+          .eq('id', messageId)
+          .select('id, image_url')
+          .maybeSingle();
+
+        if (error) {
+          console.error('Update failed:', error);
+          return { success: false, error };
+        }
+
+        if (!data) {
+          console.error('No message found to update');
+          return { success: false, error: new Error('Message not found') };
+        }
+
+        return { success: true, data };
+      }
+
+      return { success: true, data: null };
+    } catch (error) {
+      console.error('Failed to update message:', error);
+      return { success: false, error };
+    }
+  },
+
+  async resetConversation(conversationId: string) {
+    try {
+      // Deleting the conversation will automatically delete messages due to ON DELETE CASCADE
+      const { error } = await supabase
+        .from('conversations')
+        .delete()
+        .eq('id', conversationId);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to reset conversation:', error);
       return { success: false, error };
     }
   },

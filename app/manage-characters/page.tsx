@@ -50,6 +50,7 @@ export default function ManageCharactersPage() {
         loraWeight: string;
         specialPrompt: string;
         specialNegativePrompt: string;
+        customSpecialty: string;
     };
 
     const getEmptySpecialCharacterForm = (): SpecialCharacterFormState => ({
@@ -62,6 +63,7 @@ export default function ManageCharactersPage() {
         loraWeight: '1',
         specialPrompt: '',
         specialNegativePrompt: '',
+        customSpecialty: '',
     });
 
     const [specialForm, setSpecialForm] = useState<SpecialCharacterFormState>(() => getEmptySpecialCharacterForm());
@@ -160,6 +162,7 @@ export default function ManageCharactersPage() {
                     : '',
             specialPrompt: character.specialPrompt || '',
             specialNegativePrompt: character.specialNegativePrompt || '',
+            customSpecialty: character.personality?.customSpecialty || '',
         });
         setSpecialModalError(null);
         setSpecialModalOpen(true);
@@ -218,6 +221,7 @@ export default function ManageCharactersPage() {
                     reservedOutgoing: 50,
                     seriousPlayful: 50,
                 },
+                customSpecialty: form.customSpecialty.trim() || undefined,
             },
             generation: {
                 style: form.style,
@@ -283,6 +287,14 @@ export default function ManageCharactersPage() {
                 lora_weight: loraWeight,
                 special_prompt: specialForm.specialPrompt.trim() || null,
                 special_negative_prompt: specialForm.specialNegativePrompt.trim() || null,
+                personality_traits: {
+                    submissiveDominant: 50,
+                    insecureConfident: 50,
+                    coldPassionate: 50,
+                    reservedOutgoing: 50,
+                    seriousPlayful: 50,
+                    customSpecialty: specialForm.customSpecialty.trim() || null,
+                },
             });
 
             if (!updateResult.success) {
@@ -655,6 +667,20 @@ export default function ManageCharactersPage() {
                                 className="w-full px-3 py-2 bg-dark-950/60 text-white rounded-lg border border-dark-700 focus:ring-2 focus:ring-pink-500 focus:border-pink-500 outline-none resize-none"
                                 placeholder="Extra negative prompt injected for this character"
                             />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-dark-300 mb-1">Custom Specialty</label>
+                            <input
+                                value={specialForm.customSpecialty}
+                                onChange={(e) => setSpecialForm((prev) => ({ ...prev, customSpecialty: e.target.value }))}
+                                disabled={savingSpecialCharacter}
+                                className="w-full px-3 py-2 bg-dark-950/60 text-white rounded-lg border border-dark-700 focus:ring-2 focus:ring-pink-500 focus:border-pink-500 outline-none"
+                                placeholder="e.g., Seductive Charmer, Playful Trickster, Mystical Healer..."
+                            />
+                            <p className="text-xs text-dark-500 mt-1">
+                                Define what makes this character unique and special
+                            </p>
                         </div>
                     </div>
 

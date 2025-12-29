@@ -306,6 +306,57 @@ export const characterService = {
 
     if (error) throw error;
   },
+
+  async deleteMessage(messageId: string) {
+    console.log('🗑️ Supabase: Executing delete for message:', messageId);
+    
+    // First check if message exists
+    const { data: existingMessage, error: checkError } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('id', messageId)
+      .single();
+    
+    if (checkError) {
+      console.error('❌ Supabase: Error checking message existence:', checkError);
+    } else {
+      console.log('📋 Supabase: Found message to delete:', existingMessage);
+    }
+    
+    // Execute delete
+    const { error, count } = await supabase
+      .from('messages')
+      .delete({ count: 'exact' })
+      .eq('id', messageId);
+
+    if (error) {
+      console.error('❌ Supabase: Delete error:', error);
+      throw error;
+    }
+    
+    console.log('✅ Supabase: Delete completed successfully');
+    console.log('📊 Supabase: Records deleted:', count);
+    
+    // If no records were deleted, this is likely an RLS policy issue
+    if (count === 0) {
+      console.error('🚫 Supabase: DELETE BLOCKED - No records deleted. This is likely a Row Level Security (RLS) policy issue.');
+      console.error('🔧 Supabase: Check your Supabase dashboard RLS policies for the messages table');
+      throw new Error('Delete operation failed: Row Level Security policy prevents deletion. Check Supabase RLS policies.');
+    }
+    
+    // Verify deletion by checking if message still exists
+    const { data: deletedCheck, error: verifyError } = await supabase
+      .from('messages')
+      .select('id')
+      .eq('id', messageId)
+      .maybeSingle();
+    
+    if (verifyError) {
+      console.error('❌ Supabase: Error verifying deletion:', verifyError);
+    } else {
+      console.log('🔍 Supabase: Message still exists after delete:', deletedCheck);
+    }
+  },
 };
 
 export const profileService = {

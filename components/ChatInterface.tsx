@@ -2,16 +2,25 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CharacterDraft, ChatMessage, ClothingStyle, Environment } from '@/lib/types';
+import { CharacterDraft, ChatMessage, ClothingStyle, Environment, Conversation, CharacterStyle } from '@/lib/types';
 import { CharacterGalleryComponent } from './CharacterGallery';
+import { FormatSelector } from './ui/FormatSelector';
 import { useRouter } from 'next/navigation';
 import { characterAPI } from '@/lib/api';
-import { automatic1111API } from '@/lib/automatic1111';
+import { automatic1111API, STYLE_TO_MODEL_MAP } from '@/lib/automatic1111';
+import { lmStudioService } from '@/lib/lmstudio';
+import { AspectRatioId } from '@/config/aspect-ratios';
+import { extractMessageElements } from '@/config/message-actions';
 
 interface ChatInterfaceProps {
   character: CharacterDraft;
   onBack: () => void;
   onCharacterUpdate?: (character: CharacterDraft) => void;
+}
+
+export interface ChatResponse {
+  content: string;
+  keywords: string[];
 }
 
 export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInterfaceProps) {
@@ -22,6 +31,11 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
   const [showWardrobe, setShowWardrobe] = useState(false);
   const [showEnvironment, setShowEnvironment] = useState(false);
   const [currentCharacter, setCurrentCharacter] = useState<CharacterDraft>(character);
+  const [isZoomed, setIsZoomed] = useState(false);
+  const [zoomedImageUrl, setZoomedImageUrl] = useState<string | null>(null);
+  const [selectedFormat, setSelectedFormat] = useState<AspectRatioId>('portrait');
+  const [showFormatSelector, setShowFormatSelector] = useState(false);
+  const [pendingGeneration, setPendingGeneration] = useState<{messageId: string, content: string} | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -33,38 +47,339 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
     scrollToBottom();
   }, [messages]);
 
-  const handleSendMessage = async () => {
-    if (!inputMessage.trim()) return;
-
-    const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      characterId: currentCharacter.id || 'temp',
-      content: inputMessage,
-      sender: 'user',
-      timestamp: new Date(),
+  // Close format selector when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showFormatSelector) {
+        setShowFormatSelector(false);
+        setPendingGeneration(null);
+      }
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showFormatSelector]);
+
+  const [conversation, setConversation] = useState<Conversation | null>(null);
+
+  const initChat = async () => {
+    if (currentCharacter.id) {
+      try {
+        const convResult = await characterAPI.getConversation(currentCharacter.id);
+        if (convResult.success && convResult.data) {
+          setConversation(convResult.data);
+          const messagesResult = await characterAPI.getMessages(convResult.data.id);
+          if (messagesResult.success && messagesResult.data) {
+            setMessages(messagesResult.data.map((m: any) => ({
+              ...m,
+              imageUrl: m.image_url,
+              timestamp: new Date(m.timestamp)
+            })));
+          } else {
+            setMessages([]);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to initialize chat:', error);
+        setMessages([]);
+      }
+    }
+  };
+
+  useEffect(() => {
+    initChat();
+  }, [currentCharacter.id]);
+
+  const handleSendMessage = async () => {
+    if (!inputMessage.trim() || !conversation) return;
+
+    const userMessageContent = inputMessage;
     setInputMessage('');
+
+    const userMsg: Partial<ChatMessage> = {
+      conversationId: conversation.id,
+      characterId: currentCharacter.id,
+      content: userMessageContent,
+      sender: 'user',
+    };
+
+    // Optimistic update
+    const tempId = Date.now().toString();
+    const optimisticMsg: ChatMessage = {
+      id: tempId,
+      ...userMsg as any,
+      timestamp: new Date()
+    };
+    setMessages(prev => [...prev, optimisticMsg]);
+
     setIsTyping(true);
 
-    // Simulate character response
-    setTimeout(() => {
-      const characterMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        characterId: currentCharacter.id || 'temp',
-        content: generateCharacterResponse(inputMessage, currentCharacter),
+    try {
+      // Save user message first to get real ID
+      const savedUserMsg = await characterAPI.saveMessage(userMsg);
+      
+      // Get LLM response using either saved message or fallback to optimistic
+      const messageForContext = savedUserMsg.success ? savedUserMsg.data : optimisticMsg;
+      const chatContext = [...messages, messageForContext];
+      const llmResponse = await lmStudioService.sendMessage(chatContext, currentCharacter);
+
+      const characterMsg: Partial<ChatMessage> = {
+        conversationId: conversation.id,
+        characterId: currentCharacter.id,
+        content: llmResponse.content,
         sender: 'character',
-        timestamp: new Date(),
       };
 
-      setMessages(prev => [...prev, characterMessage]);
+      // Save character message
+      const savedCharMsg = await characterAPI.saveMessage(characterMsg);
+
+      // Update messages state with both saved messages
+      setMessages(prev => {
+        let updatedMessages = [...prev];
+        
+        // Replace temporary user message with saved one
+        if (savedUserMsg.success) {
+          updatedMessages = updatedMessages.map(m => 
+            m.id === tempId ? {
+              ...savedUserMsg.data,
+              timestamp: new Date(savedUserMsg.data.timestamp)
+            } : m
+          );
+        }
+        
+        // Add saved character message
+        if (savedCharMsg.success) {
+          const characterMessageData = {
+            ...savedCharMsg.data,
+            timestamp: new Date(savedCharMsg.data.timestamp)
+          };
+          updatedMessages.push(characterMessageData);
+        }
+        
+        return updatedMessages;
+      });
+
+      // Check for clothing changes in character response (after message is saved)
+      const characterMessageElements = extractMessageElements(llmResponse.content);
+      if (characterMessageElements.clothing.length > 0) {
+        const clothingDescription = characterMessageElements.clothing.join(', ');
+        await handleCustomClothing(clothingDescription);
+      }
+
+      // Handle keywords/triggers from user message (not character response)
+      const userKeywords = lmStudioService.extractKeywords(userMessageContent);
+      if (userKeywords.length > 0) {
+        for (const keyword of userKeywords) {
+          if (keyword.startsWith('style:')) {
+            const style = keyword.split(':')[1] as ClothingStyle;
+            if (style !== currentCharacter.appearance?.clothing) {
+              await handleOutfitChange(style);
+            }
+          } else if (keyword.startsWith('env:')) {
+            const env = keyword.split(':')[1] as Environment;
+            if (env !== currentCharacter.appearance?.environment) {
+              await handleEnvironmentChange(env);
+            }
+          } else if (keyword.startsWith('custom:')) {
+            const clothingDescription = keyword.split(':')[1];
+            await handleCustomClothing(clothingDescription);
+          }
+        }
+      }
+
+    } catch (error) {
+      console.error('Chat error:', error);
+      const errorMsg: ChatMessage = {
+        id: Date.now().toString(),
+        conversationId: conversation.id,
+        characterId: currentCharacter.id || 'temp',
+        content: "*Connection lost. Please make sure LM Studio is running.*",
+        sender: 'system',
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, errorMsg]);
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
+  };
+
+  const handleResetChat = async () => {
+    if (!conversation) return;
+
+    if (confirm('Are you sure you want to reset the chat history? This cannot be undone.')) {
+      const result = await characterAPI.resetConversation(conversation.id);
+      if (result.success) {
+        setMessages([]);
+        setConversation(null);
+        await initChat(); // Create a new conversation record
+      }
+    }
+  };
+
+  const handleGenerateMessageImage = async (messageId: string, content: string) => {
+    // Show format selector dropdown next to the button
+    setPendingGeneration({ messageId, content });
+    setShowFormatSelector(true);
+  };
+
+  const handleRegenerateMessageImage = async (messageId: string, content: string) => {
+    // Clear current image and show loading
+    setMessages(prev => prev.map(m => m.id === messageId ? { ...m, imageUrl: undefined, isGeneratingImage: true } : m));
+
+    try {
+      const imageUrl = await automatic1111API.generateMessageImage(currentCharacter, content, selectedFormat);
+      
+      if (imageUrl && imageUrl.length > 0) {
+        setMessages(prev => prev.map(m => m.id === messageId ? { ...m, imageUrl, isGeneratingImage: false } : m));
+
+        const updateResult = await characterAPI.updateMessage(messageId, { imageUrl });
+        
+        if (!updateResult.success) {
+          console.error('Failed to save image URL to database:', updateResult.error);
+        }
+      } else {
+        console.error('No image URL returned from generation');
+        alert('No image was generated. Please check the console for errors.');
+      }
+    } catch (error) {
+      console.error('Failed to generate message image:', error);
+      alert('Failed to generate image: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isGeneratingImage: false } : m));
+    }
+  };
+
+  const handleFormatSelectAndGenerate = async (format: AspectRatioId) => {
+    if (!pendingGeneration) return;
+
+    setSelectedFormat(format);
+    setShowFormatSelector(false);
+
+    const { messageId, content } = pendingGeneration;
+    setPendingGeneration(null);
+
+    setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isGeneratingImage: true } : m));
+
+    try {
+      const imageUrl = await automatic1111API.generateMessageImage(currentCharacter, content, format);
+      
+      if (imageUrl && imageUrl.length > 0) {
+        setMessages(prev => prev.map(m => m.id === messageId ? { ...m, imageUrl, isGeneratingImage: false } : m));
+
+        const updateResult = await characterAPI.updateMessage(messageId, { imageUrl });
+        
+        if (!updateResult.success) {
+          console.error('Failed to save image URL to database:', updateResult.error);
+        }
+      } else {
+        console.error('No image URL returned from generation');
+        alert('No image was generated. Please check the console for errors.');
+      }
+    } catch (error) {
+      console.error('Failed to generate message image:', error);
+      alert('Failed to generate image: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isGeneratingImage: false } : m));
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: string) => {
+    if (!confirm('Are you sure you want to delete this message?')) return;
+    
+    console.log('🗑️ Attempting to delete message:', messageId);
+    
+    try {
+      const result = await characterAPI.deleteMessage(messageId);
+      console.log('📊 Delete result:', result);
+      
+      if (result.success) {
+        console.log('✅ Message deleted from Supabase, removing from UI');
+        setMessages(prev => prev.filter(m => m.id !== messageId));
+        
+        // Check immediately if message is gone
+        setTimeout(() => {
+          if (conversation) {
+            console.log('🔍 Checking if message is immediately gone...');
+            characterAPI.getMessages(conversation.id).then(messagesResult => {
+              if (messagesResult.success && messagesResult.data) {
+                const deletedMessage = messagesResult.data.find((m: any) => m.id === messageId);
+                console.log('📋 Message still exists immediately after delete?', deletedMessage);
+                
+                // Check again after 2 seconds
+                setTimeout(() => {
+                  console.log('🔍 Checking again after 2 seconds...');
+                  characterAPI.getMessages(conversation.id).then(messagesResult2 => {
+                    if (messagesResult2.success && messagesResult2.data) {
+                      const deletedMessage2 = messagesResult2.data.find((m: any) => m.id === messageId);
+                      console.log('📋 Message exists after 2 seconds?', deletedMessage2);
+                      
+                      // Update UI with current state
+                      setMessages(messagesResult2.data.map((m: any) => ({
+                        ...m,
+                        imageUrl: m.image_url,
+                        timestamp: new Date(m.timestamp)
+                      })));
+                    }
+                  });
+                }, 2000);
+              }
+            });
+          }
+        }, 500); // Wait 500ms then check
+      } else {
+        console.error('❌ Failed to delete message:', result.error);
+        alert('Failed to delete message: ' + (result.error as string));
+      }
+    } catch (error) {
+      console.error('❌ Exception during delete:', error);
+      alert('Failed to delete message: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    }
+  };
+
+  const handleRegenerateCharacterMessage = async (messageId: string, oldContent: string) => {
+    // Get the previous user message for context
+    const messageIndex = messages.findIndex(m => m.id === messageId);
+    const previousMessages = messages.slice(0, messageIndex);
+    const lastUserMessage = previousMessages.reverse().find(m => m.sender === 'user');
+    
+    if (!lastUserMessage) {
+      alert('Cannot regenerate - no user message found for context');
+      return;
+    }
+
+    try {
+      // Delete the old message
+      await handleDeleteMessage(messageId);
+      
+      // Generate a new response
+      setIsTyping(true);
+      const chatContext = [...previousMessages.filter(m => m.id !== messageId), lastUserMessage];
+      const llmResponse = await lmStudioService.sendMessage(chatContext, currentCharacter);
+
+      const characterMsg: Partial<ChatMessage> = {
+        conversationId: conversation?.id || 'temp',
+        characterId: currentCharacter.id || 'temp',
+        content: llmResponse.content,
+        sender: 'character',
+      };
+
+      // Save new character message
+      const savedMsg = await characterAPI.saveMessage(characterMsg);
+      if (savedMsg.success) {
+        setMessages(prev => [...prev, {
+          ...savedMsg.data,
+          timestamp: new Date(savedMsg.data.timestamp)
+        }]);
+      }
+    } catch (error) {
+      console.error('Failed to regenerate message:', error);
+      alert('Failed to regenerate message');
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   const handleCharacterUpdate = (updatedCharacter: CharacterDraft) => {
     setCurrentCharacter(updatedCharacter);
+    onCharacterUpdate?.(updatedCharacter);
   };
 
   const handleOutfitChange = async (clothing: ClothingStyle) => {
@@ -104,15 +419,20 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
     }
 
     // Add a message about the outfit change
-    const outfitMessage: ChatMessage = {
-      id: Date.now().toString(),
+    const outfitMessage: Partial<ChatMessage> = {
+      conversationId: conversation?.id || 'temp',
       characterId: currentCharacter.id || 'temp',
       content: `*${currentCharacter.name || 'The character'} changes into a ${clothing} outfit*`,
       sender: 'character',
-      timestamp: new Date(),
     };
 
-    setMessages(prev => [...prev, outfitMessage]);
+    const savedMsg = await characterAPI.saveMessage(outfitMessage);
+    if (savedMsg.success) {
+      setMessages(prev => [...prev, {
+        ...savedMsg.data,
+        timestamp: new Date(savedMsg.data.timestamp)
+      }]);
+    }
   };
 
   const handleCustomClothing = async (customOutfit: string) => {
@@ -152,16 +472,21 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
       }
     }
 
-    // Add a message about custom outfit change
-    const outfitMessage: ChatMessage = {
-      id: Date.now().toString(),
+    // Add a message about the custom outfit change
+    const outfitMessage: Partial<ChatMessage> = {
+      conversationId: conversation?.id || 'temp',
       characterId: currentCharacter.id || 'temp',
       content: `*${currentCharacter.name || 'The character'} changes into a custom outfit: ${customOutfit}*`,
       sender: 'character',
-      timestamp: new Date(),
     };
 
-    setMessages(prev => [...prev, outfitMessage]);
+    const savedMsg = await characterAPI.saveMessage(outfitMessage);
+    if (savedMsg.success) {
+      setMessages(prev => [...prev, {
+        ...savedMsg.data,
+        timestamp: new Date(savedMsg.data.timestamp)
+      }]);
+    }
   };
 
   const handleWardrobeImageGeneration = async () => {
@@ -175,20 +500,26 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
       const imageUrl = await automatic1111API.generateCharacterImage(currentCharacter);
 
       if (imageUrl) {
-        const generationMessage: ChatMessage = {
-          id: Date.now().toString(),
+        const generationMessage: Partial<ChatMessage> = {
+          conversationId: conversation?.id || 'temp',
           characterId: currentCharacter.id || 'temp',
           content: `*New image generated with ${currentCharacter.appearance?.clothing || 'current'} outfit*`,
           sender: 'character',
-          timestamp: new Date(),
         };
 
-        setMessages(prev => [...prev, generationMessage]);
+        const savedMsg = await characterAPI.saveMessage(generationMessage);
+        if (savedMsg.success) {
+          setMessages(prev => [...prev, {
+            ...savedMsg.data,
+            timestamp: new Date(savedMsg.data.timestamp)
+          }]);
+        }
       }
     } catch (error) {
       console.error('Error generating wardrobe image:', error);
       const errorMessage: ChatMessage = {
         id: Date.now().toString(),
+        conversationId: conversation?.id || 'temp',
         characterId: currentCharacter.id || 'temp',
         content: '*Failed to generate new image. Please try again.*',
         sender: 'character',
@@ -238,15 +569,20 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
     }
 
     // Add a message about the environment change
-    const environmentMessage: ChatMessage = {
-      id: Date.now().toString(),
+    const environmentMessage: Partial<ChatMessage> = {
+      conversationId: conversation?.id || 'temp',
       characterId: currentCharacter.id || 'temp',
       content: `*The scene changes to a ${environment.replace('_', ' ')}*`,
       sender: 'character',
-      timestamp: new Date(),
     };
 
-    setMessages(prev => [...prev, environmentMessage]);
+    const savedMsg = await characterAPI.saveMessage(environmentMessage);
+    if (savedMsg.success) {
+      setMessages(prev => [...prev, {
+        ...savedMsg.data,
+        timestamp: new Date(savedMsg.data.timestamp)
+      }]);
+    }
   };
 
   const generateCharacterResponse = (userMessage: string, character: CharacterDraft): string => {
@@ -319,13 +655,26 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                     {/* Character Info */}
                     <div className="flex flex-col items-center">
                       <h1 className="text-xl font-semibold text-white">{currentCharacter.name || 'Character'}</h1>
-                      <div className="text-sm text-pink-400 capitalize">{currentCharacter.personality?.archetype || 'Mysterious'}</div>
+                      <div className="text-sm text-pink-400 capitalize">
+  {currentCharacter.characterType === 'special' && currentCharacter.personality?.customSpecialty
+    ? currentCharacter.personality.customSpecialty
+    : currentCharacter.personality?.archetype || 'Mysterious'
+  }
+</div>
                     </div>
                   </div>
                 </div>
 
-                {/* Empty space to match gallery layout */}
-                <div className="w-8 h-8"></div>
+                {/* Reset Button - Right */}
+                <button
+                  onClick={handleResetChat}
+                  className="p-2 text-dark-400 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all duration-200"
+                  title="Reset History"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
               </div>
             </div>
 
@@ -343,13 +692,145 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                     >
                       <div className={`max-w-md ${message.sender === 'user' ? 'order-2' : 'order-1'}`}>
                         <div
-                          className={`px-5 py-3 rounded-2xl ${message.sender === 'user'
+                          className={`px-5 py-3 rounded-2xl relative group/msg ${message.sender === 'user'
                             ? 'bg-gradient-to-r from-pink-600 to-pink-500 text-white shadow-lg shadow-pink-500/20'
                             : 'bg-dark-800/50 text-dark-200 border border-dark-700/50 backdrop-blur-sm'
                             }`}
                         >
-                          <p className="text-sm leading-relaxed">{message.content}</p>
+                          <div className="text-sm leading-relaxed">
+                            {/* Message Content */}
+                            {message.content.split(/(\*[^*]+\*)/).map((part, index) => {
+                              // Check if this part is enclosed in asterisks (internal thought)
+                              if (part.startsWith('*') && part.endsWith('*')) {
+                                const thoughtContent = part.slice(1, -1); // Remove asterisks
+                                return <span key={index} className="italic text-pink-300 opacity-80">{thoughtContent}</span>;
+                              } else {
+                                return <span key={index}>{part}</span>;
+                              }
+                            })}
+                            
+                            {/* Message Controls - Inline with content */}
+                            <span className={`inline-flex ${message.sender === 'user' ? 'float-left mr-2' : 'float-right ml-2'} opacity-0 group-hover/msg:opacity-100 transition-opacity`}>
+                              {/* Regenerate Message */}
+                              {message.sender === 'character' && (
+                                <button
+                                  onClick={() => handleRegenerateCharacterMessage(message.id, message.content)}
+                                  className="p-0.5 text-pink-400/60 hover:text-pink-300 hover:bg-pink-500/10 rounded transition-all"
+                                  title="Regenerate message"
+                                >
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                  </svg>
+                                </button>
+                              )}
+                              
+                              {/* Delete Message */}
+                              <button
+                                onClick={() => handleDeleteMessage(message.id)}
+                                className={`p-0.5 text-red-400/60 hover:text-red-300 hover:bg-red-500/10 rounded transition-all ${message.sender === 'character' ? 'ml-1' : ''}`}
+                                title="Delete message"
+                              >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </span>
+                          </div>
+
+                          {/* Generate Image Button for Character Messages */}
+                          {message.sender === 'character' && !message.imageUrl && !message.isGeneratingImage && (
+                            <div className="absolute -right-12 top-0 flex items-center">
+                              <button
+                                onClick={() => handleGenerateMessageImage(message.id, message.content)}
+                                className="p-2 text-pink-400 hover:text-pink-300 opacity-0 group-hover/msg:opacity-100 transition-opacity bg-dark-800/80 rounded-lg backdrop-blur-sm border border-pink-500/20 shadow-xl"
+                                title="Generate image"
+                              >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                              </button>
+
+                              {/* Format Dropdown */}
+                              {showFormatSelector && pendingGeneration?.messageId === message.id && (
+                                <motion.div
+                                  initial={{ opacity: 0, scale: 0.95, y: -5 }}
+                                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                                  exit={{ opacity: 0, scale: 0.95, y: -5 }}
+                                  className="absolute left-full ml-2 top-0 bg-dark-800/95 border border-pink-500/30 rounded-lg shadow-xl backdrop-blur-sm z-50"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <div className="flex items-center p-2 space-x-3">
+                                    {[
+                                      { id: 'square' as AspectRatioId, label: 'Square', ratio: '1:1' },
+                                      { id: 'landscape' as AspectRatioId, label: 'Landscape', ratio: '4:3' },
+                                      { id: 'portrait' as AspectRatioId, label: 'Portrait', ratio: '3:4' },
+                                    ].map((format) => (
+                                      <button
+                                        key={format.id}
+                                        onClick={() => handleFormatSelectAndGenerate(format.id)}
+                                        className="flex flex-col items-center px-2 py-1 hover:bg-pink-600/20 rounded transition-colors group"
+                                      >
+                                        <div className="w-4 h-4 bg-pink-600/20 rounded mb-1 flex items-center justify-center">
+                                          <div className="w-2 h-2 bg-pink-300 rounded-sm" />
+                                        </div>
+                                        <span className="text-xs text-pink-300 group-hover:text-white">
+                                          {format.label}
+                                        </span>
+                                        <span className="text-[10px] text-pink-400 group-hover:text-pink-200">
+                                          {format.ratio}
+                                        </span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </motion.div>
+                              )}
+                            </div>
+                          )}
                         </div>
+
+                        {/* Generated Image Below Message */}
+                        {(message.imageUrl || message.isGeneratingImage) && (
+                          <div className="mt-2 relative rounded-xl overflow-hidden border border-pink-500/30 shadow-lg shadow-pink-500/10 max-w-[200px] group/img">
+                            {message.isGeneratingImage ? (
+                              <div className="aspect-[3/4] bg-dark-800/80 flex flex-col items-center justify-center space-y-3">
+                                <div className="w-6 h-6 border-2 border-pink-500 border-t-transparent rounded-full animate-spin" />
+                                <p className="text-[10px] text-pink-300 animate-pulse">Generating...</p>
+                              </div>
+                            ) : (
+                              <>
+                                <img
+                                  src={message.imageUrl}
+                                  alt="Scene"
+                                  className="w-full h-auto object-cover cursor-zoom-in hover:scale-105 transition-transform duration-500"
+                                  onClick={() => {
+                                    setZoomedImageUrl(message.imageUrl!);
+                                    setIsZoomed(true);
+                                  }}
+                                  onError={(e) => {
+                                    console.error('Failed to load message image:', message.imageUrl);
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                  }}
+                                  onLoad={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'block';
+                                  }}
+                                />
+                                {/* Regenerate Button */}
+                                <button
+                                  onClick={() => handleRegenerateMessageImage(message.id, message.content)}
+                                  className="absolute top-2 right-2 p-1.5 bg-black/60 backdrop-blur-md rounded-lg text-white opacity-0 group-hover/img:opacity-100 transition-opacity hover:text-pink-400"
+                                  title="Regenerate image"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                  </svg>
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        )}
                         <div className={`mt-1 text-xs text-pink-300 ${message.sender === 'user' ? 'text-right' : 'text-left'}`}>
                           {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </div>
@@ -717,6 +1198,43 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                   </button>
                 ))}
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Zoom Modal */}
+      <AnimatePresence>
+        {isZoomed && zoomedImageUrl && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center"
+            onClick={() => setIsZoomed(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="relative h-full flex items-center justify-center p-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img
+                src={zoomedImageUrl}
+                alt="Zoomed"
+                className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
+              />
+              <button
+                onClick={() => setIsZoomed(false)}
+                className="absolute top-8 right-8 p-2 text-white/70 hover:text-white transition-colors"
+              >
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </motion.div>
           </motion.div>
         )}

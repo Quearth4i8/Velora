@@ -45,7 +45,10 @@ export const serializeCharacter = (draft: CharacterDraft): Record<string, any> =
     custom_clothing: draft.appearance?.customClothing || undefined,
     environment: draft.appearance?.environment || null,
     personality_archetype: draft.personality?.archetype || null,
-    personality_traits: draft.personality?.traits || null,
+    personality_traits: draft.personality ? {
+      ...draft.personality.traits,
+      customSpecialty: draft.personality.customSpecialty || null
+    } : null,
     style: draft.generation?.style,
     model: draft.generation?.model,
     generated_image: draft.generation?.generatedImage,
@@ -156,7 +159,14 @@ export const deserializeCharacter = (data: Record<string, any>): CharacterDraft 
     personality: {
       archetype: data.personality_archetype,
       isCustom: data.personality_archetype === 'custom',
-      traits: data.personality_traits,
+      traits: {
+        submissiveDominant: data.personality_traits?.submissiveDominant || 50,
+        insecureConfident: data.personality_traits?.insecureConfident || 50,
+        coldPassionate: data.personality_traits?.coldPassionate || 50,
+        reservedOutgoing: data.personality_traits?.reservedOutgoing || 50,
+        seriousPlayful: data.personality_traits?.seriousPlayful || 50,
+      },
+      customSpecialty: data.personality_traits?.customSpecialty || undefined,
     },
     generation: {
       style: data.style,

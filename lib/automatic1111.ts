@@ -1,5 +1,6 @@
 import { CharacterDraft, CharacterStyle, AIModel, Ethnicity, ClothingStyle } from './types';
 import { characterAPI } from './api';
+import { supabase } from './supabase';
 import {
   NON_HUMAN_LEGS_LANDSCAPE_CINEMATIC_VARIED_POSES,
   NON_HUMAN_LEGS_LANDSCAPE_CINEMATIC_EXTRA_NEGATIVE_PROMPT,
@@ -18,6 +19,7 @@ import { ETHNICITY_PROMPT_MAP } from '@/config/ethnicity-prompts';
 import { hexToColorName } from '@/config/color-mappings';
 import { EYE_TYPE_DESCRIPTIONS } from '@/config/eye-type-descriptions';
 import { STYLE_PROMPTS } from '@/config/style-prompts';
+import { extractMessageElements } from '@/config/message-actions';
 import {
   REGULAR_HUMANOID_CLOTHING_MAP,
   REGULAR_CENTAUR_CLOTHING_MAP,
@@ -29,7 +31,7 @@ import {
 
 const AUTOMATIC1111_URL = process.env.AUTOMATIC1111_URL || 'http://127.0.0.1:7860';
 
-const STYLE_TO_MODEL_MAP: Record<CharacterStyle, AIModel> = {
+export const STYLE_TO_MODEL_MAP: Record<CharacterStyle, AIModel> = {
   [CharacterStyle.ANIME]: AIModel.ONEOBSESSION,
   [CharacterStyle.REALISTIC]: AIModel.CYBERREALISTIC,
   [CharacterStyle.ARTISTIC]: AIModel.PERFECTDELIBERATE,
@@ -611,8 +613,8 @@ export const automatic1111API = {
       let prompt = buildPrompt(modifiedDraft, style);
       let negativePrompt = buildNegativePrompt(modifiedDraft);
 
-      // Apply model-specific score tags for gallery/settings-based generation
-      if (settings && model === AIModel.CYBERREALISTIC) {
+      // Apply model-specific score tags
+      if (model === AIModel.CYBERREALISTIC) {
         prompt = `score_9, score_8_up, score_7_up, ${prompt}`;
         negativePrompt = `score_6, score_5, score_4, (worst quality:1.2), (low quality:1.2), (normal quality:1.2), ${negativePrompt}`;
       }
@@ -627,6 +629,9 @@ export const automatic1111API = {
         sampler_name: settings?.sampler || (style === CharacterStyle.SPECIAL ? 'Euler a' : 'DPM++ 2M Karras'),
         model_name: model,
         seed: settings?.seed === undefined || settings?.seed === null || settings?.seed === -1 ? -1 : settings?.seed,
+        override_settings: {
+          sd_model_checkpoint: model
+        }
       };
 
       return automatic1111API.generateImageWithPayload(payload, modifiedDraft, style, model);
@@ -643,8 +648,8 @@ export const automatic1111API = {
       let prompt = buildPrompt(modifiedDraft, style);
       let negativePrompt = buildNegativePrompt(modifiedDraft);
 
-      // Apply model-specific score tags for gallery/settings-based generation
-      if (settings && model === AIModel.CYBERREALISTIC) {
+      // Apply model-specific score tags
+      if (model === AIModel.CYBERREALISTIC) {
         prompt = `score_9, score_8_up, score_7_up, ${prompt}`;
         negativePrompt = `score_6, score_5, score_4, (worst quality:1.2), (low quality:1.2), (normal quality:1.2), ${negativePrompt}`;
       }
@@ -659,6 +664,9 @@ export const automatic1111API = {
         sampler_name: settings?.sampler || (style === CharacterStyle.SPECIAL ? 'Euler a' : 'DPM++ 2M Karras'),
         model_name: model,
         seed: settings?.seed === undefined || settings?.seed === null || settings?.seed === -1 ? -1 : settings?.seed,
+        override_settings: {
+          sd_model_checkpoint: model
+        }
       };
 
       return automatic1111API.generateImageWithPayload(payload, modifiedDraft, style, model);
@@ -683,8 +691,8 @@ export const automatic1111API = {
       const extraNegativePrompts = NON_HUMAN_LEGS_LANDSCAPE_CINEMATIC_EXTRA_NEGATIVE_PROMPT;
       negativePrompt = joinAndDedupeTags(negativePrompt, extraNegativePrompts);
 
-      // Apply model-specific score tags for gallery/settings-based generation
-      if (settings && model === AIModel.CYBERREALISTIC) {
+      // Apply model-specific score tags
+      if (model === AIModel.CYBERREALISTIC) {
         prompt = `score_9, score_8_up, score_7_up, ${prompt}`;
         negativePrompt = `score_6, score_5, score_4, (worst quality:1.2), (low quality:1.2), (normal quality:1.2), ${negativePrompt}`;
       }
@@ -699,6 +707,9 @@ export const automatic1111API = {
         sampler_name: settings?.sampler || (style === CharacterStyle.SPECIAL ? 'Euler a' : 'DPM++ 2M Karras'),
         model_name: model,
         seed: settings?.seed === undefined || settings?.seed === null || settings?.seed === -1 ? -1 : settings?.seed,
+        override_settings: {
+          sd_model_checkpoint: model
+        }
       };
 
       return automatic1111API.generateImageWithPayload(payload, modifiedDraft, style, model);
@@ -707,8 +718,8 @@ export const automatic1111API = {
     let prompt = buildPromptWithHandPose(draft, style, settings);
     let negativePrompt = buildNegativePrompt(draft);
 
-    // Apply model-specific score tags for gallery/settings-based generation
-    if (settings && model === AIModel.CYBERREALISTIC) {
+    // Apply model-specific score tags
+    if (style === CharacterStyle.REALISTIC || model === AIModel.CYBERREALISTIC) {
       prompt = `score_9, score_8_up, score_7_up, ${prompt}`;
       negativePrompt = `score_6, score_5, score_4, (worst quality:1.2), (low quality:1.2), (normal quality:1.2), ${negativePrompt}`;
     }
@@ -723,6 +734,9 @@ export const automatic1111API = {
       sampler_name: settings?.sampler || (style === CharacterStyle.SPECIAL ? 'Euler a' : 'DPM++ 2M Karras'),
       model_name: model,
       seed: settings?.seed === undefined || settings?.seed === null || settings?.seed === -1 ? -1 : settings?.seed,
+      override_settings: {
+        sd_model_checkpoint: model
+      }
     };
 
     return automatic1111API.generateImageWithPayload(payload, draft, style, model);
@@ -777,9 +791,146 @@ export const automatic1111API = {
       console.error('Error generating character image:', error);
       throw error;
     }
-  }, // Added a comma here
+  },
+
+  async generateMessageImage(character: CharacterDraft, messageContent: string, aspectRatio?: string): Promise<string> {
+    if (!character.generation?.style || !character.generation?.model) {
+      throw new Error('Character style and model must be selected before generation');
+    }
+
+    const style = character.generation.style;
+    const model = character.generation.model;
+
+    const modelSwitched = await automatic1111API.switchModel(model);
+    if (!modelSwitched) {
+      console.warn(`Failed to switch to model: ${model}, using current model`);
+    }
+
+    // Extract key elements from message content using the centralized configuration
+    const messageElements = extractMessageElements(messageContent);
+    
+    // Extract emotions, poses, clothing, and environments from the message
+    const emotions = messageElements.emotions;
+    const poses = messageElements.poses;
+    const environments = messageElements.environments;
+    
+    // Handle clothing detection with fallback to character settings
+    let clothingPrompt = '';
+    if (messageElements.clothing.length > 0) {
+      clothingPrompt = messageElements.clothing.join(', ');
+    } else if (character.appearance?.clothing) {
+      // Use existing clothing settings
+      clothingPrompt = character.appearance.clothing;
+    }
+
+    // Build custom prompt based on message content
+    let customPrompt = '';
+    if (emotions.length > 0) customPrompt += emotions.join(', ') + ', ';
+    if (poses.length > 0) customPrompt += poses.join(', ') + ', ';
+    if (environments.length > 0) customPrompt += environments.join(', ') + ', ';
+    if (clothingPrompt) customPrompt += clothingPrompt + ', ';
+    
+    // Create a modified character draft for this specific message
+    const messageDraft = {
+      ...character,
+      specialPrompt: character.specialPrompt ? 
+        `${character.specialPrompt}, ${customPrompt}`.replace(/,\s*$/, '') : 
+        customPrompt.replace(/,\s*$/, '')
+    };
+
+    // Generate image using the modified draft and add to gallery
+    const payload = this.buildPayloadForMessageImage(messageDraft, style, model, aspectRatio);
+    return this.generateImageWithPayload(payload, messageDraft, style, model);
+  },
+
+  buildPayloadForMessageImage(draft: CharacterDraft, style: CharacterStyle, model: string, aspectRatio?: string): any {
+    const finalAspectRatio = aspectRatio || 'portrait';
+    
+    let prompt = buildPrompt(draft, style);
+    let negativePrompt = buildNegativePrompt(draft);
+
+    // Apply model-specific score tags
+    if (style === CharacterStyle.REALISTIC || model === AIModel.CYBERREALISTIC) {
+      prompt = `score_9, score_8_up, score_7_up, ${prompt}`;
+      negativePrompt = `score_6, score_5, score_4, (worst quality:1.2), (low quality:1.2), (normal quality:1.2), ${negativePrompt}`;
+    }
+
+    return {
+      prompt,
+      negative_prompt: negativePrompt,
+      width: getDimensionsFromAspectRatio(finalAspectRatio, model).width,
+      height: getDimensionsFromAspectRatio(finalAspectRatio, model).height,
+      steps: 30,
+      cfg_scale: style === CharacterStyle.SPECIAL ? 6 : 8,
+      sampler_name: style === CharacterStyle.SPECIAL ? 'Euler a' : 'DPM++ 2M Karras',
+      model_name: model,
+      seed: -1,
+      override_settings: {
+        sd_model_checkpoint: model
+      }
+    };
+  },
+
+  async generateDirectImage(payload: any): Promise<string> {
+    try {
+      const response = await fetch(`${AUTOMATIC1111_URL}/sdapi/v1/txt2img`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Automatic1111 API error: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
+      if (!result.images || result.images.length === 0) {
+        throw new Error('No images returned from Automatic1111');
+      }
+
+      // Upload to Supabase storage with a unique name for message images
+      const base64Image = result.images[0];
+      const timestamp = Date.now();
+      const imageName = `message-${timestamp}-${Math.random().toString(36).substring(7)}.jpg`;
+      
+      // Convert base64 to binary data
+      const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
+      const binaryData = atob(base64Data);
+      const bytes = new Uint8Array(binaryData.length);
+      for (let i = 0; i < binaryData.length; i++) {
+        bytes[i] = binaryData.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: 'image/jpeg' });
+      
+      // Upload to Supabase storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('character-images')
+        .upload(imageName, blob, {
+          contentType: 'image/jpeg',
+          upsert: true
+        });
+
+      if (uploadError) {
+        console.error('Storage upload error:', uploadError);
+        throw uploadError;
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('character-images')
+        .getPublicUrl(imageName);
+
+      return publicUrl;
+    } catch (error) {
+      console.error('Error generating direct image:', error);
+      throw error;
+    }
+  },
 
   getModelForStyle(style: CharacterStyle): AIModel {
     return STYLE_TO_MODEL_MAP[style];
-  },
+  }
 };

@@ -196,6 +196,7 @@ export interface CharacterPersonality {
   archetype: string | null;
   isCustom: boolean;
   traits: PersonalityTraits;
+  customSpecialty?: string; // For special characters to define their unique specialty
 }
 
 export type CharacterType = 'custom' | 'special';
@@ -264,10 +265,22 @@ export interface CharacterGeneration {
 
 export interface ChatMessage {
   id: string;
+  conversationId: string;
   characterId: string;
   content: string;
-  sender: 'user' | 'character';
+  sender: 'user' | 'character' | 'system';
   timestamp: Date;
+  imageUrl?: string;
+  isGeneratingImage?: boolean;
+}
+
+export interface Conversation {
+  id: string;
+  characterId: string;
+  userId: string;
+  title?: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface Character {
