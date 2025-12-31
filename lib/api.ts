@@ -212,7 +212,7 @@ export const characterAPI = {
     }
   },
 
-  async addCharacterImage(characterId: string, imageData: string, prompt?: string, model?: string, style?: string): Promise<{ success: boolean; data?: CharacterImage; error?: any }> {
+  async addCharacterImage(characterId: string, imageData: string, prompt?: string, model?: string, style?: string, seed?: number): Promise<{ success: boolean; data?: CharacterImage; error?: any }> {
     try {
       // Upload image to storage
       const storageFile = await storageService.uploadImage(characterId, imageData);
@@ -232,6 +232,7 @@ export const characterAPI = {
         generation_prompt: prompt,
         generation_model: model,
         generation_style: style,
+        generation_seed: seed,
       };
 
       if (session?.user) {
@@ -604,13 +605,36 @@ export const characterAPI = {
 
   async resetConversation(conversationId: string) {
     try {
+      // First, get the character ID from the conversation
+      const { data: conversation, error: fetchError } = await supabase
+        .from('conversations')
+        .select('character_id')
+        .eq('id', conversationId)
+        .single();
+
+      if (fetchError) throw fetchError;
+      if (!conversation?.character_id) throw new Error('No character found for conversation');
+
+      // Reset the character's seed to undefined
+      const { error: seedError } = await supabase
+        .from('characters')
+        .update({ 
+          generation_seed: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', conversation.character_id);
+
+      if (seedError) {
+        console.warn('Failed to reset character seed:', seedError);
+      }
+
       // Deleting the conversation will automatically delete messages due to ON DELETE CASCADE
-      const { error } = await supabase
+      const { error: deleteError } = await supabase
         .from('conversations')
         .delete()
         .eq('id', conversationId);
 
-      if (error) throw error;
+      if (deleteError) throw deleteError;
       return { success: true };
     } catch (error) {
       console.error('Failed to reset conversation:', error);

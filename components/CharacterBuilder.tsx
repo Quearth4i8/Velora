@@ -89,6 +89,15 @@ export function CharacterBuilder() {
       const imageUrl = await automatic1111API.generateCharacterImage(characterWithId);
       console.log('Image generated successfully:', imageUrl);
 
+      // Refresh character data to get the newly saved seed
+      console.log('Refreshing character data to get seed...');
+      if (createResult.data.id) {
+        const refreshedResult = await characterAPI.getCharacterFresh(createResult.data.id);
+        if (refreshedResult.success && refreshedResult.data) {
+          console.log('Character data refreshed, seed:', refreshedResult.data.generation?.seed);
+        }
+      }
+
       // Navigate to the chat interface
       console.log('Navigating to chat page...');
       router.push(`/${createResult.data.id}`);

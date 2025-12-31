@@ -1,4 +1,5 @@
-import { CharacterDraft, CharacterStyle, AIModel, Ethnicity, ClothingStyle } from './types';
+import { CharacterDraft, CharacterStyle, AIModel, Ethnicity, ClothingStyle, ImageGenerationPlan } from './types';
+
 import { characterAPI } from './api';
 import { supabase } from './supabase';
 import {
@@ -38,7 +39,7 @@ export const STYLE_TO_MODEL_MAP: Record<CharacterStyle, AIModel> = {
   [CharacterStyle.SPECIAL]: AIModel.PREFECT_ILLUSTRIOUS,
 };
 
-
+// ... (rest of the code remains the same)
 
 const dedupeCommaTags = (input: string): string => {
   const parts = String(input || '')
@@ -319,9 +320,11 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle): string => {
     : '';
   const clothingTag = clothing === ClothingStyle.CUSTOM && appearance.customClothing
     ? `wearing ${appearance.customClothing}`
-    : clothing
-      ? `wearing detailed ${getClothingDetails(clothing, false, draft)}`
-      : '';
+    : clothing === ClothingStyle.NAKED
+      ? getClothingDetails(clothing, false, draft)
+      : clothing
+        ? `wearing detailed ${getClothingDetails(clothing, false, draft)}`
+        : '';
   const hairColorTag = hairColor ? `${hexToColorName(hairColor)} hair` : '';
   const eyeColorTag = eyeColor ? `${eyeColor} eyes` : '';
   const eyeTypeTag = eyeType ? (eyeTypeDescriptions[eyeType] || `${eyeType} eyes`) : '';
@@ -481,7 +484,6 @@ const buildNegativePrompt = (draft?: CharacterDraft): string => {
     negativePrompt = joinAndDedupeTags(negativePrompt, extraNegativePrompts.join(', '));
   }
 
-  // Add specific negative prompts for SPECIAL style/model
   if (draft?.generation?.style === CharacterStyle.SPECIAL) {
     negativePrompt = joinAndDedupeTags(
       negativePrompt,
@@ -499,6 +501,149 @@ const pickVariant = (variants: string[], seed?: number): string => {
     return variants[idx];
   }
   return variants[Math.floor(Math.random() * variants.length)];
+};
+
+const MESSAGE_CAMERA_VARIATIONS: string[] = [
+  'eye level shot',
+  'three-quarter view',
+  'side view',
+  'high angle shot',
+  'low angle shot',
+  'overhead view'
+];
+
+const posesIncludeCameraAngle = (poses: string[]): boolean => {
+  const joined = poses.map((p) => String(p || '').toLowerCase());
+  return joined.some((p) =>
+    p.includes('angle') ||
+    p.includes('view') ||
+    p.includes('shot') ||
+    p.includes('perspective') ||
+    p.includes('profile') ||
+    p.includes('frontal') ||
+    p.includes('rear') ||
+    p.includes('from behind')
+  );
+};
+
+const normalizePlannedPoses = (poses: string[], messageContent: string): string[] => {
+  const list = Array.isArray(poses) ? [...poses] : [];
+  const m = String(messageContent || '').toLowerCase();
+
+  const wantsSitting =
+    m.includes('sit') ||
+    m.includes('sitting') ||
+    m.includes('seated') ||
+    m.includes('edge of the bed') ||
+    m.includes('edge of bed') ||
+    m.includes('bed edge') ||
+    m.includes('sit on the bed') ||
+    m.includes('sits on the bed');
+
+  const wantsLying =
+    m.includes('lie down') ||
+    m.includes('lying') ||
+    m.includes('laying') ||
+    m.includes('prone') ||
+    m.includes('lying on stomach') ||
+    m.includes('on your stomach') ||
+    m.includes('belly down') ||
+    m.includes('face down');
+
+  const wantsLegsApart =
+    m.includes('legs apart') ||
+    m.includes('legs spread') ||
+    m.includes('thighs apart') ||
+    m.includes('spreads her legs') ||
+    m.includes('spreading her legs') ||
+    m.includes('spreads her thighs') ||
+    m.includes('spreading her thighs') ||
+    m.includes('open your legs') ||
+    m.includes('open her legs') ||
+    m.includes('open legs') ||
+    m.includes('legs wide');
+
+  let normalized = list;
+
+  if (wantsSitting && !wantsLying) {
+    normalized = normalized.filter((p) => {
+      const pl = String(p || '').toLowerCase();
+      return !pl.includes('lying') && !pl.includes('laying') && !pl.includes('prone') && !pl.includes('face down');
+    });
+  }
+
+  if (wantsLying && !wantsSitting) {
+    normalized = normalized.filter((p) => {
+      const pl = String(p || '').toLowerCase();
+      return !pl.includes('sitting') && !pl.includes('seated');
+    });
+  }
+
+  if (wantsLegsApart) {
+    normalized = normalized.filter((p) => {
+      const pl = String(p || '').toLowerCase();
+      return !pl.includes('legs apart') && !pl.includes('knees apart') && !pl.includes('spread legs');
+    });
+    normalized.unshift('(legs apart:1.4)', '(knees apart:1.3)', '(spread legs:1.25)', 'sitting with legs apart');
+  }
+
+  return normalized;
+};
+
+const normalizeMessagePoses = (poses: string[]) => {
+  const poseList = Array.isArray(poses) ? [...poses] : [];
+  const poseLower = poseList.map((p) => String(p || '').toLowerCase());
+
+  const hasProne = poseLower.some((p) =>
+    p.includes('lying on stomach') ||
+    p.includes('prone') ||
+    p.includes('belly down') ||
+    p.includes('face down') ||
+    p.includes('stomach on')
+  );
+
+  if (!hasProne) {
+    return {
+      poses: poseList,
+      extraNegativePrompt: ''
+    };
+  }
+
+  const removeIfExact = new Set<string>([
+    'lying on back',
+    'supine position',
+    'reclining pose',
+    'reclining',
+    'lying down',
+    'horizontal pose',
+    'laying down pose',
+    'back view'
+  ]);
+
+  const cleaned = poseList.filter((p) => !removeIfExact.has(String(p || '').toLowerCase()));
+  cleaned.unshift('(lying on stomach:1.4)', '(prone position:1.4)', '(face down:1.3)', '(lying face down on bed:1.3)', '(belly on bed:1.2)');
+
+  return {
+    poses: cleaned,
+    extraNegativePrompt: joinAndDedupeTags(
+      'lying on back, on her back, supine position, face up, belly up',
+      'reclining, reclining pose, propped up, sitting up, leaning back, leaning on one arm, leaning on elbows, side-lying, lying on side'
+    )
+  };
+};
+
+const sanitizeForProne = (commaTags: string): string => {
+  const remove = new Set<string>([
+    'lying on back',
+    'supine position',
+    'reclining pose',
+    'reclining',
+    'lying down',
+    'horizontal pose',
+    'laying down pose',
+    'back view'
+  ]);
+  return sanitizeCommaTags(commaTags || '', remove);
 };
 
 const buildHandPoseVariation = (draft: CharacterDraft, settings?: any): string => {
@@ -739,6 +884,9 @@ export const automatic1111API = {
       }
     };
 
+    console.log('[A1111 PAYLOAD] prompt:', prompt);
+    console.log('[A1111 PAYLOAD] negative_prompt:', negativePrompt);
+
     return automatic1111API.generateImageWithPayload(payload, draft, style, model);
   },
 
@@ -747,9 +895,9 @@ export const automatic1111API = {
       const response = await fetch(`${AUTOMATIC1111_URL}/sdapi/v1/txt2img`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
@@ -762,30 +910,27 @@ export const automatic1111API = {
         throw new Error('No images returned from Automatic1111');
       }
 
-      // Upload the generated image to Supabase storage and add to gallery
+      // Capture seed from API response and save it with the image
+      const generatedSeed = result.info ? JSON.parse(result.info).seed : undefined;
+
       const base64Image = result.images[0];
-      const prompt = typeof payload?.prompt === 'string' && payload.prompt.trim().length > 0 ? payload.prompt : buildPrompt(draft, style);
+      const prompt = typeof payload?.prompt === 'string' && payload.prompt.trim().length > 0
+        ? payload.prompt
+        : buildPrompt(draft, style);
+
       const uploadResult = await characterAPI.addCharacterImage(
         draft.id!,
         base64Image,
         prompt,
         model,
-        style
+        style,
+        generatedSeed
       );
 
       if (!uploadResult.success) {
         throw new Error('Failed to add generated image to gallery');
       }
 
-      // Set this image as primary since it's the first generated image
-      if (uploadResult.data?.id) {
-        const primaryResult = await characterAPI.setPrimaryImage(draft.id!, uploadResult.data.id);
-        if (!primaryResult.success) {
-          console.warn('Failed to set image as primary, but image was uploaded successfully');
-        }
-      }
-
-      // Return the new image URL
       return uploadResult.data?.imageUrl || '';
     } catch (error) {
       console.error('Error generating character image:', error);
@@ -793,7 +938,13 @@ export const automatic1111API = {
     }
   },
 
-  async generateMessageImage(character: CharacterDraft, messageContent: string, aspectRatio?: string): Promise<string> {
+  async generateMessageImage(
+    character: CharacterDraft,
+    messageContent: string,
+    aspectRatio?: string,
+    imagePlan?: ImageGenerationPlan,
+    intentMessageContent?: string
+  ): Promise<string> {
     if (!character.generation?.style || !character.generation?.model) {
       throw new Error('Character style and model must be selected before generation');
     }
@@ -806,46 +957,132 @@ export const automatic1111API = {
       console.warn(`Failed to switch to model: ${model}, using current model`);
     }
 
-    // Extract key elements from message content using the centralized configuration
+    const intentText = typeof intentMessageContent === 'string' && intentMessageContent.trim().length > 0
+      ? intentMessageContent
+      : messageContent;
+
     const messageElements = extractMessageElements(messageContent);
-    
-    // Extract emotions, poses, clothing, and environments from the message
-    const emotions = messageElements.emotions;
-    const poses = messageElements.poses;
-    const environments = messageElements.environments;
-    
+    const rawEmotions = imagePlan?.emotions && imagePlan.emotions.length > 0 ? imagePlan.emotions : messageElements.emotions;
+    const rawPosesBase = imagePlan?.poses && imagePlan.poses.length > 0 ? imagePlan.poses : messageElements.poses;
+    const rawPoses = normalizePlannedPoses(rawPosesBase, intentText);
+    const rawEnvironments = imagePlan?.environments && imagePlan.environments.length > 0 ? imagePlan.environments : messageElements.environments;
+    const rawClothing = imagePlan?.clothing && imagePlan.clothing.length > 0 ? imagePlan.clothing : messageElements.clothing;
+    const rawNegative = imagePlan?.negative && imagePlan.negative.length > 0 ? imagePlan.negative : [];
+
+    if (rawPosesBase.join('|') !== rawPoses.join('|')) {
+      console.log('[IMAGE PLAN] normalized poses:', { before: rawPosesBase, after: rawPoses });
+    }
+
+    const normalizedPosesResult = normalizeMessagePoses(rawPoses);
+
+    const fallbackEnvironments = (() => {
+      const env = String(character.appearance?.environment || '').toLowerCase();
+      if (!env) return [] as string[];
+
+      switch (env) {
+        case 'bedroom':
+          return ['in bedroom', 'bedroom setting', 'on bed'];
+        case 'living_room':
+          return ['in living room', 'living room setting'];
+        case 'kitchen':
+          return ['in kitchen', 'kitchen setting'];
+        case 'garden':
+          return ['in garden', 'garden setting'];
+        case 'beach':
+          return ['at beach', 'beach setting'];
+        case 'forest':
+          return ['in forest', 'forest setting'];
+        case 'city_street':
+          return ['city street', 'street setting'];
+        case 'park':
+          return ['in park', 'park setting'];
+        case 'cafe':
+          return ['in cafe', 'cafe setting'];
+        case 'library':
+          return ['in library', 'library setting'];
+        case 'rooftop':
+          return ['on rooftop', 'rooftop setting'];
+        case 'balcony':
+          return ['on balcony', 'balcony setting'];
+        case 'mountain':
+          return ['in mountains', 'mountain setting'];
+        case 'lake':
+          return ['by lake', 'lake setting'];
+        case 'club':
+          return ['in club', 'club setting'];
+        case 'restaurant':
+          return ['in restaurant', 'restaurant setting'];
+        case 'mall':
+          return ['in mall', 'mall setting'];
+        case 'office':
+          return ['in office', 'office setting'];
+        case 'gym':
+          return ['in gym', 'gym setting'];
+        case 'pool':
+          return ['at pool', 'poolside'];
+        default:
+          return [env.replace('_', ' ')];
+      }
+    })();
+
+    const effectiveEnvironments = rawEnvironments.length > 0 ? rawEnvironments : fallbackEnvironments;
+    const hasProne = Boolean(normalizedPosesResult.extraNegativePrompt);
+
+    let poses = normalizedPosesResult.poses;
+    const cameraFromPlan = imagePlan?.camera && imagePlan.camera.length > 0 ? imagePlan.camera : [];
+    if (cameraFromPlan.length > 0) {
+      poses = [...cameraFromPlan, ...poses];
+    } else if (poses.length > 0 && !posesIncludeCameraAngle(poses)) {
+      poses = [pickVariant(MESSAGE_CAMERA_VARIATIONS), ...poses];
+    }
+
     // Handle clothing detection with fallback to character settings
     let clothingPrompt = '';
-    if (messageElements.clothing.length > 0) {
-      clothingPrompt = messageElements.clothing.join(', ');
+    if (rawClothing.length > 0) {
+      clothingPrompt = rawClothing.join(', ');
     } else if (character.appearance?.clothing) {
-      // Use existing clothing settings
       clothingPrompt = character.appearance.clothing;
     }
 
-    // Build custom prompt based on message content
+    // Build custom prompt based on message content - put actions FIRST for more influence
     let customPrompt = '';
-    if (emotions.length > 0) customPrompt += emotions.join(', ') + ', ';
     if (poses.length > 0) customPrompt += poses.join(', ') + ', ';
-    if (environments.length > 0) customPrompt += environments.join(', ') + ', ';
+    if (effectiveEnvironments.length > 0) customPrompt += effectiveEnvironments.join(', ') + ', ';
+    if (rawEmotions.length > 0) customPrompt += rawEmotions.join(', ') + ', ';
     if (clothingPrompt) customPrompt += clothingPrompt + ', ';
-    
-    // Create a modified character draft for this specific message
+
+    console.log(`[PROMPT DEBUG] Custom prompt built: "${customPrompt}"`);
+
+    const varyComposition = poses.length > 0 || effectiveEnvironments.length > 0;
+    const baseSpecialPrompt = hasProne
+      ? sanitizeForProne(character.specialPrompt || '')
+      : (character.specialPrompt || '');
+
     const messageDraft = {
       ...character,
-      specialPrompt: character.specialPrompt ? 
-        `${character.specialPrompt}, ${customPrompt}`.replace(/,\s*$/, '') : 
-        customPrompt.replace(/,\s*$/, '')
+      generation: {
+        ...character.generation,
+        seed: varyComposition ? -1 : character.generation.seed
+      },
+      specialPrompt: customPrompt
+        ? `${customPrompt}${baseSpecialPrompt ? ', ' + baseSpecialPrompt : ''}`.replace(/,\s*$/, '')
+        : baseSpecialPrompt,
+      specialNegativePrompt: joinAndDedupeTags(
+        normalizedPosesResult.extraNegativePrompt,
+        rawNegative.length > 0 ? rawNegative.join(', ') : '',
+        character.specialNegativePrompt || ''
+      )
     };
 
-    // Generate image using the modified draft and add to gallery
+    console.log(`[PROMPT DEBUG] Final specialPrompt: "${messageDraft.specialPrompt}"`);
+
     const payload = this.buildPayloadForMessageImage(messageDraft, style, model, aspectRatio);
     return this.generateImageWithPayload(payload, messageDraft, style, model);
   },
 
   buildPayloadForMessageImage(draft: CharacterDraft, style: CharacterStyle, model: string, aspectRatio?: string): any {
     const finalAspectRatio = aspectRatio || 'portrait';
-    
+
     let prompt = buildPrompt(draft, style);
     let negativePrompt = buildNegativePrompt(draft);
 
@@ -854,6 +1091,16 @@ export const automatic1111API = {
       prompt = `score_9, score_8_up, score_7_up, ${prompt}`;
       negativePrompt = `score_6, score_5, score_4, (worst quality:1.2), (low quality:1.2), (normal quality:1.2), ${negativePrompt}`;
     }
+
+    // Use the seed from the first image in the character's gallery for consistency
+    const seed = typeof draft.generation?.seed === 'number' && Number.isFinite(draft.generation.seed)
+      ? draft.generation.seed
+      : -1;
+    console.log(`[SEED DEBUG] Using seed: ${seed} for character ${draft.id}`);
+    console.log(`[SEED DEBUG] Character generation object:`, draft.generation);
+
+    console.log('[A1111 PAYLOAD] prompt:', prompt);
+    console.log('[A1111 PAYLOAD] negative_prompt:', negativePrompt);
 
     return {
       prompt,
@@ -864,7 +1111,7 @@ export const automatic1111API = {
       cfg_scale: style === CharacterStyle.SPECIAL ? 6 : 8,
       sampler_name: style === CharacterStyle.SPECIAL ? 'Euler a' : 'DPM++ 2M Karras',
       model_name: model,
-      seed: -1,
+      seed,
       override_settings: {
         sd_model_checkpoint: model
       }
@@ -876,9 +1123,9 @@ export const automatic1111API = {
       const response = await fetch(`${AUTOMATIC1111_URL}/sdapi/v1/txt2img`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
@@ -895,7 +1142,7 @@ export const automatic1111API = {
       const base64Image = result.images[0];
       const timestamp = Date.now();
       const imageName = `message-${timestamp}-${Math.random().toString(36).substring(7)}.jpg`;
-      
+
       // Convert base64 to binary data
       const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
       const binaryData = atob(base64Data);
@@ -904,9 +1151,9 @@ export const automatic1111API = {
         bytes[i] = binaryData.charCodeAt(i);
       }
       const blob = new Blob([bytes], { type: 'image/jpeg' });
-      
+
       // Upload to Supabase storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('character-images')
         .upload(imageName, blob, {
           contentType: 'image/jpeg',

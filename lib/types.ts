@@ -261,6 +261,16 @@ export interface CharacterGeneration {
   generatedImage?: string;
   generationStatus?: 'pending' | 'generating' | 'completed' | 'failed';
   images?: CharacterImage[]; // Gallery of images
+  seed?: number; // Seed used for initial character generation to maintain consistency
+}
+
+export interface ImageGenerationPlan {
+  camera?: string[];
+  poses?: string[];
+  emotions?: string[];
+  environments?: string[];
+  clothing?: string[];
+  negative?: string[];
 }
 
 export interface ChatMessage {
@@ -272,6 +282,7 @@ export interface ChatMessage {
   timestamp: Date;
   imageUrl?: string;
   isGeneratingImage?: boolean;
+  imagePlan?: ImageGenerationPlan;
 }
 
 export interface Conversation {

@@ -173,6 +173,7 @@ export const deserializeCharacter = (data: Record<string, any>): CharacterDraft 
       model: data.model,
       generationStatus: 'pending',
       generatedImage: data.generated_image,
+      seed: data.generation_seed || undefined,
     },
     isGalleryOnly: data.is_gallery_only || false,
     userId: data.user_id,

@@ -46,6 +46,20 @@ export const characterService = {
       .single();
 
     if (error) throw error;
+    
+    // Get primary image's seed for consistency
+    const { data: imageData, error: imageError } = await supabase
+      .from('character_images')
+      .select('generation_seed')
+      .eq('character_id', id)
+      .eq('is_primary', true)
+      .limit(1)
+      .single();
+    
+    if (!imageError && imageData?.generation_seed) {
+      data.generation_seed = imageData.generation_seed;
+    }
+    
     return data;
   },
 

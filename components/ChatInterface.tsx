@@ -39,6 +39,65 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
+  const findIntentMessageContent = (messageId: string): string | undefined => {
+    const idx = messages.findIndex((m) => m.id === messageId);
+    if (idx <= 0) return undefined;
+    for (let i = idx - 1; i >= 0; i--) {
+      if (messages[i]?.sender === 'user') return messages[i].content;
+    }
+    return undefined;
+  };
+
+  const applyDetectedClothing = async (clothingTags: string[]) => {
+    console.log('[CLOTHING DETECT] tags:', clothingTags);
+    const lower = clothingTags.map((t) => String(t || '').toLowerCase());
+    const wantsNaked = lower.some((t) => t.includes('nude') || t.includes('naked') || t.includes('no clothes') || t.includes('completely exposed'));
+    const wantsUnderwear = lower.some((t) => t.includes('underwear') || t.includes('bra and panties'));
+    const wantsLingerie = lower.some((t) => t.includes('lingerie'));
+    const wantsRevealing = lower.some((t) => t.includes('revealing'));
+
+    if (wantsNaked) {
+      console.log('[CLOTHING DETECT] mapped style:', ClothingStyle.NAKED);
+      if (currentCharacter.appearance?.clothing !== ClothingStyle.NAKED) {
+        await handleOutfitChange(ClothingStyle.NAKED);
+      }
+      return;
+    }
+
+    if (wantsUnderwear) {
+      console.log('[CLOTHING DETECT] mapped style:', ClothingStyle.UNDERWEAR);
+      if (currentCharacter.appearance?.clothing !== ClothingStyle.UNDERWEAR) {
+        await handleOutfitChange(ClothingStyle.UNDERWEAR);
+      }
+      return;
+    }
+
+    if (wantsLingerie) {
+      console.log('[CLOTHING DETECT] mapped style:', ClothingStyle.LINGERIE);
+      if (currentCharacter.appearance?.clothing !== ClothingStyle.LINGERIE) {
+        await handleOutfitChange(ClothingStyle.LINGERIE);
+      }
+      return;
+    }
+
+    if (wantsRevealing) {
+      console.log('[CLOTHING DETECT] mapped style:', ClothingStyle.REVEALING);
+      if (currentCharacter.appearance?.clothing !== ClothingStyle.REVEALING) {
+        await handleOutfitChange(ClothingStyle.REVEALING);
+      }
+      return;
+    }
+
+    const clothingDescription = clothingTags.join(', ');
+    console.log('[CLOTHING DETECT] mapped style:', ClothingStyle.CUSTOM, 'custom:', clothingDescription);
+    if (
+      currentCharacter.appearance?.clothing !== ClothingStyle.CUSTOM ||
+      (currentCharacter.appearance?.customClothing || '') !== clothingDescription
+    ) {
+      await handleCustomClothing(clothingDescription);
+    }
+  };
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -161,9 +220,19 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
 
       // Check for clothing changes in character response (after message is saved)
       const characterMessageElements = extractMessageElements(llmResponse.content);
-      if (characterMessageElements.clothing.length > 0) {
-        const clothingDescription = characterMessageElements.clothing.join(', ');
-        await handleCustomClothing(clothingDescription);
+      console.log('[CLOTHING DETECT] extracted from character:', characterMessageElements.clothing);
+      const userMessageElements = extractMessageElements(userMessageContent);
+      console.log('[CLOTHING DETECT] extracted from user:', userMessageElements.clothing);
+
+      const effectiveClothing = characterMessageElements.clothing.length > 0
+        ? characterMessageElements.clothing
+        : userMessageElements.clothing;
+      if (effectiveClothing.length > 0) {
+        console.log(
+          '[CLOTHING DETECT] applying from:',
+          characterMessageElements.clothing.length > 0 ? 'character' : 'user'
+        );
+        await applyDetectedClothing(effectiveClothing);
       }
 
       // Handle keywords/triggers from user message (not character response)
@@ -227,7 +296,23 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
     setMessages(prev => prev.map(m => m.id === messageId ? { ...m, imageUrl: undefined, isGeneratingImage: true } : m));
 
     try {
-      const imageUrl = await automatic1111API.generateMessageImage(currentCharacter, content, selectedFormat);
+      let imagePlan;
+      try {
+        const chatContext = messages.slice(-10);
+        imagePlan = await lmStudioService.generateImagePlan(chatContext, currentCharacter);
+        console.log('[IMAGE PLAN] generated:', imagePlan);
+      } catch (e) {
+        console.warn('[IMAGE PLAN] generation failed, falling back to keyword extraction');
+      }
+
+      const intentMessageContent = findIntentMessageContent(messageId);
+      const imageUrl = await automatic1111API.generateMessageImage(
+        currentCharacter,
+        content,
+        selectedFormat,
+        imagePlan,
+        intentMessageContent
+      );
       
       if (imageUrl && imageUrl.length > 0) {
         setMessages(prev => prev.map(m => m.id === messageId ? { ...m, imageUrl, isGeneratingImage: false } : m));
@@ -260,7 +345,23 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
     setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isGeneratingImage: true } : m));
 
     try {
-      const imageUrl = await automatic1111API.generateMessageImage(currentCharacter, content, format);
+      let imagePlan;
+      try {
+        const chatContext = messages.slice(-10);
+        imagePlan = await lmStudioService.generateImagePlan(chatContext, currentCharacter);
+        console.log('[IMAGE PLAN] generated:', imagePlan);
+      } catch (e) {
+        console.warn('[IMAGE PLAN] generation failed, falling back to keyword extraction');
+      }
+
+      const intentMessageContent = findIntentMessageContent(messageId);
+      const imageUrl = await automatic1111API.generateMessageImage(
+        currentCharacter,
+        content,
+        format,
+        imagePlan,
+        intentMessageContent
+      );
       
       if (imageUrl && imageUrl.length > 0) {
         setMessages(prev => prev.map(m => m.id === messageId ? { ...m, imageUrl, isGeneratingImage: false } : m));
@@ -613,7 +714,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
         <div className="flex h-screen bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950 relative">
           {/* Static Character Image - Full Right Side */}
           {currentCharacter.generation?.generatedImage && (
-            <div className="absolute right-0 top-0 z-10 w-full h-[45vh] md:h-[55vh] lg:w-[450px] lg:h-full lg:opacity-100 lg:translate-x-0 opacity-100 translate-x-0 transition-all duration-500 ease-in-out">
+            <div className="absolute right-0 top-0 z-10 w-full h-[35vh] sm:h-[40vh] md:h-[45vh] lg:w-[450px] lg:h-full lg:opacity-100 lg:translate-x-0 opacity-100 translate-x-0 transition-all duration-500 ease-in-out">
               <div className="relative group h-full p-4">
                 <div className="relative h-full overflow-hidden rounded-3xl border-2 border-pink-500/20 shadow-2xl shadow-pink-500/10">
                   <img
@@ -635,9 +736,9 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
           )}
 
           {/* Chat Area - Left Side Only */}
-          <div className="flex-1 flex flex-col bg-gradient-to-b from-dark-900/30 to-dark-800/30 lg:mr-[450px] mr-0 mt-[45vh] md:mt-[55vh] lg:mt-0">
+          <div className="flex-1 flex flex-col bg-gradient-to-b from-dark-900/30 to-dark-800/30 lg:mr-[450px] mr-0 mt-[35vh] sm:mt-[40vh] md:mt-[45vh] lg:mt-0">
             {/* Chat Header */}
-            <div className="px-8 py-6 border-b border-dark-700/50 backdrop-blur-sm">
+            <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 border-b border-dark-700/50 backdrop-blur-sm">
               <div className="flex items-center">
                 <button
                   onClick={onBack}
@@ -656,11 +757,8 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                     <div className="flex flex-col items-center">
                       <h1 className="text-xl font-semibold text-white">{currentCharacter.name || 'Character'}</h1>
                       <div className="text-sm text-pink-400 capitalize">
-  {currentCharacter.characterType === 'special' && currentCharacter.personality?.customSpecialty
-    ? currentCharacter.personality.customSpecialty
-    : currentCharacter.personality?.archetype || 'Mysterious'
-  }
-</div>
+                        {currentCharacter.stylePreset || 'Human'}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -679,7 +777,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
             </div>
 
             {/* Messages Area - Scrollable Only */}
-            <div className="flex-1 overflow-y-auto p-8">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
               <div className="max-w-4xl mx-auto space-y-6">
                 <AnimatePresence>
                   {messages.map((message) => (
@@ -739,7 +837,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
 
                           {/* Generate Image Button for Character Messages */}
                           {message.sender === 'character' && !message.imageUrl && !message.isGeneratingImage && (
-                            <div className="absolute -right-12 top-0 flex items-center">
+                            <div className="absolute -right-8 sm:-right-10 md:-right-12 top-0 flex items-center">
                               <button
                                 onClick={() => handleGenerateMessageImage(message.id, message.content)}
                                 className="p-2 text-pink-400 hover:text-pink-300 opacity-0 group-hover/msg:opacity-100 transition-opacity bg-dark-800/80 rounded-lg backdrop-blur-sm border border-pink-500/20 shadow-xl"
@@ -859,7 +957,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
             </div>
 
             {/* Message Input */}
-            <div className="p-6 border-t border-dark-700/50 backdrop-blur-sm">
+            <div className="p-3 sm:p-4 lg:p-6 border-t border-dark-700/50 backdrop-blur-sm">
               <div className="max-w-4xl mx-auto">
                 {/* Buttons Above Input */}
                 <div className="flex items-center justify-center space-x-3 mb-3">
@@ -989,15 +1087,15 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                   <h3 className="text-xl font-semibold text-pink-300">Regular Outfits</h3>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {[
-                    { id: 'casual', label: 'Casual', image: '/images/clothing-casual.jpg', description: 'Relaxed everyday style - comfortable and approachable look' },
-                    { id: 'formal', label: 'Formal', image: '/images/clothing-formal.jpg', description: 'Classic evening elegance - refined and sophisticated outfit' },
-                    { id: 'sporty', label: 'Sporty', image: '/images/clothing-sporty.jpg', description: 'Active and energetic - athletic vibe with practical details' },
-                    { id: 'elegant', label: 'Elegant', image: '/images/clothing-elegant.jpg', description: 'Timeless sophistication - graceful, polished appearance' },
-                    { id: 'cute', label: 'Cute', image: '/images/clothing-cute.jpg', description: 'Adorable and sweet - charming and playful look' },
-                    { id: 'edgy', label: 'Edgy', image: '/images/clothing-edgy.jpg', description: 'Bold modern style - confident attitude with striking accents' },
-                    { id: 'traditional', label: 'Traditional', image: '/images/clothing-traditional.jpg', description: 'Cultural elegance - rich patterns and traditional details' },
-                    { id: 'fantasy', label: 'Fantasy', image: '/images/clothing-fantasy.jpg', description: 'Magical and dreamy - enchanting fairytale outfit' }
+                  {[ 
+                    { id: 'casual', label: 'Casual', image: '/images/velora.png', description: 'Relaxed everyday style - comfortable and approachable look' },
+                    { id: 'formal', label: 'Formal', image: '/images/velora.png', description: 'Classic evening elegance - refined and sophisticated outfit' },
+                    { id: 'sporty', label: 'Sporty', image: '/images/velora.png', description: 'Active and energetic - athletic vibe with practical details' },
+                    { id: 'elegant', label: 'Elegant', image: '/images/velora.png', description: 'Timeless sophistication - graceful, polished appearance' },
+                    { id: 'cute', label: 'Cute', image: '/images/velora.png', description: 'Adorable and sweet - charming and playful look' },
+                    { id: 'edgy', label: 'Edgy', image: '/images/velora.png', description: 'Bold modern style - confident attitude with striking accents' },
+                    { id: 'traditional', label: 'Traditional', image: '/images/velora.png', description: 'Cultural elegance - rich patterns and traditional details' },
+                    { id: 'fantasy', label: 'Fantasy', image: '/images/velora.png', description: 'Magical and dreamy - enchanting fairytale outfit' }
                   ].map((outfit) => (
                     <motion.button
                       key={outfit.id}
@@ -1048,14 +1146,14 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {[
-                    { id: 'lingerie', label: 'Lingerie', image: '/images/clothing-lingerie.jpg', description: 'Intimate apparel - delicate lace lingerie set for romantic moments' },
-                    { id: 'naked', label: 'Naked', image: '/images/clothing-naked.jpg', description: 'Natural beauty - completely nude, embracing natural form' },
-                    { id: 'bikini', label: 'Bikini', image: '/images/clothing-bikini.jpg', description: 'Beach ready - revealing bikini perfect for sunny days' },
-                    { id: 'underwear', label: 'Underwear', image: '/images/clothing-underwear.jpg', description: 'Intimate wear - sexy underwear set for private moments' },
-                    { id: 'revealing', label: 'Revealing', image: '/images/clothing-revealing.jpg', description: 'Bold style - daring outfit that shows more skin' },
-                    { id: 'bodysuit', label: 'Bodysuit', image: '/images/clothing-bodysuit.jpg', description: 'Form fitting - tight bodysuit that accentuates curves' },
-                    { id: 'crotchless', label: 'Crotchless Panties', image: '/images/clothing-crotchless.jpg', description: 'Extremely explicit - sheer lace panties with fully open crotch, designed for instant access and maximum exposure' },
-                    { id: 'nipple-pasties', label: 'Nipple Pasties', image: '/images/clothing-nipple-pasties.jpg', description: 'tiny pasties over nipples, completely topless otherwise with thong or nothing below for ultimate tease, sheer lace panties' }
+                    { id: 'lingerie', label: 'Lingerie', image: '/images/velora.png', description: 'Intimate apparel - delicate lace lingerie set for romantic moments' },
+                    { id: 'naked', label: 'Naked', image: '/images/velora.png', description: 'Natural beauty - completely nude, embracing natural form' },
+                    { id: 'bikini', label: 'Bikini', image: '/images/velora.png', description: 'Beach ready - revealing bikini perfect for sunny days' },
+                    { id: 'underwear', label: 'Underwear', image: '/images/velora.png', description: 'Intimate wear - sexy underwear set for private moments' },
+                    { id: 'revealing', label: 'Revealing', image: '/images/velora.png', description: 'Bold style - daring outfit that shows more skin' },
+                    { id: 'bodysuit', label: 'Bodysuit', image: '/images/velora.png', description: 'Form fitting - tight bodysuit that accentuates curves' },
+                    { id: 'crotchless', label: 'Crotchless Panties', image: '/images/velora.png', description: 'Extremely explicit - sheer lace panties with fully open crotch, designed for instant access and maximum exposure' },
+                    { id: 'nipple-pasties', label: 'Nipple Pasties', image: '/images/velora.png', description: 'tiny pasties over nipples, completely topless otherwise with thong or nothing below for ultimate tease, sheer lace panties' }
                   ].map((outfit) => (
                     <motion.button
                       key={outfit.id}
