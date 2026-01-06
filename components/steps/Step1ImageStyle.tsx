@@ -9,6 +9,7 @@ import { CHARACTER_CONFIG } from '@/config/character-config';
 
 const styleOptions = [
   { id: CharacterStyle.ANIME, label: 'Anime', description: 'Stylized anime aesthetic' },
+  { id: CharacterStyle.ANIME_ILLUSTRIOUS, label: 'Anime Illustrative', description: 'High-quality anime illustration style' },
   { id: CharacterStyle.REALISTIC, label: 'Realistic', description: 'Photorealistic appearance' },
   { id: CharacterStyle.ARTISTIC, label: 'Artistic', description: 'Artistic and creative style' },
   { id: CharacterStyle.SPECIAL, label: 'Special', description: 'Monster girls and exotic species' },

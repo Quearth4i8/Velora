@@ -7,7 +7,8 @@ import { Navbar } from '@/components/Navbar';
 import { useBlurNSFW } from '@/lib/useBlurNSFW';
 import { useAuth } from '@/context/AuthContext';
 import { profileService } from '@/lib/supabase';
-import { User, Shield, Check, Loader2, AlertCircle, Camera } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import { User, Shield, Check, Loader2, AlertCircle, Camera, Trash2, Database } from 'lucide-react';
 
 export default function SettingsPage() {
   const { blurNSFW, toggleBlurNSFW } = useBlurNSFW();
@@ -17,6 +18,11 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Storage cleanup states
+  const [cleaningStorage, setCleaningStorage] = useState(false);
+  const [cleanupResult, setCleanupResult] = useState<string | null>(null);
+  const [cleanupError, setCleanupError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     full_name: '',
@@ -74,6 +80,76 @@ export default function SettingsPage() {
       setError(err.message || 'Failed to update profile');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleStorageCleanup = async () => {
+    if (!user) return;
+    
+    setCleaningStorage(true);
+    setCleanupResult(null);
+    setCleanupError(null);
+
+    try {
+      // Get all files from the storage bucket
+      const { data: files, error: listError } = await supabase.storage
+        .from('character-images')
+        .list();
+
+      if (listError) {
+        throw new Error(`Failed to list storage files: ${listError.message}`);
+      }
+
+      // Get all image records from the database
+      const { data: dbImages, error: dbError } = await supabase
+        .from('character_images')
+        .select('file_name')
+        .eq('user_id', user.id);
+
+      if (dbError) {
+        throw new Error(`Failed to fetch database records: ${dbError.message}`);
+      }
+
+      // Create a Set of valid file names from the database
+      const validFileNames = new Set(dbImages?.map((img: any) => img.file_name) || []);
+      
+      // Find orphaned files (in bucket but not in database)
+      const orphanedFiles = files?.filter(file => !validFileNames.has(file.name)) || [];
+      
+      if (orphanedFiles.length === 0) {
+        setCleanupResult('No orphaned files found. Storage is already clean.');
+        return;
+      }
+
+      // Delete orphaned files from storage
+      const deletePromises = orphanedFiles.map(async (file) => {
+        const { error } = await supabase.storage
+          .from('character-images')
+          .remove([file.name]);
+        
+        if (error) {
+          console.error(`Failed to delete ${file.name}:`, error);
+          return { file: file.name, success: false, error: error.message };
+        }
+        return { file: file.name, success: true };
+      });
+
+      const results = await Promise.all(deletePromises);
+      const successful = results.filter(r => r.success);
+      const failed = results.filter(r => !r.success);
+
+      if (successful.length > 0) {
+        setCleanupResult(
+          `Cleanup completed! Deleted ${successful.length} orphaned file(s).` +
+          (failed.length > 0 ? ` ${failed.length} file(s) failed to delete.` : '')
+        );
+      } else {
+        setCleanupError(`Failed to delete any files. ${failed.map(f => f.error).join(', ')}`);
+      }
+    } catch (err: any) {
+      setCleanupError(err.message || 'Failed to cleanup storage');
+    } finally {
+      setCleaningStorage(false);
     }
   };
 
@@ -225,6 +301,56 @@ export default function SettingsPage() {
                         className={`inline-block h-5 w-5 transform rounded-full bg-white transition-all duration-300 ${blurNSFW ? 'translate-x-8' : 'translate-x-1'
                           }`}
                       />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Storage Management Section */}
+              <div className="bg-dark-900/50 backdrop-blur-xl border border-white/5 rounded-3xl p-8 shadow-2xl flex-1">
+                <div className="flex items-center gap-4 mb-8">
+                  <div className="p-3 bg-orange-500/10 rounded-2xl text-orange-500">
+                    <Database size={24} />
+                  </div>
+                  <h2 className="text-2xl font-bold text-white">Storage Management</h2>
+                </div>
+
+                <div className="bg-white/5 border border-white/5 rounded-2xl p-6">
+                  <div>
+                    <h3 className="text-white font-bold text-lg mb-2">Clean Up Storage</h3>
+                    <p className="text-dark-400 text-sm mb-4">
+                      Remove orphaned files from storage that are no longer referenced in the database. 
+                      This helps free up space by deleting files that exist in the bucket but not in the character_images table.
+                    </p>
+                    
+                    {cleanupResult && (
+                      <div className="mb-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+                        <p className="text-green-300 text-sm">{cleanupResult}</p>
+                      </div>
+                    )}
+                    
+                    {cleanupError && (
+                      <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                        <p className="text-red-300 text-sm">{cleanupError}</p>
+                      </div>
+                    )}
+
+                    <button
+                      onClick={handleStorageCleanup}
+                      disabled={cleaningStorage}
+                      className="px-6 py-3 bg-orange-500/10 hover:bg-orange-500/20 text-orange-300 font-semibold rounded-2xl transition-all active:scale-[0.95] border border-orange-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      {cleaningStorage ? (
+                        <>
+                          <Loader2 size={18} className="animate-spin" />
+                          Cleaning...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 size={18} />
+                          Clean Storage
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>

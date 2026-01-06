@@ -89,6 +89,22 @@ export const MODEL_SPECIFIC_RESOLUTIONS: Record<string, Partial<Record<AspectRat
     wide: { width: 1152, height: 896 },
     square: { width: 1024, height: 1024 },
   },
+  'prefectIllustriousXL_v3.safetensors': {
+    portrait: { width: 768, height: 1024 },
+    mobile: { width: 832, height: 1216 },
+    landscape: { width: 1024, height: 768 },  // Higher quality: 786,432 pixels instead of 590,208
+    cinematic: { width: 1216, height: 704 },
+    wide: { width: 1024, height: 768 },
+    square: { width: 896, height: 896 },
+  },
+  'waiIllustriousSDXL_v160.safetensors': {
+    portrait: { width: 832, height: 1216 },
+    mobile: { width: 832, height: 1216 },
+    landscape: { width: 1216, height: 832 },
+    cinematic: { width: 1344, height: 768 },
+    wide: { width: 1152, height: 896 },
+    square: { width: 1024, height: 1024 },
+  },
 };
 
 export const MODEL_DEFAULT_SETTINGS: Record<string, { steps: number; cfgScale: number; sampler: string }> = {
@@ -101,6 +117,11 @@ export const MODEL_DEFAULT_SETTINGS: Record<string, { steps: number; cfgScale: n
     steps: 30,
     cfgScale: 5,
     sampler: 'DPM++ 2M Karras',
+  },
+  'waiIllustriousSDXL_v160.safetensors': {
+    steps: 30,
+    cfgScale: 6,
+    sampler: 'Euler a',
   },
 };
 

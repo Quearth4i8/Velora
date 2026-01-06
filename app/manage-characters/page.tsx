@@ -83,7 +83,15 @@ export default function ManageCharactersPage() {
         [Ethnicity.SCANDINAVIAN]: 'Scandinavian',
         [Ethnicity.ITALIAN]: 'Italian',
         [Ethnicity.LEBANESE]: 'Lebanese',
-        [Ethnicity.MIXED_EXOTIC]: 'Mixed / Exotic',
+        [Ethnicity.MIXED_EXOTIC]: 'Mixed Exotic',
+    };
+
+    const styleLabelMap: Record<CharacterStyle, string> = {
+        [CharacterStyle.ANIME]: 'Anime',
+        [CharacterStyle.ANIME_ILLUSTRIOUS]: 'Anime Illustrative',
+        [CharacterStyle.REALISTIC]: 'Realistic',
+        [CharacterStyle.ARTISTIC]: 'Artistic',
+        [CharacterStyle.SPECIAL]: 'Special',
     };
 
     const invalidateCharacterCaches = (characterId?: string) => {
@@ -602,7 +610,7 @@ export default function ManageCharactersPage() {
                                 >
                                     {styleOptions.map((style) => (
                                         <option key={style} value={style}>
-                                            {style}
+                                            {styleLabelMap[style] || style}
                                         </option>
                                     ))}
                                 </select>

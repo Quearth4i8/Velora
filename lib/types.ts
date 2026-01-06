@@ -226,6 +226,7 @@ export interface CharacterDraft {
 
 export enum CharacterStyle {
   ANIME = 'anime',
+  ANIME_ILLUSTRIOUS = 'anime_illustrious',
   REALISTIC = 'realistic',
   ARTISTIC = 'artistic',
   SPECIAL = 'special',
@@ -236,6 +237,7 @@ export enum AIModel {
   ONEOBSESSION = 'oneObsession_v18.safetensors',
   PERFECTDELIBERATE = 'perfectdeliberate_v30.safetensors',
   PREFECT_ILLUSTRIOUS = 'prefectIllustriousXL_v3.safetensors',
+  WAI_ILLUSTRIOUS_SDXL = 'waiIllustriousSDXL_v160.safetensors',
 }
 
 export interface CharacterImage {
@@ -266,6 +268,7 @@ export interface CharacterGeneration {
 
 export interface ImageGenerationPlan {
   camera?: string[];
+  actions?: string[];
   poses?: string[];
   emotions?: string[];
   environments?: string[];

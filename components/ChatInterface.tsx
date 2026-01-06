@@ -5,12 +5,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { CharacterDraft, ChatMessage, ClothingStyle, Environment, Conversation, CharacterStyle } from '@/lib/types';
 import { CharacterGalleryComponent } from './CharacterGallery';
 import { FormatSelector } from './ui/FormatSelector';
+import { TTSButton } from './ui/TTSButton';
 import { useRouter } from 'next/navigation';
 import { characterAPI } from '@/lib/api';
 import { automatic1111API, STYLE_TO_MODEL_MAP } from '@/lib/automatic1111';
 import { lmStudioService } from '@/lib/lmstudio';
 import { AspectRatioId } from '@/config/aspect-ratios';
-import { extractMessageElements } from '@/config/message-actions';
+import { useDialog } from '@/components/ui/DialogProvider';
 
 interface ChatInterfaceProps {
   character: CharacterDraft;
@@ -28,6 +29,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
+  const [isLargeScreen, setIsLargeScreen] = useState(false);
   const [showWardrobe, setShowWardrobe] = useState(false);
   const [showEnvironment, setShowEnvironment] = useState(false);
   const [currentCharacter, setCurrentCharacter] = useState<CharacterDraft>(character);
@@ -37,7 +39,9 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
   const [showFormatSelector, setShowFormatSelector] = useState(false);
   const [pendingGeneration, setPendingGeneration] = useState<{messageId: string, content: string} | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isMountedRef = useRef(true);
   const router = useRouter();
+  const dialog = useDialog();
 
   const findIntentMessageContent = (messageId: string): string | undefined => {
     const idx = messages.findIndex((m) => m.id === messageId);
@@ -48,6 +52,40 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
     return undefined;
   };
 
+  const shouldRunContextExtraction = (text: string): boolean => {
+    const t = String(text || '').toLowerCase();
+    if (!t.trim()) return false;
+
+    // Only run the structured extractor when the user is likely asking for an outfit/location change.
+    // Image generation planning is handled elsewhere.
+
+    // More specific clothing detection to avoid false positives from pose descriptions
+    const clothingKeywords = ['wear', 'outfit', 'dress', 'clothes', 'naked'];
+    const actionKeywords = ['change into', 'put on', 'take off'];
+    
+    // Check if clothing keywords appear in a context suggesting clothing change
+    const hasClothingContext = clothingKeywords.some(keyword => {
+      const index = t.indexOf(keyword);
+      if (index === -1) return false;
+      
+      // Check surrounding context for clothing-related words
+      const before = t.substring(Math.max(0, index - 20), index);
+      const after = t.substring(index + keyword.length, Math.min(t.length, index + keyword.length + 20));
+      
+      return before.includes('want') || before.includes('can you') || before.includes('please') || 
+             before.includes('let\'s') || before.includes('lets') || before.includes('i want') ||
+             after.includes('outfit') || after.includes('dress') || after.includes('clothes');
+    });
+    
+    if (hasClothingContext) return true;
+    if (actionKeywords.some(keyword => t.includes(keyword))) return true;
+
+    if (t.includes('go to') || t.includes('location') || t.includes('environment')) return true;
+    if (t.includes('let\'s go') || t.includes('lets go') || t.includes('take me to') || t.includes('move to')) return true;
+
+    return false;
+  };
+
   const applyDetectedClothing = async (clothingTags: string[]) => {
     console.log('[CLOTHING DETECT] tags:', clothingTags);
     const lower = clothingTags.map((t) => String(t || '').toLowerCase());
@@ -55,6 +93,11 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
     const wantsUnderwear = lower.some((t) => t.includes('underwear') || t.includes('bra and panties'));
     const wantsLingerie = lower.some((t) => t.includes('lingerie'));
     const wantsRevealing = lower.some((t) => t.includes('revealing'));
+
+    const styleValues = Object.values(ClothingStyle) as string[];
+    const explicitStyle = lower
+      .map((t) => t.trim())
+      .find((t) => styleValues.includes(t) && t !== ClothingStyle.CUSTOM);
 
     if (wantsNaked) {
       console.log('[CLOTHING DETECT] mapped style:', ClothingStyle.NAKED);
@@ -88,6 +131,14 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
       return;
     }
 
+    if (explicitStyle) {
+      console.log('[CLOTHING DETECT] mapped style:', explicitStyle);
+      if (currentCharacter.appearance?.clothing !== (explicitStyle as ClothingStyle)) {
+        await handleOutfitChange(explicitStyle as ClothingStyle);
+      }
+      return;
+    }
+
     const clothingDescription = clothingTags.join(', ');
     console.log('[CLOTHING DETECT] mapped style:', ClothingStyle.CUSTOM, 'custom:', clothingDescription);
     if (
@@ -98,6 +149,61 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
     }
   };
 
+  const getImagePlanContextForMessage = (messageId: string, messageContent: string): ChatMessage[] => {
+    const messageIndex = messages.findIndex((m) => m.id === messageId);
+    const targetMessage = messageIndex >= 0 ? messages[messageIndex] : null;
+
+    let previousUserMessage: ChatMessage | null = null;
+    if (messageIndex > 0) {
+      for (let i = messageIndex - 1; i >= 0; i--) {
+        if (messages[i]?.sender === 'user') {
+          previousUserMessage = messages[i];
+          break;
+        }
+      }
+    }
+
+    const context: ChatMessage[] = [];
+    if (previousUserMessage) context.push(previousUserMessage);
+    if (targetMessage) {
+      context.push(targetMessage);
+      return context;
+    }
+
+    context.push({
+      id: `temp-image-plan-${Date.now()}`,
+      conversationId: conversation?.id || 'temp',
+      characterId: currentCharacter.id || 'temp',
+      content: messageContent,
+      sender: 'character',
+      timestamp: new Date()
+    } as any);
+
+    return context;
+  };
+
+  const detectAndApplyClothingFromContext = async (chatContext: ChatMessage[]) => {
+    try {
+      const plan = await lmStudioService.generateImagePlan(chatContext, currentCharacter);
+      const clothing = Array.isArray(plan?.clothing) ? plan.clothing : [];
+      console.log('[CLOTHING DETECT] plan clothing:', clothing);
+      if (clothing.length > 0) {
+        await applyDetectedClothing(clothing);
+      }
+    } catch (e) {
+      console.warn('[CLOTHING DETECT] image plan extraction failed');
+    }
+  };
+
+  const extractDialogueText = (content: string): string => {
+    // Split by thinking patterns and filter out thinking parts
+    const parts = content.split(/(\*[^*]+\*)/);
+    return parts
+      .filter(part => !(part.startsWith('*') && part.endsWith('*'))) // Remove thinking parts
+      .join('') // Join remaining parts
+      .trim(); // Clean up whitespace
+  };
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -105,6 +211,27 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const mql = window.matchMedia('(min-width: 1024px)');
+    const update = () => setIsLargeScreen(mql.matches);
+    update();
+
+    if (mql.addEventListener) {
+      mql.addEventListener('change', update);
+      return () => mql.removeEventListener('change', update);
+    }
+
+    mql.addListener(update);
+    return () => mql.removeListener(update);
+  }, []);
 
   // Close format selector when clicking outside
   useEffect(() => {
@@ -218,21 +345,13 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
         return updatedMessages;
       });
 
-      // Check for clothing changes in character response (after message is saved)
-      const characterMessageElements = extractMessageElements(llmResponse.content);
-      console.log('[CLOTHING DETECT] extracted from character:', characterMessageElements.clothing);
-      const userMessageElements = extractMessageElements(userMessageContent);
-      console.log('[CLOTHING DETECT] extracted from user:', userMessageElements.clothing);
-
-      const effectiveClothing = characterMessageElements.clothing.length > 0
-        ? characterMessageElements.clothing
-        : userMessageElements.clothing;
-      if (effectiveClothing.length > 0) {
-        console.log(
-          '[CLOTHING DETECT] applying from:',
-          characterMessageElements.clothing.length > 0 ? 'character' : 'user'
-        );
-        await applyDetectedClothing(effectiveClothing);
+      // Check for clothing changes using LM Studio structured extraction
+      const lastContext = [...messages, messageForContext].slice(-10);
+      const effectiveContext: ChatMessage[] = savedCharMsg.success
+        ? [...lastContext, { ...(savedCharMsg.data as any), timestamp: new Date(savedCharMsg.data.timestamp) }]
+        : lastContext;
+      if (shouldRunContextExtraction(userMessageContent)) {
+        await detectAndApplyClothingFromContext(effectiveContext);
       }
 
       // Handle keywords/triggers from user message (not character response)
@@ -275,13 +394,21 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
   const handleResetChat = async () => {
     if (!conversation) return;
 
-    if (confirm('Are you sure you want to reset the chat history? This cannot be undone.')) {
-      const result = await characterAPI.resetConversation(conversation.id);
-      if (result.success) {
-        setMessages([]);
-        setConversation(null);
-        await initChat(); // Create a new conversation record
-      }
+    const ok = await dialog.confirm({
+      title: 'Reset chat?',
+      message: 'Are you sure you want to reset the chat history? This cannot be undone.',
+      confirmText: 'Reset',
+      cancelText: 'Cancel',
+      destructive: true,
+    });
+
+    if (!ok) return;
+
+    const result = await characterAPI.resetConversation(conversation.id);
+    if (result.success) {
+      setMessages([]);
+      setConversation(null);
+      await initChat();
     }
   };
 
@@ -298,7 +425,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
     try {
       let imagePlan;
       try {
-        const chatContext = messages.slice(-10);
+        const chatContext = getImagePlanContextForMessage(messageId, content);
         imagePlan = await lmStudioService.generateImagePlan(chatContext, currentCharacter);
         console.log('[IMAGE PLAN] generated:', imagePlan);
       } catch (e) {
@@ -311,25 +438,32 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
         content,
         selectedFormat,
         imagePlan,
-        intentMessageContent
+        intentMessageContent,
+        messageId
       );
       
       if (imageUrl && imageUrl.length > 0) {
-        setMessages(prev => prev.map(m => m.id === messageId ? { ...m, imageUrl, isGeneratingImage: false } : m));
-
-        const updateResult = await characterAPI.updateMessage(messageId, { imageUrl });
-        
-        if (!updateResult.success) {
-          console.error('Failed to save image URL to database:', updateResult.error);
+        if (isMountedRef.current) {
+          setMessages(prev => prev.map(m => m.id === messageId ? { ...m, imageUrl, isGeneratingImage: false } : m));
         }
       } else {
         console.error('No image URL returned from generation');
-        alert('No image was generated. Please check the console for errors.');
+        if (isMountedRef.current) {
+          await dialog.alert({
+            title: 'Error',
+            message: 'No image was generated. Please check the console for errors.',
+          });
+        }
       }
     } catch (error) {
       console.error('Failed to generate message image:', error);
-      alert('Failed to generate image: ' + (error instanceof Error ? error.message : 'Unknown error'));
-      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isGeneratingImage: false } : m));
+      if (isMountedRef.current) {
+        await dialog.alert({
+          title: 'Error',
+          message: 'Failed to generate image: ' + (error instanceof Error ? error.message : 'Unknown error'),
+        });
+        setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isGeneratingImage: false } : m));
+      }
     }
   };
 
@@ -347,7 +481,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
     try {
       let imagePlan;
       try {
-        const chatContext = messages.slice(-10);
+        const chatContext = getImagePlanContextForMessage(messageId, content);
         imagePlan = await lmStudioService.generateImagePlan(chatContext, currentCharacter);
         console.log('[IMAGE PLAN] generated:', imagePlan);
       } catch (e) {
@@ -360,30 +494,45 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
         content,
         format,
         imagePlan,
-        intentMessageContent
+        intentMessageContent,
+        messageId
       );
       
       if (imageUrl && imageUrl.length > 0) {
-        setMessages(prev => prev.map(m => m.id === messageId ? { ...m, imageUrl, isGeneratingImage: false } : m));
-
-        const updateResult = await characterAPI.updateMessage(messageId, { imageUrl });
-        
-        if (!updateResult.success) {
-          console.error('Failed to save image URL to database:', updateResult.error);
+        if (isMountedRef.current) {
+          setMessages(prev => prev.map(m => m.id === messageId ? { ...m, imageUrl, isGeneratingImage: false } : m));
         }
       } else {
         console.error('No image URL returned from generation');
-        alert('No image was generated. Please check the console for errors.');
+        if (isMountedRef.current) {
+          await dialog.alert({
+            title: 'Error',
+            message: 'No image was generated. Please check the console for errors.',
+          });
+        }
       }
     } catch (error) {
       console.error('Failed to generate message image:', error);
-      alert('Failed to generate image: ' + (error instanceof Error ? error.message : 'Unknown error'));
-      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isGeneratingImage: false } : m));
+      if (isMountedRef.current) {
+        await dialog.alert({
+          title: 'Error',
+          message: 'Failed to generate image: ' + (error instanceof Error ? error.message : 'Unknown error'),
+        });
+        setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isGeneratingImage: false } : m));
+      }
     }
   };
 
-  const handleDeleteMessage = async (messageId: string) => {
-    if (!confirm('Are you sure you want to delete this message?')) return;
+  const handleDeleteMessage = async (messageId: string): Promise<boolean> => {
+    const ok = await dialog.confirm({
+      title: 'Delete message?',
+      message: 'Are you sure you want to delete this message? This cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      destructive: true,
+    });
+
+    if (!ok) return false;
     
     console.log('🗑️ Attempting to delete message:', messageId);
     
@@ -425,13 +574,23 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
             });
           }
         }, 500); // Wait 500ms then check
+
+        return true;
       } else {
         console.error('❌ Failed to delete message:', result.error);
-        alert('Failed to delete message: ' + (result.error as string));
+        await dialog.alert({
+          title: 'Error',
+          message: 'Failed to delete message: ' + String(result.error),
+        });
+        return false;
       }
     } catch (error) {
       console.error('❌ Exception during delete:', error);
-      alert('Failed to delete message: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      await dialog.alert({
+        title: 'Error',
+        message: 'Failed to delete message: ' + (error instanceof Error ? error.message : 'Unknown error'),
+      });
+      return false;
     }
   };
 
@@ -442,13 +601,17 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
     const lastUserMessage = previousMessages.reverse().find(m => m.sender === 'user');
     
     if (!lastUserMessage) {
-      alert('Cannot regenerate - no user message found for context');
+      await dialog.alert({
+        title: 'Error',
+        message: 'Cannot regenerate - no user message found for context',
+      });
       return;
     }
 
     try {
       // Delete the old message
-      await handleDeleteMessage(messageId);
+      const deleted = await handleDeleteMessage(messageId);
+      if (!deleted) return;
       
       // Generate a new response
       setIsTyping(true);
@@ -472,7 +635,10 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
       }
     } catch (error) {
       console.error('Failed to regenerate message:', error);
-      alert('Failed to regenerate message');
+      await dialog.alert({
+        title: 'Error',
+        message: error instanceof Error ? error.message : 'Failed to regenerate message',
+      });
     } finally {
       setIsTyping(false);
     }
@@ -713,30 +879,43 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
       ) : (
         <div className="flex h-screen bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950 relative">
           {/* Static Character Image - Full Right Side */}
-          {currentCharacter.generation?.generatedImage && (
-            <div className="absolute right-0 top-0 z-10 w-full h-[35vh] sm:h-[40vh] md:h-[45vh] lg:w-[450px] lg:h-full lg:opacity-100 lg:translate-x-0 opacity-100 translate-x-0 transition-all duration-500 ease-in-out">
-              <div className="relative group h-full p-4">
-                <div className="relative h-full overflow-hidden rounded-3xl border-2 border-pink-500/20 shadow-2xl shadow-pink-500/10">
-                  <img
-                    src={currentCharacter.generation.generatedImage}
-                    alt="Generated Character"
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
-                  <div className="absolute bottom-4 right-4">
-                    <div className="px-4 py-2 bg-black/40 backdrop-blur-md rounded-lg border border-white/20">
-                      <p className="text-white text-lg font-medium">
-                        {currentCharacter.name || 'Unnamed Character'}
-                      </p>
+          <AnimatePresence>
+            {isLargeScreen && currentCharacter.generation?.generatedImage && (
+              <motion.div
+                key="static-character-image"
+                initial={{ opacity: 0, x: 80 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 80 }}
+                transition={{ duration: 0.5, ease: 'easeInOut' }}
+                className="absolute right-0 top-0 z-10 w-[450px] h-full"
+              >
+                <div className="relative group h-full p-4">
+                  <div className="relative h-full overflow-hidden rounded-3xl border-2 border-pink-500/20 shadow-2xl shadow-pink-500/10">
+                    <img
+                      src={currentCharacter.generation.generatedImage}
+                      alt="Generated Character"
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
+                    <div className="absolute top-4 right-4">
+                      <div className="px-4 py-2 bg-black/40 backdrop-blur-md rounded-lg border border-white/20">
+                        <p className="text-white text-lg font-medium">
+                          {currentCharacter.name || 'Unnamed Character'}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          )}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Chat Area - Left Side Only */}
-          <div className="flex-1 flex flex-col bg-gradient-to-b from-dark-900/30 to-dark-800/30 lg:mr-[450px] mr-0 mt-[35vh] sm:mt-[40vh] md:mt-[45vh] lg:mt-0">
+          <div
+            className={`flex-1 flex flex-col bg-gradient-to-b from-dark-900/30 to-dark-800/30 mt-0 transition-[margin] duration-500 ease-in-out ${
+              isLargeScreen ? 'mr-[450px]' : 'mr-0'
+            }`}
+          >
             {/* Chat Header */}
             <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 border-b border-dark-700/50 backdrop-blur-sm">
               <div className="flex items-center">
@@ -809,6 +988,13 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                             
                             {/* Message Controls - Inline with content */}
                             <span className={`inline-flex ${message.sender === 'user' ? 'float-left mr-2' : 'float-right ml-2'} opacity-0 group-hover/msg:opacity-100 transition-opacity`}>
+                              {extractDialogueText(message.content) && (
+                                <TTSButton
+                                  text={extractDialogueText(message.content)}
+                                  className="p-0.5 mr-1 text-pink-400/60 hover:text-pink-300 hover:bg-pink-500/10 rounded transition-all"
+                                  title="Generate voice"
+                                />
+                              )}
                               {/* Regenerate Message */}
                               {message.sender === 'character' && (
                                 <button

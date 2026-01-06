@@ -156,10 +156,7 @@ export const RACE_DEFINITIONS: Record<CharacterStyle, { races: Record<string, Ra
       arachne: {
         label: 'Arachne',
         mainTag: 'arachne',
-        specialPrompt:
-          'arachnecpt, arachne, spider girl, monster girl, arthropod abdomen, (eight legs:1.4), (spider legs:1.35), (no human legs:1.3), detailed carapace, silk threads, upright upper body, hands visible and free, (facing viewer:1.2), (normal orientation:1.2)',
-        specialNegativePrompt:
-          'human legs, human feet, human lower body, bipedal, two legs, standing on two legs, extra human limbs, fused legs, missing spider legs, deformed legs, extra abdomen, asymmetrical body, duplicated torso, hands on ground, all fours, crawling pose, crouching with hands down, kneeling on hands, hands touching floor, on all fours pose, quadruped stance, upside down, inverted, hanging, bottom view, underside view, from below, looking up at camera, head at bottom, feet at top, reversed orientation, flipped',
+        specialPrompt: '',
         loraName: 'arachne.safetensors',
         loraWeight: 1,
       },

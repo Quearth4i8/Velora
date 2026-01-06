@@ -9,7 +9,7 @@ import { CharacterStyle, Ethnicity, Height, Physique, ChestSize, ButtSize, HairS
 import { useBlurNSFW } from '@/lib/useBlurNSFW';
 import { useDialog } from '@/components/ui/DialogProvider';
 import { Eye, Sparkles } from 'lucide-react';
-import { ASPECT_RATIO_OPTIONS, getDimensionsFromAspectRatio } from '@/config/aspect-ratios';
+import { ASPECT_RATIO_OPTIONS, getDimensionsFromAspectRatio, MODEL_DEFAULT_SETTINGS } from '@/config/aspect-ratios';
 
 export default function GalleryPage() {
   const [filter, setFilter] = useState<'all' | 'sfw' | 'nsfw'>('all');
@@ -76,6 +76,8 @@ export default function GalleryPage() {
     const stylePrefixes: Record<CharacterStyle, string> = {
       [CharacterStyle.ANIME]:
         'high quality, best quality, masterpiece, highres, very aesthetic, absurdres, anime art, illustration, clean lineart, vibrant colors',
+      [CharacterStyle.ANIME_ILLUSTRIOUS]:
+        'masterpiece, best quality, amazing quality, absurdres, high quality, best quality, amazing quality, anime art, illustration, clean lineart, vibrant colors',
       [CharacterStyle.REALISTIC]:
         'high quality, best quality, masterpiece, highres, very aesthetic, absurdres, photorealistic, professional photography, high resolution',
       [CharacterStyle.ARTISTIC]:
@@ -121,8 +123,8 @@ export default function GalleryPage() {
         throw new Error('Automatic1111 is not running or not accessible');
       }
 
-      const dimensions = getDimensionsFromAspectRatio(generationSettings.aspectRatio || 'portrait');
       const resolvedModel = automatic1111API.getModelForStyle(generationSettings.style);
+      const dimensions = getDimensionsFromAspectRatio(generationSettings.aspectRatio || 'portrait', resolvedModel);
 
       const finalPrompt = buildSpecialPrompt(specialPrompt, generationSettings.style);
       const finalNegativePrompt = buildSpecialNegativePrompt(specialNegativePrompt);
@@ -266,6 +268,17 @@ export default function GalleryPage() {
     negativePrompt: '',
     seed: -1
   });
+
+  useEffect(() => {
+    const { automatic1111API } = require('@/lib/automatic1111');
+    const model = automatic1111API.getModelForStyle(generationSettings.style);
+    if (model && MODEL_DEFAULT_SETTINGS[model]) {
+      setGenerationSettings(prev => ({
+        ...prev,
+        ...MODEL_DEFAULT_SETTINGS[model]
+      }));
+    }
+  }, [generationSettings.style]);
 
   // Fetch all character images on component mount
   useEffect(() => {
@@ -728,6 +741,7 @@ export default function GalleryPage() {
             >
               <option value={CharacterStyle.REALISTIC}>Realistic</option>
               <option value={CharacterStyle.ANIME}>Anime</option>
+              <option value={CharacterStyle.ANIME_ILLUSTRIOUS}>Anime Illustrative</option>
               <option value={CharacterStyle.ARTISTIC}>Artistic</option>
               <option value={CharacterStyle.SPECIAL}>Special</option>
             </select>
@@ -754,7 +768,9 @@ export default function GalleryPage() {
               className="w-full p-2 text-sm bg-dark-900 text-white rounded-lg border border-dark-700 focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
             >
               {ASPECT_RATIO_OPTIONS.map((option) => {
-                const dims = getDimensionsFromAspectRatio(option.id);
+                const { automatic1111API } = require('@/lib/automatic1111');
+                const selectedModel = automatic1111API.getModelForStyle(generationSettings.style);
+                const dims = getDimensionsFromAspectRatio(option.id, selectedModel);
                 return (
                   <option key={option.id} value={option.id}>
                     {option.label} ({dims.width}x{dims.height})
