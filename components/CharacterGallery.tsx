@@ -32,13 +32,28 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
   const [showGenerationSettingsModal, setShowGenerationSettingsModal] = useState(false);
   const [filter, setFilter] = useState<'all' | 'sfw' | 'nsfw'>('all');
 
+  // Sync editedCharacter when character prop changes
+  useEffect(() => {
+    setEditedCharacter(character);
+  }, [character]);
+
   // Local generation settings
-  const [generationSettings, setGenerationSettings] = useState({
+  const [generationSettings, setGenerationSettings] = useState<{
+    steps: number;
+    cfgScale: number;
+    aspectRatio: string;
+    sampler: string;
+    seed: number;
+    additionalTags?: string;
+    isFuta: boolean;
+  }>({
     steps: 30,
     cfgScale: 6,
     aspectRatio: 'portrait',
     sampler: 'Euler a',
-    seed: -1
+    seed: -1,
+    additionalTags: '',
+    isFuta: false
   });
 
   // Apply default model settings when model changes
@@ -47,7 +62,9 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
     if (model && MODEL_DEFAULT_SETTINGS[model]) {
       setGenerationSettings(prev => ({
         ...prev,
-        ...MODEL_DEFAULT_SETTINGS[model]
+        ...MODEL_DEFAULT_SETTINGS[model],
+        additionalTags: prev.additionalTags || '',
+        isFuta: prev.isFuta || false
       }));
     }
   }, [editedCharacter.generation?.model]);
@@ -779,6 +796,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
         isGenerating={isGenerating}
         disabled={!editedCharacter.generation?.style}
         selectedModel={editedCharacter.generation?.model}
+        characterId={character.id}
       />
 
       {/* Simple Zoom Modal */}

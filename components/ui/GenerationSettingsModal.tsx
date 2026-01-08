@@ -3,6 +3,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ASPECT_RATIO_OPTIONS, getDimensionsFromAspectRatio } from '@/config/aspect-ratios';
+import { characterAPI } from '@/lib/api';
 
 interface GenerationSettings {
   steps: number;
@@ -10,6 +11,8 @@ interface GenerationSettings {
   aspectRatio: string;
   sampler: string;
   seed: number;
+  additionalTags?: string;
+  isFuta: boolean;
 }
 
 interface GenerationSettingsModalProps {
@@ -21,6 +24,7 @@ interface GenerationSettingsModalProps {
   isGenerating: boolean;
   disabled?: boolean;
   selectedModel?: string | null;
+  characterId?: string; // Add characterId to save futanari to character
 }
 
 export function GenerationSettingsModal({
@@ -31,8 +35,27 @@ export function GenerationSettingsModal({
   onGenerate,
   isGenerating,
   disabled = false,
-  selectedModel
+  selectedModel,
+  characterId
 }: GenerationSettingsModalProps) {
+  const handleFutanariToggle = async () => {
+    const newFutaValue = !settings.isFuta;
+    
+    // Update local settings immediately
+    onSettingsChange({ ...settings, isFuta: newFutaValue });
+    
+    // Also save to character if characterId is provided
+    if (characterId) {
+      try {
+        await characterAPI.updateCharacterDirect(characterId, {
+          futanari: newFutaValue
+        });
+      } catch (error) {
+        console.error('Error saving futanari to character:', error);
+      }
+    }
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -127,6 +150,37 @@ export function GenerationSettingsModal({
                   <option value="Euler">Euler</option>
                   <option value="DDIM">DDIM</option>
                 </select>
+              </div>
+
+              {/* Additional Tags */}
+              <div>
+                <label className="text-dark-300 text-sm block mb-2">Additional Tags</label>
+                <textarea
+                  value={settings.additionalTags || ''}
+                  onChange={(e) => onSettingsChange({ ...settings, additionalTags: e.target.value })}
+                  className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white text-sm resize-none"
+                  rows={3}
+                  placeholder="Enter additional tags separated by commas (e.g., detailed, high quality, 4k)..."
+                />
+              </div>
+
+              {/* Futa Toggle */}
+              <div className="flex items-center justify-between">
+                <label className="text-dark-300 text-sm">Futanari Content</label>
+                <button
+                  onClick={handleFutanariToggle}
+                  className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 ${
+                    settings.isFuta
+                      ? 'bg-gradient-to-r from-pink-600 to-pink-500 shadow-lg shadow-pink-500/30'
+                      : 'bg-dark-700'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-lg transition-transform duration-300 ${
+                      settings.isFuta ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
               </div>
 
               {/* Seed */}

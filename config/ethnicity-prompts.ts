@@ -1,5 +1,20 @@
 import { Ethnicity } from '@/lib/types';
 
+export const ETHNICITY_TO_RACE_MAP: Record<Ethnicity, string> = {
+    [Ethnicity.EAST_ASIAN]: 'Asian',
+    [Ethnicity.KOREAN]: 'Asian',
+    [Ethnicity.JAPANESE]: 'Asian',
+    [Ethnicity.BRAZILIAN]: 'Latina',
+    [Ethnicity.COLOMBIAN]: 'Latina',
+    [Ethnicity.LATIN_AMERICAN]: 'Latina',
+    [Ethnicity.RUSSIAN]: 'White',
+    [Ethnicity.UKRAINIAN]: 'White',
+    [Ethnicity.SCANDINAVIAN]: 'White',
+    [Ethnicity.ITALIAN]: 'White',
+    [Ethnicity.LEBANESE]: 'Middle Eastern',
+    [Ethnicity.MIXED_EXOTIC]: 'Mixed',
+};
+
 export const ETHNICITY_PROMPT_MAP: Record<Ethnicity, { adult: string; minor: string }> = {
     [Ethnicity.EAST_ASIAN]: {
         adult: 'east asian, delicate features, youthful glow, k-pop idol vibe, j-pop idol vibe',

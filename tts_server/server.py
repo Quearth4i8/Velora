@@ -86,18 +86,31 @@ async def speak(request: TTSRequest):
     if not text:
         raise HTTPException(status_code=400, detail="Text is required")
     
+    # Limit text length for better performance
+    if len(text) > 200:
+        raise HTTPException(status_code=400, detail="Text too long. Please use shorter text (max 200 characters).")
+    
     try:
+        print(f"🎙️  Generating TTS for: '{text}'")
+        print(f"📁 Reference audio exists: {os.path.exists(audio_prompt_path)}")
+        
         # Generate audio with voice cloning
         if os.path.exists(audio_prompt_path):
+            print("🔄 Using voice cloning...")
             wav = model.generate(text, audio_prompt_path=audio_prompt_path)
         else:
             # Fallback to regular generation if no reference audio
+            print("🔄 Using regular generation (no reference audio)")
             wav = model.generate(text)
+        
+        print("✅ Audio generation complete")
         
         # Convert to bytes
         audio_buffer = io.BytesIO()
         ta.save(audio_buffer, wav, model.sr, format="wav")
         audio_bytes = audio_buffer.getvalue()
+        
+        print(f"📊 Audio size: {len(audio_bytes)} bytes")
         
         return Response(
             content=audio_bytes,

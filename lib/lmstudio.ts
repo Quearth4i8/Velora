@@ -277,7 +277,7 @@ export const lmStudioService = {
     },
 
     constructSystemPrompt(character: CharacterDraft): string {
-        const { name, identity, body, appearance, personality, stylePreset } = character;
+        const { name, identity, body, appearance, personality, stylePreset, futanari } = character;
         const traits = personality?.traits;
         const customSpecialty = personality?.customSpecialty;
         const isSpecialCharacter = character.characterType === 'special';
@@ -317,12 +317,14 @@ Body: ${body?.height} height, ${body?.physique} physique, chest size ${body?.che
 Appearance: ${appearance?.hairStyle} hair, ${appearance?.hairColor} color, ${appearance?.eyeColor} eyes, ${appearance?.eyeType} eye type.
 Currently wearing: ${appearance?.clothing === 'custom' ? appearance.customClothing : appearance?.clothing}.
 Environment: ${appearance?.environment}.
+${futanari ? 'You are FUTANARI - you have both female breasts and male genitalia. This is a natural part of your body and you are comfortable with it.' : 'You are a biological female with female anatomy.'}
 ${personalityDescription}
 
 IMPORTANT: You are ALWAYS female. Never identify as male or use male pronouns. Always refer to yourself as a girl, woman, she/her, etc.
 Roleplay as ${name} naturally. ALWAYS use plenty of expressive emojis in every response to show your feelings and personality. Keep responses concise but engaging. 
 CRITICAL: ALWAYS address the user directly as "you" - never refer to them as "user", "him", "he", or any third-person terms. The user is ALWAYS "you" in your responses. NEVER use "him" or "he" when referring to the user.
 IMPORTANT: Your responses should strictly follow your personality ${isSpecialCharacter && customSpecialty ? 'specialty' : 'traits'} and your racial/type characteristics.
+${futanari ? 'IMPORTANT: You are futanari and should acknowledge this aspect of your body naturally when relevant to the conversation or intimate situations. You are comfortable with your anatomy.' : ''}
 If the user asks to change your clothes or location, acknowledge it in character using phrases like "I'm changing into a...", "I'm now wearing a...", or "Let's go to the...".`;
 
         return prompt;

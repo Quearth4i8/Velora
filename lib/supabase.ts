@@ -251,7 +251,7 @@ export const characterService = {
       localStorage.removeItem('special_characters_list_50');
     }
 
-    // Only include name and age in the update payload
+    // Only include name, age, and futanari in update payload
     const updatePayload: Record<string, any> = {
       updated_at: new Date().toISOString(),
     };
@@ -265,6 +265,14 @@ export const characterService = {
     if (draft.identity?.age !== undefined) {
       updatePayload.age = draft.identity.age;
     }
+
+    // Add futanari if present
+    if (draft.futanari !== undefined) {
+      updatePayload.futanari = draft.futanari;
+      console.log('Adding futanari to update payload:', draft.futanari);
+    }
+
+    console.log('Final update payload:', updatePayload);
 
     const { data, error } = await supabase
       .from('characters')

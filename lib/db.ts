@@ -6,6 +6,7 @@ export const serializeCharacter = (draft: CharacterDraft): Record<string, any> =
   console.log('Identity:', draft.identity);
   console.log('Identity age:', draft.identity?.age);
   console.log('Identity ethnicity:', draft.identity?.ethnicity);
+  console.log('Futanari:', draft.futanari);
 
   // Check if required identity fields exist, but skip for special characters if they are intentional
   // However, validation is good. For special characters, identity might be partial or mock.
@@ -53,6 +54,7 @@ export const serializeCharacter = (draft: CharacterDraft): Record<string, any> =
     model: draft.generation?.model,
     generated_image: draft.generation?.generatedImage,
     is_gallery_only: draft.isGalleryOnly || false,
+    futanari: draft.futanari || false,
     user_id: draft.userId || null,
   };
 
@@ -176,6 +178,7 @@ export const deserializeCharacter = (data: Record<string, any>): CharacterDraft 
       seed: data.generation_seed || undefined,
     },
     isGalleryOnly: data.is_gallery_only || false,
+    futanari: data.futanari || false,
     userId: data.user_id,
     createdAt: data.created_at ? new Date(data.created_at) : undefined,
     updatedAt: data.updated_at ? new Date(data.updated_at) : undefined,

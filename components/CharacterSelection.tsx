@@ -6,6 +6,7 @@ import { characterAPI } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import { automatic1111API } from '@/lib/automatic1111';
 import { CharacterDraft, AgeGroup, Ethnicity, Height, Physique, ChestSize, ButtSize, HairStyle, HairColor, EyeColor, CharacterStyle, AIModel } from '@/lib/types';
+import { ETHNICITY_TO_RACE_MAP } from '@/config/ethnicity-prompts';
 import { PrimaryCTAButton } from '@/components/ui/PrimaryCTAButton';
 import { TraitFilter } from '@/components/ui/TraitFilter';
 import { useDialog } from '@/components/ui/DialogProvider';
@@ -302,13 +303,10 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
                         </h3>
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-white/80">
-                            {character.identity?.ethnicity || 'Unknown'} • {character.identity?.age ? `${character.identity.age} years old` : 'Age not set'}
+                            {character.identity?.ethnicity ? ETHNICITY_TO_RACE_MAP[character.identity.ethnicity] || 'Unknown' : 'Unknown'}
                           </span>
-                          <span className="text-white/60 text-xs capitalize">
-                            {character.generation?.style === 'anime' ? 'Anime' :
-                              character.generation?.style === 'realistic' ? 'Realistic' :
-                                character.generation?.style === 'artistic' ? 'Artistic' :
-                                  'Unknown'}
+                          <span className="text-white/60 text-xs">
+                            {character.identity?.age ? `${character.identity.age} years old` : 'Age not set'}
                           </span>
                         </div>
                       </div>

@@ -62,6 +62,10 @@ export function TTSButton({ text, className, title = 'Generate voice' }: TTSButt
     const trimmed = String(text || '').trim();
     if (!trimmed) return;
 
+    // Truncate long text for better TTS performance
+    const maxLength = 200;
+    const textToSpeak = trimmed.length > maxLength ? trimmed.substring(0, maxLength) + '...' : trimmed;
+
     if (audioUrl) {
       togglePlay();
       return;
@@ -72,7 +76,7 @@ export function TTSButton({ text, className, title = 'Generate voice' }: TTSButt
       const res = await fetch('/api/tts/speak', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: trimmed }),
+        body: JSON.stringify({ text: textToSpeak }),
       });
 
       if (!res.ok) {

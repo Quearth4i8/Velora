@@ -12,7 +12,7 @@ import { Eye, Sparkles } from 'lucide-react';
 import { ASPECT_RATIO_OPTIONS, getDimensionsFromAspectRatio, MODEL_DEFAULT_SETTINGS } from '@/config/aspect-ratios';
 
 export default function GalleryPage() {
-  const [filter, setFilter] = useState<'all' | 'sfw' | 'nsfw'>('all');
+  const [filter, setFilter] = useState<'all' | 'sfw' | 'nsfw' | 'gallery'>('all');
   const [prompt, setPrompt] = useState('');
   const [specialPrompt, setSpecialPrompt] = useState('');
   const [specialNegativePrompt, setSpecialNegativePrompt] = useState('');
@@ -254,6 +254,7 @@ export default function GalleryPage() {
     if (filter === 'all') return true;
     if (filter === 'sfw') return !isNSFWImage(img);
     if (filter === 'nsfw') return isNSFWImage(img);
+    if (filter === 'gallery') return img.isGalleryOnly;
     return true;
   });
 
@@ -376,9 +377,25 @@ export default function GalleryPage() {
     if (!ok) return;
 
     try {
+      // Find the image to get character information
+      const imageToDelete = communityImages.find(img => img.id === imageId);
+      
       const result = await characterAPI.deleteCharacterImageFromGallery(imageId);
 
       if (result.success) {
+        // Check if this was a gallery-only character and if there are no more images
+        if (imageToDelete?.isGalleryOnly && imageToDelete.characterId) {
+          // Check if this was the last image for this character
+          const remainingImages = communityImages.filter(img => 
+            img.characterId === imageToDelete.characterId && img.id !== imageId
+          );
+          
+          if (remainingImages.length === 0) {
+            // This was the last image, delete the character
+            await characterAPI.deleteCharacter(imageToDelete.characterId);
+          }
+        }
+        
         // Refresh the gallery to remove the deleted image
         await fetchAllCharacterImages();
         await dialog.alert({ title: 'Deleted', message: 'Image deleted successfully' });
@@ -975,6 +992,15 @@ export default function GalleryPage() {
                           }`}
                       >
                         SFW
+                      </button>
+                      <button
+                        onClick={() => setFilter('gallery')}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${filter === 'gallery'
+                          ? 'bg-purple-600 text-white'
+                          : 'text-dark-300 hover:text-white hover:bg-dark-700'
+                          }`}
+                      >
+                        Gallery
                       </button>
                       <button
                         onClick={() => setFilter('nsfw')}

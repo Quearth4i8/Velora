@@ -220,6 +220,7 @@ export interface CharacterDraft {
   personality: CharacterPersonality;
   generation: CharacterGeneration;
   isGalleryOnly?: boolean; // Flag to exclude from chat
+  futanari?: boolean; // Futanari content toggle
   createdAt?: Date;
   updatedAt?: Date;
 }

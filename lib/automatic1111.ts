@@ -66,7 +66,7 @@ const joinAndDedupeTags = (...pieces: Array<string | undefined | null | false>):
 const applyModelPromptDefaults = (model: AIModel, prompt: string, negativePrompt: string) => {
   if (model === AIModel.WAI_ILLUSTRIOUS_SDXL) {
     return {
-      prompt: joinAndDedupeTags('masterpiece', 'best quality', 'amazing quality', prompt),
+      prompt: joinAndDedupeTags('masterpiece', 'best quality', 'amazing quality', '1girl', prompt),
       negativePrompt: joinAndDedupeTags('bad quality', 'worst quality', 'worst detail', 'sketch', 'censor', negativePrompt),
     };
   }
@@ -226,7 +226,7 @@ const normalizeLoraNames = (draft: CharacterDraft): string[] => {
   return Array.from(new Set(result));
 };
 
-const buildPrompt = (draft: CharacterDraft, style: CharacterStyle, messageContent?: string): string => {
+const buildPrompt = (draft: CharacterDraft, style: CharacterStyle, settings?: any, messageContent?: string): string => {
   const { identity, body, appearance, personality } = draft;
 
   const stylePrompts = STYLE_PROMPTS;
@@ -237,6 +237,37 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle, messageConten
   const mainTagLower = mainTag?.toLowerCase() || '';
   const specialPromptLower = specialPrompt?.toLowerCase() || '';
   const originalMessageLower = (messageContent || '').toLowerCase();
+
+  // Extract additional tags and futa setting from settings
+  const additionalTags = settings?.additionalTags?.trim() || '';
+  const isFuta = settings?.isFuta || false;
+
+  // Add futa tags if enabled
+  let futaTags = '';
+  if (isFuta) {
+    // Check if clothing is SFW or NSFW
+    const nsfwClothing = [
+      ClothingStyle.LINGERIE,
+      ClothingStyle.NAKED,
+      ClothingStyle.BIKINI,
+      ClothingStyle.UNDERWEAR,
+      ClothingStyle.REVEALING,
+      ClothingStyle.BODYSUIT
+    ];
+    
+    const isNsfwClothing = appearance.clothing && nsfwClothing.includes(appearance.clothing as ClothingStyle);
+    
+    if (isNsfwClothing) {
+      // NSFW clothing - show explicit content
+      futaTags = 'futanari, huge penis, veiny penis, testicles';
+    } else {
+      // SFW clothing - show bulge only
+      futaTags = 'futanari, bulge, crotch bulge, hidden bulge, clothed bulge';
+    }
+  }
+
+  // Combine all tags
+  const allAdditionalTags = [additionalTags, futaTags].filter(tag => tag.trim()).join(', ').trim();
 
   // Check if prompt contains sexual content that should allow male presence
   // Also check if it's a self-action to avoid adding male partner for solo activities
@@ -582,7 +613,8 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle, messageConten
     eyeColorTag,
     eyeTypeTag,
     environmentTag,
-    personalityDescription ? `${personalityDescription} personality` : ''
+    personalityDescription ? `${personalityDescription} personality` : '',
+    allAdditionalTags
   );
 
   return prompt;
@@ -1064,7 +1096,7 @@ const buildHandPoseVariation = (draft: CharacterDraft, settings?: any): string =
 };
 
 const buildPromptWithHandPose = (draft: CharacterDraft, style: CharacterStyle, settings?: any): string => {
-  const prompt = buildPrompt(draft, style);
+  const prompt = buildPrompt(draft, style, settings);
   const handPoseVariation = buildHandPoseVariation(draft, settings);
   return joinAndDedupeTags(prompt, handPoseVariation);
 };
@@ -1447,14 +1479,19 @@ export const automatic1111API = {
         console.error('Failed to attach generated image to message:', lastError);
       }
     }
-
     return imageUrl;
   },
 
   buildPayloadForMessageImage(draft: CharacterDraft, style: CharacterStyle, model: string, aspectRatio?: string, messageContent?: string): any {
     const finalAspectRatio = aspectRatio || 'portrait';
 
-    let prompt = buildPrompt(draft, style, messageContent);
+    // Create settings object with character's futanari status
+    const settings = {
+      isFuta: draft.futanari || false,
+      seed: draft.generation?.seed === undefined || draft.generation?.seed === null || draft.generation?.seed === -1 ? -1 : draft.generation.seed
+    };
+
+    let prompt = buildPrompt(draft, style, settings, messageContent);
     let negativePrompt = buildNegativePrompt(draft, messageContent);
 
     // Apply model-specific score tags
@@ -1494,7 +1531,8 @@ export const automatic1111API = {
       const response = await fetch(`${AUTOMATIC1111_URL}/sdapi/v1/txt2img`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer YOUR_API_KEY' // Add API key to the headers
         },
         body: JSON.stringify(payload)
       });

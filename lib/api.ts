@@ -288,7 +288,8 @@ export const characterAPI = {
           *,
           characters!inner(
             name,
-            user_id
+            user_id,
+            is_gallery_only
           )
         `);
 
@@ -305,7 +306,8 @@ export const characterAPI = {
 
       const images = data?.map((img: any) => ({
         ...this.mapDbImageToCharacterImage(img),
-        characterName: img.characters?.name || 'Unknown'
+        characterName: img.characters?.name || 'Unknown',
+        isGalleryOnly: img.characters?.is_gallery_only || false
       })) || [];
       return { success: true, data: images };
     } catch (error) {
