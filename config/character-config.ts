@@ -36,6 +36,28 @@ export const RACE_SKIN_TONE_OPTIONS: Record<string, string[]> = {
   demon: ['#FFFFFF', '#FF0000', '#DC143C', '#800000', '#800080', '#4B0082', '#2F4F4F', '#000000'],
   succubus: ['#FFFFFF', '#800080', '#4B0082', '#0000FF', '#191970', '#DC143C', '#000000'],
   'goblin-girl': ['#FFFFFF', '#00FF00', '#008000', '#008080', '#2F4F4F', '#A52A2A'],
+  'slime-girl': [
+    '#87CEEB',
+    '#ADD8E6',
+    '#B0E0E6',
+    '#40E0D0',
+    '#00CED1',
+    '#AFEEEE',
+    '#7FFFD4',
+    '#66CDAA',
+    '#20B2AA',
+    '#008B8B',
+    '#00FFFF',
+    '#E0FFFF',
+    '#FF69B4',
+    '#FFB6C1',
+    '#FFC0CB',
+    '#9370DB',
+    '#BA55D3',
+    '#DDA0DD',
+    '#EE82EE',
+    '#DA70D6',
+  ],
 };
 
 export const getSkinToneOptionsForRace = (raceId?: string, mainTag?: string): string[] => {
@@ -263,7 +285,7 @@ export const CHARACTER_CONFIG = {
       id,
       ...def,
     })) as LoraPreset[],
-    [CharacterStyle.ANIME_ILLUSTRIOUS]: Object.entries(RACE_DEFINITIONS[CharacterStyle.ANIME].races).map(([id, def]) => ({
+    [CharacterStyle.ANIME_ILLUSTRIOUS]: Object.entries(RACE_DEFINITIONS[CharacterStyle.SPECIAL].races).map(([id, def]) => ({
       id,
       ...def,
     })) as LoraPreset[],
