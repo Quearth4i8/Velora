@@ -221,7 +221,7 @@ export const RACE_DEFINITIONS: Record<CharacterStyle, { races: Record<string, Ra
         label: 'Slime Girl',
         mainTag: 'slime girl',
         specialPrompt:
-          'slime girl, slime (substance), fully transparent body, uniform translucent slime, consistent transparency throughout body, no opaque patches, entire body made of slime, homogeneous slime texture, (transparent body:1.3), (see-through:1.2), (translucent skin:1.2), blue slime covering entire body, beautiful detailed eyes, perfect symmetrical eyes, clear pupils, sharp eye details, expressive eyes',
+          'slime girl, slime (substance), entire body made of slime, fully transparent slime body, uniform translucent slime, homogeneous slime texture, consistent transparency across entire body, no opaque areas, no solid regions, (no opaque patches:1.3), (transparent slime body:1.35), (see-through slime:1.25), (translucent slime form:1.25), beautiful detailed eyes, perfectly symmetrical eyes, clear defined pupils, sharp iris details, high eye clarity, expressive anime eyes',
         loraName: 'slime_girl.safetensors',
         loraWeight: 1,
       },

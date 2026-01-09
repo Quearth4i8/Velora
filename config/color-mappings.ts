@@ -20,6 +20,7 @@ export const HEX_TO_COLOR_MAP: Record<string, string> = {
     '#dc143c': 'red',
     '#800000': 'maroon',
     '#ff69b4': 'pink',
+    '#9370db': 'medium purple',
     '#00ff00': 'green',
     '#0000ff': 'blue',
     '#ffff00': 'yellow',
@@ -70,5 +71,13 @@ export const HEX_TO_COLOR_MAP: Record<string, string> = {
 };
 
 export const hexToColorName = (hex: string): string => {
-    return HEX_TO_COLOR_MAP[hex.toLowerCase()] || hex;
+    const normalized = typeof hex === 'string' ? hex.trim().toLowerCase() : '';
+    if (!normalized) return '';
+    if (HEX_TO_COLOR_MAP[normalized]) return HEX_TO_COLOR_MAP[normalized];
+
+    // Avoid leaking raw hex strings into prompts (A1111 won't understand them).
+    // Fallback to a generic descriptor.
+    if (/^#[0-9a-f]{6}$/.test(normalized)) return 'colored';
+
+    return normalized;
 };

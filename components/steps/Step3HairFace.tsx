@@ -19,6 +19,44 @@ const hairStyleOptions = [
   { id: HairStyle.BOB, label: 'Bob', image: '/hair/bob hair.jpg' },
 ];
 
+const slimeHairStyleOptions = [
+  {
+    id: HairStyle.LONG,
+    label: 'Classic',
+    image: '/images/velora.png',
+  },
+  {
+    id: HairStyle.STRAIGHT,
+    label: 'Fluid',
+    image: '/images/velora.png',
+  },
+  {
+    id: HairStyle.BANGS,
+    label: 'Tendril',
+    image: '/images/velora.png',
+  },
+  {
+    id: HairStyle.BRAIDS,
+    label: 'Bubble',
+    image: '/images/velora.png',
+  },
+  {
+    id: HairStyle.BUN,
+    label: 'Fully Amorphous',
+    image: '/images/velora.png',
+  },
+  {
+    id: HairStyle.PONYTAIL,
+    label: 'Floating',
+    image: '/images/velora.png',
+  },
+  {
+    id: HairStyle.BOB,
+    label: 'Color-Shift',
+    image: '/images/velora.png',
+  },
+];
+
 const hairColors = [
   { label: 'Black', value: HairColor.BLACK },
   { label: 'Dark Brown', value: HairColor.DARK_BROWN },
@@ -92,6 +130,11 @@ export const Step3HairFace: React.FC = () => {
   const isAnimeStyle = draft.generation?.style === CharacterStyle.ANIME;
   const eyeTypeOptions = isAnimeStyle ? animeEyeTypeOptions : realisticEyeTypeOptions;
 
+  const isSlimePreset =
+    (draft.stylePreset || '').toLowerCase() === 'slime-girl' || (draft.mainTag || '').toLowerCase().includes('slime girl');
+
+  const resolvedHairStyleOptions = isSlimePreset ? slimeHairStyleOptions : hairStyleOptions;
+
   React.useEffect(() => {
     if (!draft.appearance.eyeType) return;
 
@@ -100,6 +143,15 @@ export const Step3HairFace: React.FC = () => {
       setAppearance({ eyeType: null });
     }
   }, [draft.appearance.eyeType, eyeTypeOptions, setAppearance]);
+
+  React.useEffect(() => {
+    if (!draft.appearance.hairStyle) return;
+
+    const allowedHairStyles = new Set(resolvedHairStyleOptions.map((option) => option.id));
+    if (!allowedHairStyles.has(draft.appearance.hairStyle)) {
+      setAppearance({ hairStyle: null });
+    }
+  }, [draft.appearance.hairStyle, resolvedHairStyleOptions, setAppearance]);
 
   const handleHairStyleSelect = (style: HairStyle) => {
     setAppearance({ hairStyle: style });
@@ -132,7 +184,7 @@ export const Step3HairFace: React.FC = () => {
         <h2 className="text-2xl font-bold text-white mb-2">Hair Style</h2>
         <p className="text-dark-400 mb-6">Choose your hair style</p>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-          {hairStyleOptions.map((option) => (
+          {resolvedHairStyleOptions.map((option) => (
             <ImageOptionCard
               key={option.id}
               id={option.id}

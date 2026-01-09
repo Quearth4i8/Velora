@@ -238,6 +238,8 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle, settings?: an
   const specialPromptLower = specialPrompt?.toLowerCase() || '';
   const originalMessageLower = (messageContent || '').toLowerCase();
 
+  const isSlimeGirl = mainTagLower.includes('slime girl') || specialPromptLower.includes('slime girl');
+
   // Extract additional tags and futa setting from settings
   const additionalTags = settings?.additionalTags?.trim() || '';
   const isFuta = settings?.isFuta || false;
@@ -510,6 +512,18 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle, settings?: an
 
   // Appearance characteristics
   const hairStyle = appearance.hairStyle?.toLowerCase() || '';
+
+  const slimeHairStyleMap: Partial<Record<string, string>> = {
+    long: 'slime hair, gelatinous hair, liquid slime hair, hair made of slime',
+    straight: 'dripping slime hair, melting slime hair, viscous liquid hair, slime hair dripping down shoulders',
+    bangs: 'slime tendril hair, pseudopod hair, living slime strands, animated slime hair',
+    braids: 'bubble slime hair, gel blob hair, slime bubble crown, amorphous slime hair',
+    bun: 'amorphous slime head, no defined hair, smooth slime head, featureless slime hair',
+    ponytail: 'floating slime hair, weightless slime hair, levitating gelatinous hair',
+    bob: 'color-shifting slime hair, bioluminescent slime hair, reactive slime hair',
+  };
+
+  const resolvedHairStyleTag = isSlimeGirl ? slimeHairStyleMap[hairStyle] || '' : hairStyle ? `${hairStyle} hairstyle` : '';
   const hairColor = appearance.hairColor?.toLowerCase() || '';
   const eyeColor = appearance.eyeColor?.toLowerCase() || '';
   const eyeType = appearance.eyeType?.toLowerCase() || '';
@@ -518,7 +532,6 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle, settings?: an
 
   // Personality characteristics
   const archetype = personality.archetype?.toLowerCase() || '';
-  
   let personalityDescription = '';
   
   if (isSpecialCharacter && personality.customSpecialty) {
@@ -608,7 +621,7 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle, settings?: an
     physique ? `${physique} body` : '',
     chestSize ? `${chestSize} breasts` : '',
     clothingTag,
-    hairStyle ? `${hairStyle} hairstyle` : '',
+    resolvedHairStyleTag,
     hairColorTag,
     eyeColorTag,
     eyeTypeTag,
