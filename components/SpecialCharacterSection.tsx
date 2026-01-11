@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { motion, useMotionValue, useSpring, animate, useTransform } from 'framer-motion';
 import { characterAPI } from '@/lib/api';
 import { automatic1111API } from '@/lib/automatic1111';
@@ -18,12 +18,15 @@ export function SpecialCharacterSection({ onSelectCharacter }: SpecialCharacterS
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | Error | null>(null);
   const [generatingImages, setGeneratingImages] = useState<Set<string>>(new Set());
+  const [isInteracting, setIsInteracting] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
   const dialog = useDialog();
 
   // Slider Refs & Motion Values
   const containerRef = useRef<HTMLDivElement>(null);
   const cardWidth = 324; // 300px min-width + 24px gap
   const baseWidth = useMemo(() => characters.length * cardWidth, [characters.length]);
+  const currentIndexRef = useRef(0);
 
   // Smooth spring for the scroll position
   const scrollValue = useMotionValue(0);
@@ -97,17 +100,102 @@ export function SpecialCharacterSection({ onSelectCharacter }: SpecialCharacterS
     }
   }, [characters.length]);
 
-  const scroll = (direction: 'left' | 'right') => {
-    const currentX = scrollValue.get();
-    const moveAmount = cardWidth * (window.innerWidth < 768 ? 1 : 2);
-    const targetX = direction === 'left' ? currentX + moveAmount : currentX - moveAmount;
+  const getNormalizedOffset = useCallback(
+    (v: number) => {
+      if (baseWidth === 0) return 0;
+      return ((v % baseWidth) + baseWidth) % baseWidth;
+    },
+    [baseWidth]
+  );
 
-    animate(scrollValue, targetX, {
-      type: "spring",
-      stiffness: 150,
-      damping: 25
-    });
+  const getClosestIndexFromValue = useCallback(
+    (v: number) => {
+      if (characters.length === 0) return 0;
+      const offset = getNormalizedOffset(-v);
+      const approx = Math.round(offset / cardWidth);
+      return ((approx % characters.length) + characters.length) % characters.length;
+    },
+    [cardWidth, characters.length, getNormalizedOffset]
+  );
+
+  const getNearestScrollForIndex = useCallback(
+    (index: number, currentV: number) => {
+      if (characters.length === 0) return 0;
+      const i = ((index % characters.length) + characters.length) % characters.length;
+      const base = -(i * cardWidth);
+      if (baseWidth === 0) return base;
+
+      // There are infinitely many equivalent positions: base - k*baseWidth
+      // Choose the one closest to the current value to prevent visible reversal/jumps.
+      const k = Math.round((base - currentV) / baseWidth);
+      return base - k * baseWidth;
+    },
+    [baseWidth, cardWidth, characters.length]
+  );
+
+  const snapToIndex = useCallback(
+    (index: number, opts?: { instant?: boolean }) => {
+      if (characters.length === 0) return;
+      const nextIndex = ((index % characters.length) + characters.length) % characters.length;
+      currentIndexRef.current = nextIndex;
+      setActiveIndex(nextIndex);
+
+      const currentV = scrollValue.get();
+      const targetX = getNearestScrollForIndex(nextIndex, currentV);
+
+      if (opts?.instant) {
+        scrollValue.set(targetX);
+        return;
+      }
+
+      animate(scrollValue, targetX, {
+        type: 'spring',
+        stiffness: 200,
+        damping: 28,
+      });
+    },
+    [characters.length, getNearestScrollForIndex, scrollValue]
+  );
+
+  const moveBy = useCallback(
+    (delta: number) => {
+      const current = scrollValue.get();
+      const nextIndex = getClosestIndexFromValue(current) + delta;
+      snapToIndex(nextIndex);
+    },
+    [getClosestIndexFromValue, scrollValue, snapToIndex]
+  );
+
+  const scroll = (direction: 'left' | 'right') => {
+    const step = window.innerWidth < 768 ? 1 : 2;
+    moveBy(direction === 'left' ? -step : step);
   };
+
+  useEffect(() => {
+    if (characters.length === 0) return;
+    snapToIndex(0, { instant: true });
+  }, [characters.length, snapToIndex]);
+
+  useEffect(() => {
+    if (characters.length === 0) return;
+    const unsubscribe = scrollValue.on('change', (v) => {
+      const idx = getClosestIndexFromValue(v);
+      currentIndexRef.current = idx;
+      setActiveIndex(idx);
+    });
+    return () => unsubscribe();
+  }, [characters.length, getClosestIndexFromValue, scrollValue]);
+
+  useEffect(() => {
+    if (characters.length === 0) return;
+    if (isInteracting) return;
+
+    const id = window.setInterval(() => {
+      moveBy(1);
+    }, 4500);
+
+    return () => window.clearInterval(id);
+  }, [characters.length, isInteracting, moveBy]);
 
   if (isLoading && characters.length === 0) {
     return (
@@ -139,23 +227,56 @@ export function SpecialCharacterSection({ onSelectCharacter }: SpecialCharacterS
         {/* Navigation Buttons - Hidden on small touch screens, visible on hover */}
         <button
           onClick={() => scroll('left')}
-          className="absolute left-0 top-1/2 -translate-y-1/2 z-30 w-14 h-14 hidden md:flex items-center justify-center bg-dark-900/60 hover:bg-pink-600 border border-white/10 hover:border-pink-500 rounded-full text-white shadow-2xl backdrop-blur-xl transition-all duration-300 opacity-0 group-hover/carousel:opacity-100 -translate-x-6 group-hover/carousel:translate-x-0 hover:scale-110 active:scale-90"
+          aria-label="Previous"
+          className="absolute left-0 top-1/2 -translate-y-1/2 z-30 w-14 h-14 hidden md:flex items-center justify-center bg-dark-900/60 hover:bg-pink-600 border border-white/10 hover:border-pink-500 rounded-full text-white shadow-2xl backdrop-blur-xl transition-all duration-300 opacity-0 group-hover/carousel:opacity-100 -translate-x-6 group-hover/carousel:translate-x-0 hover:scale-110 active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500/70"
         >
           <ChevronLeft className="w-8 h-8" />
         </button>
 
         <button
           onClick={() => scroll('right')}
-          className="absolute right-0 top-1/2 -translate-y-1/2 z-30 w-14 h-14 hidden md:flex items-center justify-center bg-dark-900/60 hover:bg-pink-600 border border-white/10 hover:border-pink-500 rounded-full text-white shadow-2xl backdrop-blur-xl transition-all duration-300 opacity-0 group-hover/carousel:opacity-100 translate-x-6 group-hover/carousel:translate-x-0 hover:scale-110 active:scale-90"
+          aria-label="Next"
+          className="absolute right-0 top-1/2 -translate-y-1/2 z-30 w-14 h-14 hidden md:flex items-center justify-center bg-dark-900/60 hover:bg-pink-600 border border-white/10 hover:border-pink-500 rounded-full text-white shadow-2xl backdrop-blur-xl transition-all duration-300 opacity-0 group-hover/carousel:opacity-100 translate-x-6 group-hover/carousel:translate-x-0 hover:scale-110 active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500/70"
         >
           <ChevronRight className="w-8 h-8" />
         </button>
 
         {/* Carousel Slider */}
-        <div className="relative overflow-visible" ref={containerRef}>
+        <div
+          className="relative overflow-visible focus-visible:outline-none"
+          ref={containerRef}
+          role="region"
+          aria-roledescription="carousel"
+          aria-label="Special personalities"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowLeft') {
+              e.preventDefault();
+              moveBy(-1);
+            }
+            if (e.key === 'ArrowRight') {
+              e.preventDefault();
+              moveBy(1);
+            }
+          }}
+          onMouseEnter={() => setIsInteracting(true)}
+          onMouseLeave={() => setIsInteracting(false)}
+          onFocus={() => setIsInteracting(true)}
+          onBlur={() => setIsInteracting(false)}
+        >
           <motion.div
             className="flex gap-6"
             style={{ x: trackX }}
+            drag="x"
+            dragElastic={0.08}
+            dragMomentum={true}
+            onDragStart={() => setIsInteracting(true)}
+            onDragEnd={() => {
+              setIsInteracting(false);
+              const current = scrollValue.get();
+              const idx = getClosestIndexFromValue(current);
+              snapToIndex(idx);
+            }}
           >
             {loopedCharacters.map((character, index) => (
               <motion.div
@@ -216,6 +337,20 @@ export function SpecialCharacterSection({ onSelectCharacter }: SpecialCharacterS
               </motion.div>
             ))}
           </motion.div>
+
+          {characters.length > 1 && (
+            <div className="mt-8 flex items-center justify-center gap-2" aria-label="Carousel pagination">
+              {characters.map((c, i) => (
+                <button
+                  key={c.id || i}
+                  type="button"
+                  aria-label={`Go to slide ${i + 1}`}
+                  onClick={() => snapToIndex(i)}
+                  className={`h-2.5 rounded-full transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500/70 ${i === activeIndex ? 'w-10 bg-pink-500/80' : 'w-2.5 bg-white/20 hover:bg-white/35'}`}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
