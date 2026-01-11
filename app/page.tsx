@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { CharacterSelection } from '@/components/CharacterSelection';
@@ -9,8 +9,36 @@ import { Navbar } from '@/components/Navbar';
 import { PrimaryCTAButton } from '@/components/ui/PrimaryCTAButton';
 import { SearchBar } from '@/components/ui/SearchBar';
 import { AnimatedBackground } from '@/components/AnimatedBackground';
+import { characterAPI } from '@/lib/api';
+import type { CharacterDraft } from '@/lib/types';
 
 export default function Home() {
+  const [allCharacters, setAllCharacters] = useState<CharacterDraft[]>([]);
+
+  useEffect(() => {
+    const load = async () => {
+      const [custom, special] = await Promise.all([
+        characterAPI.getCharacters(),
+        characterAPI.getSpecialCharacters(),
+      ]);
+
+      const next: CharacterDraft[] = [];
+      if (custom.success && Array.isArray(custom.data)) next.push(...custom.data);
+      if (special.success && Array.isArray(special.data)) next.push(...special.data);
+      setAllCharacters(next);
+    };
+
+    load();
+  }, []);
+
+  const charactersById = useMemo(() => {
+    const map = new Map<string, CharacterDraft>();
+    for (const c of allCharacters) {
+      if (c?.id) map.set(c.id, c);
+    }
+    return map;
+  }, [allCharacters]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950 relative">
       <AnimatedBackground />
@@ -115,6 +143,15 @@ export default function Home() {
             <SearchBar 
               onSearch={(query) => {
                 console.log('Searching for:', query);
+              }}
+              characters={Array.from(charactersById.values())}
+              onSelectResult={(character) => {
+                if (!character?.id) return;
+                if (character.characterType === 'special') {
+                  window.location.href = `/special/${character.id}`;
+                } else {
+                  window.location.href = `/${character.id}`;
+                }
               }}
             />
           </motion.div>
