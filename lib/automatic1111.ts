@@ -239,7 +239,11 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle, settings?: an
   const originalMessageLower = (messageContent || '').toLowerCase();
 
   const isSlimeGirl = mainTagLower.includes('slime girl') || specialPromptLower.includes('slime girl');
-
+  const isCentaur =
+    mainTagLower.includes('centaur') ||
+    specialPromptLower.includes('centaur') ||
+    mainTagLower.includes('taur') ||
+    specialPromptLower.includes('taur');
   // Extract additional tags and futa setting from settings
   const additionalTags = settings?.additionalTags?.trim() || '';
   const isFuta = settings?.isFuta || false;
@@ -259,12 +263,22 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle, settings?: an
     
     const isNsfwClothing = appearance.clothing && nsfwClothing.includes(appearance.clothing as ClothingStyle);
     
-    if (isNsfwClothing) {
-      // NSFW clothing - show explicit content
-      futaTags = 'futanari, huge penis, veiny penis, testicles';
+    if (isCentaur) {
+      if (isNsfwClothing) {
+        // NSFW clothing - show explicit equine genitalia
+        futaTags = 'futanari, equine genitalia, horse penis, sheath';
+      } else {
+        // SFW clothing - show equine bulge/sheath
+        futaTags = 'futanari, equine bulge, horse sheath, clothed equine genitalia';
+      }
     } else {
-      // SFW clothing - show bulge only
-      futaTags = 'futanari, bulge, crotch bulge, hidden bulge, clothed bulge';
+      if (isNsfwClothing) {
+        // NSFW clothing - show explicit content
+        futaTags = 'futanari, huge penis, veiny penis, testicles';
+      } else {
+        // SFW clothing - show bulge only
+        futaTags = 'futanari, bulge, crotch bulge, hidden bulge, clothed bulge';
+      }
     }
   }
 
@@ -283,66 +297,31 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle, settings?: an
       originalMessageLower.includes('oral') ||
       originalMessageLower.includes('suck'));
 
-  const isSelfAction = 
+  const isSelfAction =
     mainTagLower.includes('her own') ||
     mainTagLower.includes('herself') ||
-    (mainTagLower.includes('takes') && mainTagLower.includes('penis') && (mainTagLower.includes('her') || mainTagLower.includes('his')) && mainTagLower.includes('into her mouth')) ||
-    // Detect futanari self-oral actions - check both mainTag and specialPrompt
-    ((mainTagLower.includes('futanari') || specialPromptLower.includes('futanari')) && (mainTagLower.includes('blowjob') || mainTagLower.includes('deepthroat') || mainTagLower.includes('oral') || specialPromptLower.includes('blowjob') || specialPromptLower.includes('deepthroat') || specialPromptLower.includes('oral'))) ||
-    // Detect solo sexual actions that imply self-pleasure
-    (mainTagLower.includes('solo') && (mainTagLower.includes('blowjob') || mainTagLower.includes('deepthroat') || mainTagLower.includes('oral') || mainTagLower.includes('sucking'))) ||
+    (mainTagLower.includes('takes') &&
+      mainTagLower.includes('penis') &&
+      (mainTagLower.includes('her') || mainTagLower.includes('his')) &&
+      mainTagLower.includes('into her mouth')) ||
+    ((mainTagLower.includes('futanari') || specialPromptLower.includes('futanari')) &&
+      (mainTagLower.includes('blowjob') ||
+        mainTagLower.includes('deepthroat') ||
+        mainTagLower.includes('oral') ||
+        specialPromptLower.includes('blowjob') ||
+        specialPromptLower.includes('deepthroat') ||
+        specialPromptLower.includes('oral'))) ||
+    (mainTagLower.includes('solo') &&
+      (mainTagLower.includes('blowjob') ||
+        mainTagLower.includes('deepthroat') ||
+        mainTagLower.includes('oral') ||
+        mainTagLower.includes('sucking'))) ||
     isSelfActionFromMessage;
-
-  const isFutanariFromAny =
-    mainTagLower.includes('futanari') ||
-    specialPromptLower.includes('futanari') ||
-    originalMessageLower.includes('futanari');
-
-  const isOralFromAny =
-    mainTagLower.includes('blowjob') ||
-    mainTagLower.includes('deepthroat') ||
-    mainTagLower.includes('oral') ||
-    specialPromptLower.includes('blowjob') ||
-    specialPromptLower.includes('deepthroat') ||
-    specialPromptLower.includes('oral') ||
-    originalMessageLower.includes('blowjob') ||
-    originalMessageLower.includes('deepthroat') ||
-    originalMessageLower.includes('oral') ||
-    originalMessageLower.includes('suck');
-
-  const isFutanariSelfOral = isFutanariFromAny && isOralFromAny;
-
-  if (isSelfAction && isFutanariSelfOral) {
-    const selfOralStrongPose =
-      'autofellatio, self oral, penis in mouth, mouth on penis, oral sex, curled body, extreme backbend, flexibility, contortion, head between legs, face near crotch, 1girl, solo';
-
-    if (mainTagLower.includes('blowjob')) {
-      mainTag = mainTag?.replace(/\bblowjob\b/gi, 'autofellatio, self oral, penis in mouth');
-    }
-    if (mainTagLower.includes('deepthroat')) {
-      mainTag = mainTag?.replace(/\bdeepthroat\b/gi, 'deepthroat, penis in mouth');
-    }
-    if (specialPromptLower.includes('blowjob')) {
-      specialPrompt = specialPrompt.replace(/\bblowjob\b/gi, 'autofellatio, self oral, penis in mouth');
-    }
-    if (specialPromptLower.includes('deepthroat')) {
-      specialPrompt = specialPrompt.replace(/\bdeepthroat\b/gi, 'deepthroat, penis in mouth');
-    }
-
-    if (mainTagLower.includes('bent over')) {
-      mainTag = mainTag?.replace(/\bbent over\b/gi, 'curled body, head between legs, face near crotch');
-    }
-    if (specialPromptLower.includes('bent over')) {
-      specialPrompt = specialPrompt.replace(/\bbent over\b/gi, 'curled body, head between legs, face near crotch');
-    }
-
-    mainTag = mainTag ? `${mainTag}, ${selfOralStrongPose}` : selfOralStrongPose;
-  }
 
   const mainTagAfterLower = mainTag?.toLowerCase() || '';
   const specialPromptAfterLower = specialPrompt?.toLowerCase() || '';
 
-  const hasSexualContent = 
+  const hasSexualContent =
     mainTagAfterLower.includes('oral sex') ||
     mainTagAfterLower.includes('sex') ||
     mainTagAfterLower.includes('intercourse') ||
@@ -454,8 +433,6 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle, settings?: an
     specialPromptLower.includes('kinky') ||
     specialPromptLower.includes('fetish');
 
-  const isCentaur =
-    mainTagLower.includes('centaur') || specialPromptLower.includes('centaur') || mainTagLower.includes('taur') || specialPromptLower.includes('taur');
   const isDemonish =
     mainTagLower.includes('demon') ||
     mainTagLower.includes('succubus') ||
@@ -672,7 +649,6 @@ const buildNegativePrompt = (draft?: CharacterDraft, messageContent?: string): s
     mainTagSexual.includes('doggy style') ||
     mainTagSexual.includes('missionary') ||
     mainTagSexual.includes('cowgirl') ||
-    mainTagSexual.includes('reverse cowgirl') ||
     mainTagSexual.includes('riding') ||
     mainTagSexual.includes('cock') ||
     mainTagSexual.includes('dick') ||
@@ -875,6 +851,8 @@ const buildNegativePrompt = (draft?: CharacterDraft, messageContent?: string): s
   const isArachne = hasPromptToken(mainTag, 'arachnecpt') || hasPromptToken(specialPrompt, 'arachnecpt');
   const hasNonHumanLegs = isCentaur || isLamia || isHarpy || isSlimeGirl;
 
+  const isFuta = mainTag.includes('futanari') || specialPrompt.includes('futanari');
+
   if (hasNonHumanLegs) {
     extraNegativePrompts.push('missing lower body');
   }
@@ -890,6 +868,12 @@ const buildNegativePrompt = (draft?: CharacterDraft, messageContent?: string): s
   if (isCentaur) {
     extraNegativePrompts.push(
       'bipedal, human legs, human lower body, only two legs, two-legged centaur, missing hind legs, missing horse legs'
+    );
+  }
+
+  if (isCentaur && isFuta) {
+    extraNegativePrompts.push(
+      'human penis, penis on human body, penis on torso, crotch penis, human genitalia, genitalia on human upper body'
     );
   }
 
