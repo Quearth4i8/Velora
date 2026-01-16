@@ -80,7 +80,29 @@ type TentaclesPresetId =
   | 'egg_birth'
   | 'monster_birth'
   | 'mouth_play'
-  | 'impregnation';
+  | 'impregnation'
+  // New extreme tentacle presets
+  | 'huge_tentacles'
+  | 'veiny_tentacles'
+  | 'glowing_tentacles'
+  | 'knotty_tentacles'
+  | 'extreme_restraint'
+  | 'suspended_air'
+  | 'spread_arms_legs'
+  | 'arms_behind_back'
+  | 'tentacle_pit'
+  | 'magic_circle'
+  | 'background_tentacles'
+  | 'extreme_intensity'
+  | 'breast_manipulation'
+  | 'breast_fluids'
+  | 'extreme_nipple_play'
+  | 'extreme_throat'
+  | 'emotional_distress'
+  | 'extreme_cumshot'
+  | 'open_breasts'
+  | 'tentacle_penetration'
+  | 'bdsm_tentacles';
 
 type PresetCategoryId =
   | 'pose_restraint'
@@ -101,11 +123,11 @@ type XRayPartId =
   | 'ass_anal';
 
 const XRAY_PARTS: Array<{ id: XRayPartId; label: string; prompt: string }> = [
-  { id: 'breasts', label: 'Breasts', prompt: 'x-ray, transparent skin, visible breasts, internal view' },
-  { id: 'nipples', label: 'Nipples', prompt: 'x-ray, transparent skin, nipples cross-section, internal view' },
-  { id: 'belly_womb', label: 'Belly / Womb', prompt: 'x-ray, transparent skin, womb visible, belly internal view' },
-  { id: 'mouth_throat', label: 'Mouth / Throat', prompt: 'x-ray, transparent skin, throat view, mouth interior' },
-  { id: 'ass_anal', label: 'Ass / Anal', prompt: 'x-ray, transparent skin, pelvis internal view, anal internal view' },
+  { id: 'breasts', label: 'Breasts', prompt: 'breast x-ray, transparent skin, visible breasts, internal view' },
+  { id: 'nipples', label: 'Nipples', prompt: 'nipple x-ray, transparent skin, nipples cross-section, internal view' },
+  { id: 'belly_womb', label: 'Belly / Womb', prompt: 'womb x-ray, transparent skin, womb visible, belly internal view, uterus, reproductive organs' },
+  { id: 'mouth_throat', label: 'Mouth / Throat', prompt: 'throat x-ray, transparent skin, throat view, mouth interior, esophagus visible, tongue visible, oral cavity' },
+  { id: 'ass_anal', label: 'Ass / Anal', prompt: 'anal x-ray, transparent skin, pelvis internal view, anal internal view, rectum' },
 ];
 
 const PRESET_CATEGORIES: PresetCategory[] = [
@@ -168,6 +190,29 @@ const TENTACLES_PRESETS: Array<{ id: TentaclesPresetId; label: string; prompt: s
   { id: 'monster_birth', label: 'Monster Birth', prompt: 'monster birth, birthing scene, creature emerging, wet birth fluids', category: 'explicit' },
   { id: 'mouth_play', label: 'Mouth Play', prompt: 'open mouth, tentacle near mouth, saliva strings', category: 'explicit' },
   { id: 'impregnation', label: 'Impregnation', prompt: 'impregnation, breeding, tentacles filling womb, swollen belly', category: 'explicit' },
+
+  // New extreme tentacle presets
+  { id: 'huge_tentacles', label: 'Huge Tentacles', prompt: 'huge tentacle, massive tentacles, giant tentacles, enormous tentacles', category: 'tentacle_behavior' },
+  { id: 'veiny_tentacles', label: 'Veiny Tentacles', prompt: 'veins tentacle, veiny tentacles, throbbing veins, vascular tentacles', category: 'tentacle_behavior' },
+  { id: 'glowing_tentacles', label: 'Glowing Tentacles', prompt: 'glowing tentacles, bioluminescent tentacles, radiant tentacles, ethereal glow', category: 'tentacle_behavior' },
+  { id: 'knotty_tentacles', label: 'Knotty Tentacles', prompt: 'knotty tentacles, knotted tentacles, textured surface, bumpy tentacles', category: 'tentacle_behavior' },
+  { id: 'extreme_restraint', label: 'Extreme Restraint', prompt: 'restrained by tentacles, arms restrained by tentacles, restrained_tentacles, tight bondage', category: 'pose_restraint' },
+  { id: 'suspended_air', label: 'Suspended in Air', prompt: 'suspended in air, suspension, floating, levitating, hanging by tentacles', category: 'pose_restraint' },
+  { id: 'spread_arms_legs', label: 'Spread Arms & Legs', prompt: 'spread arms, outstretched arms, spread legs, forced spread position', category: 'pose_restraint' },
+  { id: 'arms_behind_back', label: 'Arms Behind Back', prompt: 'arms behind back, reverse prayer position, restrained arms', category: 'pose_restraint' },
+  { id: 'tentacle_pit', label: 'Tentacle Pit', prompt: 'tentacle pit, pit full of tentacles, surrounded by tentacles, tentacle nest', category: 'atmosphere' },
+  { id: 'magic_circle', label: 'Magic Circle', prompt: 'magic circle, ritual circle, glowing runes, summoning circle, mystical symbols', category: 'atmosphere' },
+  { id: 'background_tentacles', label: 'Background Tentacles', prompt: 'background fill tentacle, tentacle background, surrounded by tentacles, tentacle environment', category: 'atmosphere' },
+  { id: 'extreme_intensity', label: 'Extreme Intensity', prompt: 'extremely, extreme intensity, hardcore, brutal, intense', category: 'details' },
+  { id: 'breast_manipulation', label: 'Breast Manipulation', prompt: 'grabbing breasts, squeezing breasts, bloated breasts, breast manipulation', category: 'explicit' },
+  { id: 'breast_fluids', label: 'Breast Fluids', prompt: 'breasts dripping, nipples dripping, breast fluids, nipple fluids', category: 'explicit' },
+  { id: 'extreme_nipple_play', label: 'Extreme Nipple Play', prompt: 'nipplepen, nipple penetration, nipple insertion, extreme nipple play', category: 'explicit' },
+  { id: 'extreme_throat', label: 'Extreme Throat', prompt: 'extreme deep throat, mouth bulge, throat bulge, esophagus bulge', category: 'explicit' },
+  { id: 'emotional_distress', label: 'Emotional Distress', prompt: 'look of fear, tears, runny nose, drool, crying, distressed expression', category: 'details' },
+  { id: 'extreme_cumshot', label: 'Extreme Cumshot', prompt: 'bukkake, facial, excessive cum, cum in mouth, cum drip, cum over, cum in pussy', category: 'explicit' },
+  { id: 'open_breasts', label: 'Open Breasts', prompt: 'open breasts, exposed breasts, breast exposure, chest exposure', category: 'explicit' },
+  { id: 'tentacle_penetration', label: 'Tentacle Penetration', prompt: 'tentacle sex, vaginal penetration, double penetration, tentacle fuck, tentacle insertation', category: 'explicit' },
+  { id: 'bdsm_tentacles', label: 'BDSM Tentacles', prompt: 'bdsm, tentacle bdsm, bondage, submission, domination, power play', category: 'explicit' },
 ];
 
 function toPresetMap(list: typeof TENTACLES_PRESETS) {
@@ -295,12 +340,12 @@ export default function TentaclesPage() {
       .filter(Boolean);
 
     // Dedupe base tags that appear on every part
-    const baseTags = new Set(['x-ray', 'transparent skin']);
+    const baseTags = new Set(['transparent skin']);
     const unique = Array.from(new Set(partTags));
     const deduped = unique.filter((tag) => !baseTags.has(tag));
 
-    // Build final clause: x-ray, transparent skin, [unique part tags...]
-    const final = ['x-ray', 'transparent skin', ...deduped].join(', ');
+    // Build final clause: [specific x-ray types], transparent skin, [unique part tags...]
+    const final = [...deduped].join(', ');
     return final;
   }, [selectedXRayParts]);
 
@@ -683,8 +728,8 @@ export default function TentaclesPage() {
         action:
           composedAction ||
           `${toolConfigLocal?.promptBase || ''} ${selectedCharacter.name}, Intensity: ${blended}/100 (${intensityText}), ${consentText}`,
-        loraName: 'tentacle.safetensors',
-        loraWeight: 1,
+        loraName: 'extreme_tentacles',
+        loraWeight: 0.7,
       });
 
       const res = await automatic1111API.generateDirectImage({
@@ -741,8 +786,8 @@ export default function TentaclesPage() {
     const { prompt, negative_prompt } = buildTentaclesPrompts({
       character: selectedCharacter,
       action: composedAction,
-      loraName: 'tentacle.safetensors',
-      loraWeight: 1,
+      loraName: 'extreme_tentacles',
+      loraWeight: 0.7,
     });
 
     setIsGenerating(true);
@@ -778,15 +823,26 @@ export default function TentaclesPage() {
           });
 
       if (res && res.length > 0) {
-        await characterAPI.addCharacterImage(
-          selectedId,
-          res,
-          prompt,
-          selectedCharacter.generation?.model ? String(selectedCharacter.generation.model) : undefined,
-          selectedCharacter.generation?.style || undefined
-        );
-        await loadCharacterImages();
-        setToast(useHires ? 'Hi-res image generated' : 'Image generated');
+        // Use the same approach as CharacterGallery - pass base64 directly to addCharacterImage
+        try {
+          const uploadResult = await characterAPI.addCharacterImage(
+            selectedId,
+            res, // Pass base64 directly, not URL
+            prompt,
+            selectedCharacter.generation?.model ? String(selectedCharacter.generation.model) : undefined,
+            selectedCharacter.generation?.style || undefined
+          );
+          
+          if (uploadResult.success) {
+            await loadCharacterImages();
+            setToast(useHires ? 'Hi-res image generated' : 'Image generated');
+          } else {
+            throw new Error(uploadResult.error);
+          }
+        } catch (uploadError) {
+          console.error('Failed to save generated image:', uploadError);
+          setToast(useHires ? 'Hi-res image generated but failed to save' : 'Image generated but failed to save');
+        }
       }
     } catch {
       setToast('Generation failed');

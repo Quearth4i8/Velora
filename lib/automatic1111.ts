@@ -30,6 +30,7 @@ import {
 } from '@/config/clothing-prompts';
 
 const AUTOMATIC1111_URL = process.env.AUTOMATIC1111_URL || 'http://127.0.0.1:7860';
+const AUTOMATIC1111_PROXY_URL = '/api/automatic1111/txt2img';
 
 export const STYLE_TO_MODEL_MAP: Record<CharacterStyle, AIModel> = {
   [CharacterStyle.ANIME]: AIModel.PREFECT_ILLUSTRIOUS,
@@ -61,6 +62,119 @@ const joinAndDedupeTags = (...pieces: Array<string | undefined | null | false>):
     .filter((piece): piece is string => typeof piece === 'string' && piece.trim().length > 0)
     .join(', ');
   return dedupeCommaTags(joined);
+};
+
+const ensureSoloPromptTags = (input: string): string => {
+  const base = String(input || '').trim();
+  if (!base) return 'solo';
+
+  const mustIncludeLower = ['solo', '1girl', 'single character'];
+  const parts = base
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean);
+  const lower = parts.map((p) => p.toLowerCase());
+
+  for (const tag of mustIncludeLower) {
+    if (!lower.includes(tag)) {
+      parts.unshift(tag);
+      lower.unshift(tag);
+    }
+  }
+  return dedupeCommaTags(parts.join(', '));
+};
+
+const detectOralSexIntentFromMessage = (messageContent?: string) => {
+  const t = String(messageContent || '').toLowerCase();
+  const mentionsCock = t.includes('cock') || t.includes('dick') || t.includes('penis');
+  const mentionsOral =
+    t.includes('blowjob') ||
+    t.includes('deepthroat') ||
+    t.includes('suck') ||
+    t.includes('sucking') ||
+    t.includes('lick') ||
+    t.includes('licking') ||
+    t.includes('oral');
+  const explicitOral = mentionsCock && mentionsOral;
+  return {
+    explicitOral,
+    mentionsCock,
+  };
+};
+
+const ensureNoMultiSubjectNegativeTags = (input: string): string => {
+  return joinAndDedupeTags(
+    input,
+    'multiple girls',
+    '2girls',
+    'two girls',
+    '3girls',
+    'three girls',
+    'group',
+    'threesome',
+    'orgy',
+    'multiple people',
+    'extra person',
+    'duplicate',
+    'duplicates'
+  );
+};
+
+const shouldAllowSexActTagsFromCurrentText = (messageContent?: string): boolean => {
+  const t = String(messageContent || '').toLowerCase();
+  if (!t) return false;
+
+  // Only allow explicit sex-act tags if the current message explicitly contains them.
+  // This avoids “jumping ahead” based on prior context or character persona.
+  const explicitTokens = [
+    'blowjob',
+    'deepthroat',
+    'throat fuck',
+    'throatfuck',
+    'oral sex',
+    'handjob',
+    'fingering',
+    'cunnilingus',
+    'rimming',
+    'vaginal sex',
+    'anal sex',
+    'penetration',
+    'fuck',
+    'fucking',
+    'suck',
+    'sucking',
+  ];
+
+  return explicitTokens.some((tok) => t.includes(tok));
+};
+
+const filterSexActTagsIfNotExplicit = (tags: string[], allow: boolean): string[] => {
+  if (allow) return tags;
+  const banned = new Set(
+    [
+      'blowjob',
+      'deepthroat',
+      'throat fucking',
+      'throat fucking',
+      'throat fuck',
+      'throatfuck',
+      'oral sex',
+      'vaginal sex',
+      'anal sex',
+      'handjob',
+      'fingering',
+      'cunnilingus',
+      'rimming',
+      'facial',
+      'cumshot',
+      'creampie',
+      'cumming',
+      'cum in mouth',
+      'spitroast',
+      'double penetration',
+    ].map((t) => t.toLowerCase())
+  );
+  return tags.filter((t) => !banned.has(String(t || '').toLowerCase().trim()));
 };
 
 const applyModelPromptDefaults = (model: AIModel, prompt: string, negativePrompt: string) => {
@@ -189,7 +303,10 @@ const getClothingDetails = (
   const specialPrompt = draft?.specialPrompt?.toLowerCase() || '';
 
   const isCentaur =
-    mainTag.includes('centaur') || specialPrompt.includes('centaur') || mainTag.includes('taur') || specialPrompt.includes('taur');
+    mainTag.includes('centaur') ||
+    specialPrompt.includes('centaur') ||
+    mainTag.includes('taur') ||
+    specialPrompt.includes('taur');
   const isLegless =
     mainTag.includes('lamia') ||
     specialPrompt.includes('lamia') ||
@@ -1325,12 +1442,12 @@ export const automatic1111API = {
 
   async generateImageWithPayload(payload: any, draft: CharacterDraft, style: CharacterStyle, model: string): Promise<string> {
     try {
-      const response = await fetch(`${AUTOMATIC1111_URL}/sdapi/v1/txt2img`, {
+      const response = await fetch(AUTOMATIC1111_PROXY_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ payload })
       });
 
       if (!response.ok) {
@@ -1391,10 +1508,15 @@ export const automatic1111API = {
       console.warn(`Failed to switch to model: ${model}, using current model`);
     }
 
-    const rawActions = imagePlan?.actions && imagePlan.actions.length > 0 ? imagePlan.actions : [];
+    const oralIntent = detectOralSexIntentFromMessage(messageContent);
+    const allowSexActTags = shouldAllowSexActTagsFromCurrentText(messageContent);
+    
+    const rawActionsUnfiltered = imagePlan?.actions && imagePlan.actions.length > 0 ? imagePlan.actions : [];
+    const rawActions = filterSexActTagsIfNotExplicit(rawActionsUnfiltered, allowSexActTags);
     const rawEmotionsFull = imagePlan?.emotions && imagePlan.emotions.length > 0 ? imagePlan.emotions : [];
     const rawEmotions = rawEmotionsFull.length > 0 ? [rawEmotionsFull[rawEmotionsFull.length - 1]] : [];
-    const rawPoses = imagePlan?.poses && imagePlan.poses.length > 0 ? imagePlan.poses : [];
+    const rawPosesUnfiltered = imagePlan?.poses && imagePlan.poses.length > 0 ? imagePlan.poses : [];
+    const rawPoses = filterSexActTagsIfNotExplicit(rawPosesUnfiltered, allowSexActTags);
     const rawEnvironments = imagePlan?.environments && imagePlan.environments.length > 0 ? imagePlan.environments : [];
     const rawClothing = imagePlan?.clothing && imagePlan.clothing.length > 0 ? imagePlan.clothing : [];
     const rawNegative = imagePlan?.negative && imagePlan.negative.length > 0 ? imagePlan.negative : [];
@@ -1463,13 +1585,21 @@ export const automatic1111API = {
       clothingPrompt = rawClothing.join(', ');
     }
 
-    const customPrompt = joinAndDedupeTags(
+    const oralBoostPrompt = oralIntent.explicitOral
+      ? joinAndDedupeTags('blowjob', 'licking', 'POV', 'penis')
+      : '';
+
+    const customPromptBase = joinAndDedupeTags(
       rawActions.length > 0 ? rawActions.join(', ') : '',
       normalizedPosesResult.poses.length > 0 ? normalizedPosesResult.poses.join(', ') : '',
       effectiveEnvironments.length > 0 ? effectiveEnvironments.join(', ') : '',
       rawEmotions.length > 0 ? rawEmotions.join(', ') : '',
-      clothingPrompt
+      clothingPrompt,
+      oralBoostPrompt
     );
+
+    const customPrompt = oralIntent.explicitOral ? customPromptBase : ensureSoloPromptTags(customPromptBase);
+    
 
     console.log(`[PROMPT DEBUG] Custom prompt built: "${customPrompt}"`);
 
@@ -1491,6 +1621,8 @@ export const automatic1111API = {
         character.specialNegativePrompt || ''
       )
     };
+
+    messageDraft.specialNegativePrompt = ensureNoMultiSubjectNegativeTags(messageDraft.specialNegativePrompt);
 
     console.log(`[PROMPT DEBUG] Final specialPrompt: "${messageDraft.specialPrompt}"`);
 
@@ -1608,12 +1740,8 @@ export const automatic1111API = {
         throw uploadError;
       }
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('character-images')
-        .getPublicUrl(imageName);
-
-      return publicUrl;
+      // Return base64 directly (like generateCharacterImage does) instead of URL
+      return base64Image;
     } catch (error) {
       console.error('Error generating direct image:', error);
       throw error;
@@ -1626,12 +1754,12 @@ export const automatic1111API = {
       const hiresPayload = {
         ...payload,
         enable_hr: true,
-        hr_scale: 2.0, // 2x upscaling
-        hr_upscaler: 'Latent',
-        hr_second_pass_steps: Math.floor(payload.steps * 0.5), // Half steps for second pass
-        hr_resize_x: payload.width * 2,
-        hr_resize_y: payload.height * 2,
-        denoising_strength: 0.7, // Good balance for detail preservation
+        hr_scale: 1.5, // Reduced from 2.0 to prevent artifacts
+        hr_upscaler: '4x-UltraSharp', // Better upscaler than Latent
+        hr_second_pass_steps: Math.floor(payload.steps * 0.7), // More steps for better quality
+        hr_resize_x: payload.width * 1.5,
+        hr_resize_y: payload.height * 1.5,
+        denoising_strength: 0.5, // Reduced from 0.7 to prevent artifacts
       };
 
       const response = await fetch(`${AUTOMATIC1111_URL}/sdapi/v1/txt2img`, {
@@ -1680,12 +1808,8 @@ export const automatic1111API = {
         throw uploadError;
       }
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('character-images')
-        .getPublicUrl(imageName);
-
-      return publicUrl;
+      // Return base64 directly (like generateCharacterImage does) instead of URL
+      return base64Image;
     } catch (error) {
       console.error('Error generating hires image:', error);
       throw error;

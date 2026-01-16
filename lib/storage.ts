@@ -21,8 +21,11 @@ export class StorageService {
   private supabase = supabase;
   private bucketName = 'character-images';
 
-  private isProbablyHttpUrl(value: string) {
-    return /^https?:\/\//i.test(String(value || '').trim());
+  private isProbablyHttpUrl(value: string): boolean {
+    const url = String(value || '').trim();
+    // Normalize protocol - ensure https:// not https://
+    const normalizedUrl = url.replace(/^https?:\/\//i, 'https://');
+    return /^https?:\/\//i.test(url);
   }
 
   private parseDataUrl(value: string): { mime: string; base64: string } | null {
@@ -101,17 +104,20 @@ export class StorageService {
         const raw = String(imageData || '').trim();
 
         if (this.isProbablyHttpUrl(raw)) {
+          // Normalize protocol to ensure https://
+          const normalizedUrl = raw.replace(/^https?:\/\//i, 'https://');
           let res: Response;
           let retryCount = 0;
           const maxRetries = 3;
           
           while (retryCount < maxRetries) {
             try {
-              res = await fetch(raw, {
+              res = await fetch(normalizedUrl, {
                 mode: 'cors',
                 credentials: 'omit',
                 headers: {
                   'Accept': 'image/*',
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                 },
               });
               break;
