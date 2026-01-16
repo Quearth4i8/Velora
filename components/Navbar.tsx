@@ -68,6 +68,7 @@ export function Navbar() {
     { href: '/create', label: 'Create' },
     { href: '/gallery', label: 'Gallery' },
     { href: '/my-characters', label: 'My Characters' },
+    { href: '/tentacles', label: 'Tentacles' },
   ];
 
   return (

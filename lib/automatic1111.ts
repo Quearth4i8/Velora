@@ -73,6 +73,43 @@ const applyModelPromptDefaults = (model: AIModel, prompt: string, negativePrompt
   return { prompt, negativePrompt };
 };
 
+const applyHiresFixSettings = (payload: any, settings?: any): any => {
+  if (!settings?.hiresFix) return payload;
+
+  return {
+    ...payload,
+    enable_hr: true,
+    hr_scale: typeof settings?.hiresScale === 'number' ? settings.hiresScale : 2,
+    hr_upscaler: typeof settings?.hiresUpscaler === 'string' ? settings.hiresUpscaler : 'Latent',
+    hr_second_pass_steps: typeof settings?.hiresSteps === 'number' ? settings.hiresSteps : 0,
+    denoising_strength: typeof settings?.hiresDenoise === 'number' ? settings.hiresDenoise : 0.35,
+  };
+};
+
+export const buildCharacterBasePrompts = (draft: CharacterDraft) => {
+  const style = draft?.generation?.style;
+  const model = draft?.generation?.model;
+
+  const fallbackPrompt = String(draft?.generation?.prompt || '').trim();
+  const fallbackNegativePrompt = String(draft?.generation?.negativePrompt || '').trim();
+
+  if (!style || !model) {
+    return { prompt: fallbackPrompt, negativePrompt: fallbackNegativePrompt };
+  }
+
+  let prompt = buildPrompt(draft, style);
+  let negativePrompt = buildNegativePrompt(draft);
+
+  ({ prompt, negativePrompt } = applyModelPromptDefaults(model, prompt, negativePrompt));
+
+  if (style === CharacterStyle.REALISTIC || model === AIModel.CYBERREALISTIC) {
+    prompt = `score_9, score_8_up, score_7_up, ${prompt}`;
+    negativePrompt = `score_6, score_5, score_4, (worst quality:1.2), (low quality:1.2), (normal quality:1.2), ${negativePrompt}`;
+  }
+
+  return { prompt, negativePrompt };
+};
+
 const sanitizeCommaTags = (input: string, removeTagsLower: Set<string>): string => {
   const parts = String(input || '')
     .split(',')
@@ -1180,7 +1217,7 @@ export const automatic1111API = {
         specialPrompt: joinAndDedupeTags(draft.specialPrompt, randomPose, handPoseVariation)
       };
 
-      let prompt = buildPrompt(modifiedDraft, style);
+      let prompt = buildPrompt(modifiedDraft, style, settings);
       let negativePrompt = buildNegativePrompt(modifiedDraft);
 
       ({ prompt, negativePrompt } = applyModelPromptDefaults(model, prompt, negativePrompt));
@@ -1191,7 +1228,7 @@ export const automatic1111API = {
         negativePrompt = `score_6, score_5, score_4, (worst quality:1.2), (low quality:1.2), (normal quality:1.2), ${negativePrompt}`;
       }
 
-      const payload = {
+      const payload = applyHiresFixSettings({
         prompt,
         negative_prompt: negativePrompt,
         width: settings?.width || getDimensionsFromAspectRatio(aspectRatio, draft.generation.model).width,
@@ -1204,7 +1241,7 @@ export const automatic1111API = {
         override_settings: {
           sd_model_checkpoint: model
         }
-      };
+      }, settings);
 
       return automatic1111API.generateImageWithPayload(payload, modifiedDraft, style, model);
     }
@@ -1222,7 +1259,7 @@ export const automatic1111API = {
         )
       };
 
-      let prompt = buildPrompt(modifiedDraft, style);
+      let prompt = buildPrompt(modifiedDraft, style, settings);
       let negativePrompt = buildNegativePrompt(modifiedDraft);
 
       ({ prompt, negativePrompt } = applyModelPromptDefaults(model, prompt, negativePrompt));
@@ -1236,7 +1273,7 @@ export const automatic1111API = {
         negativePrompt = `score_6, score_5, score_4, (worst quality:1.2), (low quality:1.2), (normal quality:1.2), ${negativePrompt}`;
       }
 
-      const payload = {
+      const payload = applyHiresFixSettings({
         prompt,
         negative_prompt: negativePrompt,
         width: settings?.width || getDimensionsFromAspectRatio(aspectRatio, model).width,
@@ -1249,7 +1286,7 @@ export const automatic1111API = {
         override_settings: {
           sd_model_checkpoint: model
         }
-      };
+      }, settings);
 
       return automatic1111API.generateImageWithPayload(payload, modifiedDraft, style, model);
     }
@@ -1265,7 +1302,7 @@ export const automatic1111API = {
       negativePrompt = `score_6, score_5, score_4, (worst quality:1.2), (low quality:1.2), (normal quality:1.2), ${negativePrompt}`;
     }
 
-    const payload = {
+    const payload = applyHiresFixSettings({
       prompt,
       negative_prompt: negativePrompt,
       width: settings?.width || getDimensionsFromAspectRatio(aspectRatio, model).width,
@@ -1278,7 +1315,7 @@ export const automatic1111API = {
       override_settings: {
         sd_model_checkpoint: model
       }
-    };
+    }, settings);
 
     console.log('[A1111 PAYLOAD] prompt:', prompt);
     console.log('[A1111 PAYLOAD] negative_prompt:', negativePrompt);
@@ -1579,6 +1616,78 @@ export const automatic1111API = {
       return publicUrl;
     } catch (error) {
       console.error('Error generating direct image:', error);
+      throw error;
+    }
+  },
+
+  async generateHiresImage(payload: any): Promise<string> {
+    try {
+      // Enable hires fix with upscaling
+      const hiresPayload = {
+        ...payload,
+        enable_hr: true,
+        hr_scale: 2.0, // 2x upscaling
+        hr_upscaler: 'Latent',
+        hr_second_pass_steps: Math.floor(payload.steps * 0.5), // Half steps for second pass
+        hr_resize_x: payload.width * 2,
+        hr_resize_y: payload.height * 2,
+        denoising_strength: 0.7, // Good balance for detail preservation
+      };
+
+      const response = await fetch(`${AUTOMATIC1111_URL}/sdapi/v1/txt2img`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer YOUR_API_KEY'
+        },
+        body: JSON.stringify(hiresPayload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Automatic1111 API error: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
+      if (!result.images || result.images.length === 0) {
+        throw new Error('No images returned from Automatic1111');
+      }
+
+      // Upload to Supabase storage with hires prefix
+      const base64Image = result.images[0];
+      const timestamp = Date.now();
+      const imageName = `hires-${timestamp}-${Math.random().toString(36).substring(7)}.jpg`;
+
+      // Convert base64 to binary data
+      const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
+      const binaryData = atob(base64Data);
+      const bytes = new Uint8Array(binaryData.length);
+      for (let i = 0; i < binaryData.length; i++) {
+        bytes[i] = binaryData.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: 'image/jpeg' });
+
+      // Upload to Supabase storage
+      const { error: uploadError } = await supabase.storage
+        .from('character-images')
+        .upload(imageName, blob, {
+          contentType: 'image/jpeg',
+          upsert: true
+        });
+
+      if (uploadError) {
+        console.error('Storage upload error:', uploadError);
+        throw uploadError;
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('character-images')
+        .getPublicUrl(imageName);
+
+      return publicUrl;
+    } catch (error) {
+      console.error('Error generating hires image:', error);
       throw error;
     }
   },

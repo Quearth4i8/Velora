@@ -46,6 +46,11 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
     seed: number;
     additionalTags?: string;
     isFuta: boolean;
+    hiresFix: boolean;
+    hiresScale: number;
+    hiresUpscaler: string;
+    hiresSteps: number;
+    hiresDenoise: number;
   }>({
     steps: 30,
     cfgScale: 6,
@@ -53,7 +58,12 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
     sampler: 'Euler a',
     seed: -1,
     additionalTags: '',
-    isFuta: false
+    isFuta: false,
+    hiresFix: false,
+    hiresScale: 2,
+    hiresUpscaler: 'Latent',
+    hiresSteps: 0,
+    hiresDenoise: 0.35
   });
 
   // Apply default model settings when model changes
@@ -64,7 +74,12 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
         ...prev,
         ...MODEL_DEFAULT_SETTINGS[model],
         additionalTags: prev.additionalTags || '',
-        isFuta: prev.isFuta || false
+        isFuta: prev.isFuta || false,
+        hiresFix: prev.hiresFix || false,
+        hiresScale: prev.hiresScale || 2,
+        hiresUpscaler: prev.hiresUpscaler || 'Latent',
+        hiresSteps: typeof prev.hiresSteps === 'number' ? prev.hiresSteps : 0,
+        hiresDenoise: typeof prev.hiresDenoise === 'number' ? prev.hiresDenoise : 0.35
       }));
     }
   }, [editedCharacter.generation?.model]);

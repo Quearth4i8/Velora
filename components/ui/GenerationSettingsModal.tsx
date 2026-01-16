@@ -13,6 +13,11 @@ interface GenerationSettings {
   seed: number;
   additionalTags?: string;
   isFuta: boolean;
+  hiresFix: boolean;
+  hiresScale: number;
+  hiresUpscaler: string;
+  hiresSteps: number;
+  hiresDenoise: number;
 }
 
 interface GenerationSettingsModalProps {
@@ -163,6 +168,83 @@ export function GenerationSettingsModal({
                   placeholder="Enter additional tags separated by commas (e.g., detailed, high quality, 4k)..."
                 />
               </div>
+
+              <div className="flex items-center justify-between">
+                <label className="text-dark-300 text-sm">Hires Fix</label>
+                <button
+                  onClick={() => onSettingsChange({ ...settings, hiresFix: !settings.hiresFix })}
+                  className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 ${
+                    settings.hiresFix
+                      ? 'bg-gradient-to-r from-pink-600 to-pink-500 shadow-lg shadow-pink-500/30'
+                      : 'bg-dark-700'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-lg transition-transform duration-300 ${
+                      settings.hiresFix ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {settings.hiresFix && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-dark-300 text-sm block mb-2">Hires Scale: {settings.hiresScale}</label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="4"
+                      step="0.05"
+                      value={settings.hiresScale}
+                      onChange={(e) => onSettingsChange({ ...settings, hiresScale: parseFloat(e.target.value) })}
+                      className="w-full h-2 bg-dark-700 rounded-lg appearance-none cursor-pointer"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-dark-300 text-sm block mb-2">Denoise: {settings.hiresDenoise}</label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value={settings.hiresDenoise}
+                      onChange={(e) => onSettingsChange({ ...settings, hiresDenoise: parseFloat(e.target.value) })}
+                      className="w-full h-2 bg-dark-700 rounded-lg appearance-none cursor-pointer"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-dark-300 text-sm block mb-2">Hires Steps: {settings.hiresSteps}</label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="60"
+                      value={settings.hiresSteps}
+                      onChange={(e) => onSettingsChange({ ...settings, hiresSteps: parseInt(e.target.value) })}
+                      className="w-full h-2 bg-dark-700 rounded-lg appearance-none cursor-pointer"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-dark-300 text-sm block mb-2">Upscaler</label>
+                    <select
+                      value={settings.hiresUpscaler}
+                      onChange={(e) => onSettingsChange({ ...settings, hiresUpscaler: e.target.value })}
+                      className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white text-sm"
+                    >
+                      <option value="Latent">Latent</option>
+                      <option value="Latent (antialiased)">Latent (antialiased)</option>
+                      <option value="Latent (bicubic)">Latent (bicubic)</option>
+                      <option value="Latent (bicubic antialiased)">Latent (bicubic antialiased)</option>
+                      <option value="ESRGAN_4x">ESRGAN_4x</option>
+                      <option value="R-ESRGAN 4x+">R-ESRGAN 4x+</option>
+                      <option value="R-ESRGAN 4x+ Anime6B">R-ESRGAN 4x+ Anime6B</option>
+                    </select>
+                  </div>
+                </div>
+              )}
 
               {/* Futa Toggle */}
               <div className="flex items-center justify-between">

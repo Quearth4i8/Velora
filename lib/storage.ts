@@ -21,6 +21,31 @@ export class StorageService {
   private supabase = supabase;
   private bucketName = 'character-images';
 
+  private isProbablyHttpUrl(value: string) {
+    return /^https?:\/\//i.test(String(value || '').trim());
+  }
+
+  private parseDataUrl(value: string): { mime: string; base64: string } | null {
+    const s = String(value || '').trim();
+    const match = s.match(/^data:([^;]+);base64,(.*)$/i);
+    if (!match) return null;
+    return { mime: match[1] || 'application/octet-stream', base64: match[2] || '' };
+  }
+
+  private base64ToBlob(base64: string, mime: string) {
+    const cleaned = String(base64 || '')
+      .trim()
+      .replace(/\s+/g, '');
+
+    const byteCharacters = atob(cleaned);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    return new Blob([byteArray], { type: mime });
+  }
+
   /**
    * Create the bucket if it doesn't exist
    */
@@ -66,30 +91,76 @@ export class StorageService {
   async uploadImage(characterId: string, imageData: string | Blob, fileName?: string): Promise<StorageFile | null> {
     try {
       // Generate a unique file name if not provided
-      const fileExt = typeof imageData === 'string' ? 'jpg' : 'png';
+      let mime = 'image/jpeg';
+      let fileExt = 'jpg';
       const finalFileName = fileName || `${characterId}-${Date.now()}.${fileExt}`;
       
       // Convert base64 to blob if needed
       let file: Blob;
       if (typeof imageData === 'string') {
-        // Remove data URL prefix if present
-        const base64Data = imageData.replace(/^data:image\/[a-z]+;base64,/, '');
-        const byteCharacters = atob(base64Data);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        const raw = String(imageData || '').trim();
+
+        if (this.isProbablyHttpUrl(raw)) {
+          let res: Response;
+          let retryCount = 0;
+          const maxRetries = 3;
+          
+          while (retryCount < maxRetries) {
+            try {
+              res = await fetch(raw, {
+                mode: 'cors',
+                credentials: 'omit',
+                headers: {
+                  'Accept': 'image/*',
+                },
+              });
+              break;
+            } catch (error) {
+              retryCount++;
+              if (retryCount >= maxRetries) {
+                throw error;
+              }
+              // Wait before retrying (exponential backoff)
+              await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
+            }
+          }
+          
+          if (!res!.ok) {
+            throw new Error(`Failed to fetch image URL: ${res!.status} ${res!.statusText}`);
+          }
+          const blob = await res!.blob();
+          mime = blob.type || 'image/jpeg';
+          fileExt = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg';
+          const resolvedFileName = fileName || `${characterId}-${Date.now()}.${fileExt}`;
+          file = blob;
+
+          // Override file name based on fetched mime/ext
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const _finalFileName = resolvedFileName;
+        } else {
+          const parsed = this.parseDataUrl(raw);
+          if (parsed) {
+            mime = parsed.mime || 'image/jpeg';
+            fileExt = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg';
+            file = this.base64ToBlob(parsed.base64, mime);
+          } else {
+            // Assume raw base64
+            file = this.base64ToBlob(raw, mime);
+          }
         }
-        const byteArray = new Uint8Array(byteNumbers);
-        file = new Blob([byteArray], { type: 'image/jpeg' });
       } else {
         file = imageData;
+        mime = file.type || 'image/jpeg';
+        fileExt = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg';
       }
+
+      const resolvedFileName = fileName || `${characterId}-${Date.now()}.${fileExt}`;
 
       // Upload to Supabase storage
       const { data, error } = await this.supabase.storage
         .from(this.bucketName)
-        .upload(finalFileName, file, {
-          contentType: 'image/jpeg',
+        .upload(resolvedFileName, file, {
+          contentType: mime,
           upsert: true,
         });
 
@@ -101,13 +172,13 @@ export class StorageService {
       // Get public URL
       const { data: urlData } = this.supabase.storage
         .from(this.bucketName)
-        .getPublicUrl(finalFileName);
+        .getPublicUrl(resolvedFileName);
 
       return {
-        name: finalFileName,
+        name: resolvedFileName,
         url: urlData.publicUrl,
         size: file.size,
-        contentType: 'image/jpeg',
+        contentType: mime,
       };
     } catch (error) {
       console.error('Failed to upload image:', error);

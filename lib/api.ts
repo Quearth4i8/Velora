@@ -316,6 +316,85 @@ export const characterAPI = {
     }
   },
 
+  async getAllCharacterImagesPaged(
+    opts?: { limit?: number; offset?: number }
+  ): Promise<{ success: boolean; data?: CharacterImage[]; error?: any }> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      const limit = Math.max(1, Math.min(100, Number(opts?.limit ?? 50)));
+      const offset = Math.max(0, Number(opts?.offset ?? 0));
+
+      let query = supabase
+        .from('character_images')
+        .select(`
+          *,
+          characters!inner(
+            name,
+            user_id,
+            is_gallery_only
+          )
+        `)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (session?.user) {
+        query = query.eq('user_id', session.user.id);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const images =
+        data?.map((img: any) => ({
+          ...this.mapDbImageToCharacterImage(img),
+          characterName: img.characters?.name || 'Unknown',
+          isGalleryOnly: img.characters?.is_gallery_only || false,
+        })) || [];
+
+      return { success: true, data: images };
+    } catch (error) {
+      console.error('Failed to get all character images paged:', error);
+      return { success: false, error };
+    }
+  },
+
+  async getAllCharacterImagesPagedGlobal(
+    opts?: { limit?: number; offset?: number }
+  ): Promise<{ success: boolean; data?: CharacterImage[]; error?: any }> {
+    try {
+      const limit = Math.max(1, Math.min(100, Number(opts?.limit ?? 50)));
+      const offset = Math.max(0, Number(opts?.offset ?? 0));
+
+      const { data, error } = await supabase
+        .from('character_images')
+        .select(`
+          *,
+          characters!inner(
+            name,
+            user_id,
+            is_gallery_only
+          )
+        `)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (error) throw error;
+
+      const images =
+        data?.map((img: any) => ({
+          ...this.mapDbImageToCharacterImage(img),
+          characterName: img.characters?.name || 'Unknown',
+          isGalleryOnly: img.characters?.is_gallery_only || false,
+        })) || [];
+
+      return { success: true, data: images };
+    } catch (error) {
+      console.error('Failed to get all character images paged global:', error);
+      return { success: false, error };
+    }
+  },
+
   async getUserImages(limit = 100): Promise<{ success: boolean; data?: CharacterImage[]; error?: any }> {
     try {
       const { data: { session } } = await supabase.auth.getSession();
