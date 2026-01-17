@@ -620,6 +620,10 @@ export const characterAPI = {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) throw new Error('Not authenticated');
 
+      const imageUrls = Array.isArray((message as any).imageUrls)
+        ? (message as any).imageUrls
+        : (message.imageUrl ? [message.imageUrl] : null);
+
       const { data, error } = await supabase
         .from('messages')
         .insert({
@@ -629,6 +633,7 @@ export const characterAPI = {
           content: message.content,
           sender: message.sender,
           image_url: message.imageUrl,
+          image_urls: imageUrls,
           timestamp: new Date().toISOString()
         })
         .select()
@@ -656,12 +661,19 @@ export const characterAPI = {
 
   async updateMessage(messageId: string, updates: Partial<ChatMessage>) {
     try {
-      if (updates.imageUrl) {
+      const hasImageUrl = Object.prototype.hasOwnProperty.call(updates, 'imageUrl') && typeof updates.imageUrl === 'string';
+      const hasImageUrls = Array.isArray((updates as any).imageUrls);
+
+      if (hasImageUrl || hasImageUrls) {
+        const payload: Record<string, any> = {};
+        if (hasImageUrl) payload.image_url = updates.imageUrl ? updates.imageUrl : null;
+        if (hasImageUrls) payload.image_urls = (updates as any).imageUrls;
+
         const { data, error } = await supabase
           .from('messages')
-          .update({ image_url: updates.imageUrl })
+          .update(payload)
           .eq('id', messageId)
-          .select('id, image_url')
+          .select('id, image_url, image_urls')
           .maybeSingle();
 
         if (error) {

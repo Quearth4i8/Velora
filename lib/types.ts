@@ -275,6 +275,7 @@ export interface ImageGenerationPlan {
   environments?: string[];
   clothing?: string[];
   negative?: string[];
+  details?: string[];
 }
 
 export interface ChatMessage {
@@ -285,6 +286,7 @@ export interface ChatMessage {
   sender: 'user' | 'character' | 'system';
   timestamp: Date;
   imageUrl?: string;
+  imageUrls?: string[];
   isGeneratingImage?: boolean;
   imagePlan?: ImageGenerationPlan;
 }

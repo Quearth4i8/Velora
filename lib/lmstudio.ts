@@ -132,7 +132,7 @@ export const lmStudioService = {
             : 'If the scene location is NOT explicitly specified by the user, omit environments (or return an empty array). ';
         const systemPrompt =
             'You are a deterministic information-extraction tool that outputs ONLY valid JSON. No markdown, no explanations. ' +
-            'Return EXACTLY one JSON object with keys: camera, actions, poses, emotions, environments, clothing, negative. ' +
+            'Return EXACTLY one JSON object with keys: camera, actions, poses, emotions, environments, clothing, negative, details. ' +
             'Each key value must be an array of strings (or an empty array). Never return non-array values. ' +
             'Your goal: convert the latest chat intent into concise Stable Diffusion style tags. Prefer concrete visual tags, not prose. ' +
             'Scope: focus on what is happening NOW in the latest turn (latest user message and/or latest character message). Do not import earlier scene actions unless they are reaffirmed in the latest turn. ' +
@@ -140,10 +140,13 @@ export const lmStudioService = {
             'Return AT MOST ONE emotion (dominant). ' +
             'NEVER hallucinate. If the latest turn is dialogue-only (talking/insulting/flirting/threats/desires with no physical act described), actions must be empty (except non-sexual conversational-safe physical acts explicitly stated like "slaps you" or "hugs you"). ' +
             'Critical: do not output sexual actions unless an explicit sexual ACT is described in the latest turn (clear physical act words). Desire/intent alone ("i want", "i\'d like", "make love") is NOT an act. ' +
+            'Violence/injury extraction (only when explicit): if the text describes cutting, stabbing, amputation, blood, wounds, or self-inflicted injury, include concrete visual tags like "cutting", "cutting off hand", "bleeding", "blood", "injury" (keep them short). Do not invent gore if it is not mentioned. ' +
+            'Use details[] for specific interaction targets and explicit contact mechanics (e.g., "cock to nipple", "nipple penetration", "penetrating nipple", "tip touching nipple", "hand on breast", "mouth on nipple"). Keep these short (1-4 words) and only include if explicitly described. ' +
             'Normalization: prefer these canonical tags when applicable (use only those supported by the text): ' +
             'Sex acts: "vaginal sex", "anal sex", "blowjob", "deepthroat", "throat fucking", "handjob", "fingering", "cunnilingus", "rimming", "facial", "cumshot", "creampie", "cumming", "cum in mouth", "spitroast", "double penetration". ' +
             'Non-sex intimacy: "kissing", "making out", "hugging", "cuddling", "caressing", "groping", "grinding", "lap sitting", "neck kiss", "breast fondling". ' +
             'Aggression/force (only if explicit): "slapping", "choking", "hair pulling", "pushing", "pinning", "spanking", "scratching", "biting", "tearing clothes". ' +
+            'Injury/violence (only if explicit): "cutting", "stabbing", "bleeding", "injury", "wounded", "blood". ' +
             'Body exposure: "nude", "topless", "panties down", "spread legs", "showing pussy", "showing ass", "showing anus", "presenting anus", "arched back". ' +
             'Camera tags: "close-up", "portrait", "upper body", "full body", "wide shot", "over-the-shoulder", "POV", "low angle", "high angle", "rear view", "front view", "side view". ' +
             'Pose tags (pick coherent ones): "standing", "kneeling", "on knees", "lying down", "on back", "on stomach", "sitting", "straddling", "bent over", "doggystyle position", "missionary position", "cowgirl position", "reverse cowgirl", "legs up", "spread legs", "presenting pose". ' +
@@ -171,7 +174,8 @@ export const lmStudioService = {
             'Output hygiene: ' +
             '1) Arrays must contain unique strings (no duplicates). ' +
             '2) Keep tags short (1-4 words). ' +
-            '3) If you are unsure, omit rather than guess. ';
+            '3) If you are unsure, omit rather than guess. ' +
+            'Example output format (do not copy content unless supported by the transcript): {"camera":[],"actions":[],"poses":[],"emotions":[],"environments":[],"clothing":[],"negative":[],"details":[]} ';
 
         const all = Array.isArray(messages) ? messages : [];
         // Only consider the latest turn to avoid contradictory actions/emotions from older messages.
@@ -197,19 +201,33 @@ export const lmStudioService = {
             }
         ];
 
-        const response = await fetch(PROXY_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                model: 'local-model',
-                messages: formattedMessages,
-                temperature: 0.2,
-                max_tokens: 256,
-                stream: false,
-            }),
+        const requestBodyBase: any = {
+            model: 'local-model',
+            messages: formattedMessages,
+            temperature: 0,
+            max_tokens: 256,
+            stream: false,
+        };
+
+        const tryFetch = async (body: any) => {
+            const response = await fetch(PROXY_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(body),
+            });
+            return response;
+        };
+
+        let response = await tryFetch({
+            ...requestBodyBase,
+            response_format: { type: 'json_object' },
         });
+
+        if (!response.ok) {
+            response = await tryFetch(requestBodyBase);
+        }
 
         if (!response.ok) {
             throw new Error(`LM Studio error: ${response.statusText}`);
@@ -243,6 +261,7 @@ export const lmStudioService = {
             environments: normalize(parsed.environments),
             clothing: normalize(parsed.clothing),
             negative: normalize(parsed.negative),
+            details: normalize(parsed.details),
         };
 
         const transcriptText = last
@@ -272,6 +291,127 @@ export const lmStudioService = {
                 plan.actions = Array.from(new Set([...actions, 'jumping']));
             }
         }
+
+        // Post-normalization for visually-specific explicit interactions that are often under-extracted.
+        // Only add when the transcript explicitly contains strong cues.
+        const details = Array.isArray(plan.details) ? plan.details : [];
+        const detailLower = details.map((d: string) => String(d || '').toLowerCase());
+        const addDetail = (d: string) => {
+            const dl = d.toLowerCase();
+            if (!detailLower.includes(dl)) details.push(d);
+        };
+
+        const negative = Array.isArray(plan.negative) ? plan.negative : [];
+        const removeNegative = (n: string) => {
+            const nl = n.toLowerCase();
+            for (let i = negative.length - 1; i >= 0; i--) {
+                if (String(negative[i] || '').toLowerCase() === nl) negative.splice(i, 1);
+            }
+        };
+
+        const addAction = (a: string) => {
+            const al = a.toLowerCase();
+            const current = Array.isArray(plan.actions) ? plan.actions : [];
+            if (!current.map((x) => String(x || '').toLowerCase()).includes(al)) {
+                plan.actions = [...current, a];
+            }
+        };
+
+        const mentionsNipple = transcriptText.includes('nipple') || transcriptText.includes('nipples');
+        const mentionsCock = transcriptText.includes('cock') || transcriptText.includes('dick') || transcriptText.includes('penis');
+        const mentionsInsert = transcriptText.includes('insert') || transcriptText.includes('inserting') || transcriptText.includes('push in') || transcriptText.includes('pushing in') || transcriptText.includes('slide in') || transcriptText.includes('sliding in');
+
+        if (mentionsNipple && mentionsCock) {
+            if (transcriptText.includes('tip') && transcriptText.includes('nipple')) {
+                addDetail('tip on nipple');
+            }
+            if (mentionsInsert && (transcriptText.includes('into') || transcriptText.includes('inside'))) {
+                addDetail('nipple penetration');
+                addDetail('cock to nipple');
+            }
+        }
+
+        const mentionsCutOffHand =
+            (transcriptText.includes('cut off') || transcriptText.includes('cuts off') || transcriptText.includes('cutting off')) &&
+            (transcriptText.includes('hand') || transcriptText.includes('hands'));
+        const mentionsBlood =
+            transcriptText.includes('blood') ||
+            transcriptText.includes('bleed') ||
+            transcriptText.includes('bleeding');
+        const mentionsPainVocal =
+            transcriptText.includes('pained cry') ||
+            transcriptText.includes('pain') ||
+            transcriptText.includes('scream') ||
+            transcriptText.includes('screams') ||
+            transcriptText.includes('cry') ||
+            transcriptText.includes('cries');
+
+        if (mentionsCutOffHand) {
+            addAction('cutting off hand');
+            addDetail('severed hand');
+            addDetail('injury');
+        }
+
+        if (mentionsBlood) {
+            addAction('bleeding');
+            addDetail('blood');
+        }
+
+        if (mentionsPainVocal) {
+            addAction('screaming');
+        }
+
+        if (transcriptText.includes('shudder')) {
+            addAction('shuddering');
+        }
+
+        if (transcriptText.includes('look away') || transcriptText.includes('looks away')) {
+            addAction('looking away');
+        }
+
+        if (transcriptText.includes('hand') || transcriptText.includes('hands') || transcriptText.includes('arm') || transcriptText.includes('arms')) {
+            removeNegative('handless');
+            removeNegative('armless');
+        }
+
+        const hasProneCue =
+            transcriptText.includes('lying') ||
+            transcriptText.includes('laying') ||
+            transcriptText.includes('on back') ||
+            transcriptText.includes('on her back') ||
+            transcriptText.includes('on my back');
+        if (!hasProneCue) {
+            const nextPoses = (Array.isArray(plan.poses) ? plan.poses : []).filter((p) => {
+                const pl = String(p || '').toLowerCase();
+                return pl !== 'lying down' && pl !== 'on back' && pl !== 'on stomach';
+            });
+            plan.poses = nextPoses;
+        }
+
+        plan.details = Array.from(
+            new Set(
+                details
+                    .map((x: string) => String(x || '').trim())
+                    .filter((x: string) => x.length > 0)
+            )
+        );
+
+        const dedupe = (arr: string[] | undefined) =>
+            Array.from(
+                new Set(
+                    (Array.isArray(arr) ? arr : [])
+                        .map((x) => String(x || '').trim())
+                        .filter((x) => x.length > 0)
+                )
+            );
+
+        plan.camera = dedupe(plan.camera);
+        plan.actions = dedupe(plan.actions);
+        plan.poses = dedupe(plan.poses);
+        plan.emotions = dedupe(plan.emotions).slice(0, 1);
+        plan.environments = dedupe(plan.environments);
+        plan.clothing = dedupe(plan.clothing);
+        plan.negative = dedupe(negative);
 
         return plan;
     },

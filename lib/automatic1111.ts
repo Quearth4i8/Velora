@@ -610,7 +610,7 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle, settings?: an
   const age = ageNumber !== null ? `${ageNumber} years old` : '';
 
   const isMinor = ageNumber !== null && ageNumber < 18;
-  const subjectDescriptor = isMinor ? 'loli, small, mini size, tiny size, petite size, small legs, small hands' : 'woman';
+  const subjectDescriptor = isMinor ? 'loli, small, mini size, shortstack, goblin size, tiny size, petite size, small legs, small hands' : 'woman';
   const malePartnerPrompt = (hasSexualContent && !isSelfAction) ? 'male, man' : '';
   const soloDescriptor = hasSexualContent ? '' : 'solo';
   const ageDescriptor =
@@ -1513,6 +1513,8 @@ export const automatic1111API = {
     
     const rawActionsUnfiltered = imagePlan?.actions && imagePlan.actions.length > 0 ? imagePlan.actions : [];
     const rawActions = filterSexActTagsIfNotExplicit(rawActionsUnfiltered, allowSexActTags);
+    const rawDetailsUnfiltered = imagePlan?.details && imagePlan.details.length > 0 ? imagePlan.details : [];
+    const rawDetails = filterSexActTagsIfNotExplicit(rawDetailsUnfiltered, allowSexActTags);
     const rawEmotionsFull = imagePlan?.emotions && imagePlan.emotions.length > 0 ? imagePlan.emotions : [];
     const rawEmotions = rawEmotionsFull.length > 0 ? [rawEmotionsFull[rawEmotionsFull.length - 1]] : [];
     const rawPosesUnfiltered = imagePlan?.poses && imagePlan.poses.length > 0 ? imagePlan.poses : [];
@@ -1591,6 +1593,7 @@ export const automatic1111API = {
 
     const customPromptBase = joinAndDedupeTags(
       rawActions.length > 0 ? rawActions.join(', ') : '',
+      rawDetails.length > 0 ? rawDetails.join(', ') : '',
       normalizedPosesResult.poses.length > 0 ? normalizedPosesResult.poses.join(', ') : '',
       effectiveEnvironments.length > 0 ? effectiveEnvironments.join(', ') : '',
       rawEmotions.length > 0 ? rawEmotions.join(', ') : '',

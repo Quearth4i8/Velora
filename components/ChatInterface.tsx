@@ -35,6 +35,12 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
   const [currentCharacter, setCurrentCharacter] = useState<CharacterDraft>(character);
   const [isZoomed, setIsZoomed] = useState(false);
   const [zoomedImageUrl, setZoomedImageUrl] = useState<string | null>(null);
+  const [blurImages, setBlurImages] = useState(false);
+  const [showAllImagesModal, setShowAllImagesModal] = useState(false);
+  const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
+  const [activeMessageContent, setActiveMessageContent] = useState<string>('');
+  const [activeMessageImages, setActiveMessageImages] = useState<string[]>([]);
+  const [activeMessageImageIndex, setActiveMessageImageIndex] = useState(0);
   const [selectedFormat, setSelectedFormat] = useState<AspectRatioId>('portrait');
   const [showFormatSelector, setShowFormatSelector] = useState(false);
   const [pendingGeneration, setPendingGeneration] = useState<{messageId: string, content: string} | null>(null);
@@ -43,6 +49,149 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
   const router = useRouter();
   const dialog = useDialog();
 
+  const getMessageImageUrls = (m: ChatMessage): string[] => {
+    const list = Array.isArray((m as any).imageUrls) ? (m as any).imageUrls : [];
+    const single = m.imageUrl ? [m.imageUrl] : [];
+    const merged = [...list, ...single];
+    const unique: string[] = [];
+    const seen = new Set<string>();
+    for (const u of merged) {
+      if (!u || seen.has(u)) continue;
+      seen.add(u);
+      unique.push(u);
+    }
+    return unique;
+  };
+
+  const appendMessageImageUrl = async (messageId: string, url: string) => {
+    if (!url) return;
+    let nextUrls: string[] = [];
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.id !== messageId) return m;
+        nextUrls = [...getMessageImageUrls(m), url];
+        return { ...m, imageUrls: nextUrls, imageUrl: nextUrls[0] };
+      })
+    );
+
+    // Persist to DB so images survive refresh
+    if (nextUrls.length > 0) {
+      const updateRes = await characterAPI.updateMessage(messageId, {
+        imageUrl: nextUrls[0],
+        imageUrls: nextUrls,
+      } as any);
+
+      if (!updateRes?.success) {
+        console.error('Failed to persist message images:', updateRes?.error);
+      }
+    }
+  };
+
+  const openMessageImagesModal = (m: ChatMessage, startIndex = 0) => {
+    const urls = getMessageImageUrls(m);
+    setActiveMessageId(m.id);
+    setActiveMessageContent(m.content);
+    setActiveMessageImages(urls);
+    setActiveMessageImageIndex(Math.min(Math.max(startIndex, 0), Math.max(urls.length - 1, 0)));
+    setShowAllImagesModal(true);
+  };
+
+  const closeAllImagesModal = () => {
+    setShowAllImagesModal(false);
+    setActiveMessageId(null);
+    setActiveMessageContent('');
+    setActiveMessageImages([]);
+    setActiveMessageImageIndex(0);
+  };
+
+  const persistMessageImages = async (messageId: string, nextUrls: string[]) => {
+    const normalized = (nextUrls || []).filter(Boolean);
+
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId
+          ? { ...m, imageUrls: normalized, imageUrl: normalized[0] }
+          : m
+      )
+    );
+
+    if (activeMessageId === messageId) {
+      setActiveMessageImages(normalized);
+      setActiveMessageImageIndex((i) => Math.min(i, Math.max(normalized.length - 1, 0)));
+    }
+
+    const updateRes = await characterAPI.updateMessage(messageId, {
+      imageUrl: normalized[0] || '',
+      imageUrls: normalized,
+    } as any);
+
+    if (!updateRes?.success) {
+      console.error('Failed to persist message images:', updateRes?.error);
+    }
+  };
+
+  const handleDeleteMessageImageAtIndex = async (messageId: string, index: number) => {
+    const msg = messages.find((m) => m.id === messageId);
+    if (!msg) return;
+
+    const urls = getMessageImageUrls(msg);
+    if (index < 0 || index >= urls.length) return;
+
+    const nextUrls = urls.filter((_, i) => i !== index);
+    await persistMessageImages(messageId, nextUrls);
+
+    if (activeMessageId === messageId) {
+      setActiveMessageImageIndex((i) => {
+        const next = Math.min(i, Math.max(nextUrls.length - 1, 0));
+        if (index < i) return i - 1;
+        return next;
+      });
+    }
+  };
+
+  const handleRegenerateMessageImageAtIndex = async (messageId: string, content: string, index: number) => {
+    setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isGeneratingImage: true } : m));
+    try {
+      let imagePlan;
+      try {
+        const chatContext = getImagePlanContextForMessage(messageId, content);
+        imagePlan = await lmStudioService.generateImagePlan(chatContext, currentCharacter);
+      } catch (e) {
+        console.warn('[IMAGE PLAN] generation failed, falling back to keyword extraction');
+      }
+
+      const intentMessageContent = findIntentMessageContent(messageId);
+      const imageUrl = await automatic1111API.generateMessageImage(
+        currentCharacter,
+        content,
+        selectedFormat,
+        imagePlan,
+        intentMessageContent,
+        messageId
+      );
+
+      if (!imageUrl) {
+        console.error('No image URL returned from regeneration');
+        return;
+      }
+
+      const msg = messages.find((m) => m.id === messageId);
+      const urls = msg ? getMessageImageUrls(msg) : [];
+      const nextUrls = [...urls];
+      if (index < 0 || index >= nextUrls.length) {
+        nextUrls.push(imageUrl);
+      } else {
+        nextUrls[index] = imageUrl;
+      }
+
+      await persistMessageImages(messageId, nextUrls);
+    } catch (error) {
+      console.error('Failed to regenerate message image:', error);
+    } finally {
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isGeneratingImage: false } : m));
+    }
+  };
+
   const findIntentMessageContent = (messageId: string): string | undefined => {
     const idx = messages.findIndex((m) => m.id === messageId);
     if (idx <= 0) return undefined;
@@ -50,6 +199,54 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
       if (messages[i]?.sender === 'user') return messages[i].content;
     }
     return undefined;
+  };
+
+  const handleGenerateMoreImagesForMessage = async (messageId: string, content: string) => {
+    setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isGeneratingImage: true } : m));
+    try {
+      let imagePlan;
+      try {
+        const chatContext = getImagePlanContextForMessage(messageId, content);
+        imagePlan = await lmStudioService.generateImagePlan(chatContext, currentCharacter);
+        console.log('[IMAGE PLAN] generated:', imagePlan);
+      } catch (e) {
+        console.warn('[IMAGE PLAN] generation failed, falling back to keyword extraction');
+      }
+
+      const intentMessageContent = findIntentMessageContent(messageId);
+      const imageUrl = await automatic1111API.generateMessageImage(
+        currentCharacter,
+        content,
+        selectedFormat,
+        imagePlan,
+        intentMessageContent,
+        messageId
+      );
+
+      if (imageUrl && imageUrl.length > 0) {
+        if (isMountedRef.current) {
+          await appendMessageImageUrl(messageId, imageUrl);
+        }
+      } else {
+        console.error('No image URL returned from generation');
+        if (isMountedRef.current) {
+          await dialog.alert({
+            title: 'Error',
+            message: 'No image was generated. Please check the console for errors.',
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Failed to generate message image:', error);
+      if (isMountedRef.current) {
+        await dialog.alert({
+          title: 'Error',
+          message: 'Failed to generate image: ' + (error instanceof Error ? error.message : 'Unknown error'),
+        });
+      }
+    } finally {
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isGeneratingImage: false } : m));
+    }
   };
 
   const shouldRunContextExtraction = (text: string): boolean => {
@@ -256,11 +453,18 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
           setConversation(convResult.data);
           const messagesResult = await characterAPI.getMessages(convResult.data.id);
           if (messagesResult.success && messagesResult.data) {
-            setMessages(messagesResult.data.map((m: any) => ({
-              ...m,
-              imageUrl: m.image_url,
-              timestamp: new Date(m.timestamp)
-            })));
+            setMessages(messagesResult.data.map((m: any) => {
+              const urls = Array.isArray(m.image_urls)
+                ? m.image_urls
+                : (m.image_url ? [m.image_url] : []);
+
+              return {
+                ...m,
+                imageUrl: m.image_url || urls[0],
+                imageUrls: urls,
+                timestamp: new Date(m.timestamp)
+              };
+            }));
           } else {
             setMessages([]);
           }
@@ -420,7 +624,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
 
   const handleRegenerateMessageImage = async (messageId: string, content: string) => {
     // Clear current image and show loading
-    setMessages(prev => prev.map(m => m.id === messageId ? { ...m, imageUrl: undefined, isGeneratingImage: true } : m));
+    setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isGeneratingImage: true } : m));
 
     try {
       let imagePlan;
@@ -444,7 +648,8 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
       
       if (imageUrl && imageUrl.length > 0) {
         if (isMountedRef.current) {
-          setMessages(prev => prev.map(m => m.id === messageId ? { ...m, imageUrl, isGeneratingImage: false } : m));
+          await appendMessageImageUrl(messageId, imageUrl);
+          setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isGeneratingImage: false } : m));
         }
       } else {
         console.error('No image URL returned from generation');
@@ -942,22 +1147,45 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                   </div>
                 </div>
 
-                {/* Reset Button - Right */}
-                <button
-                  onClick={handleResetChat}
-                  className="p-2 text-dark-400 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all duration-200"
-                  title="Reset History"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
+                {/* Actions - Right */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setBlurImages((v) => !v)}
+                    className={`p-2 rounded-xl transition-all duration-200 ${
+                      blurImages
+                        ? 'text-pink-300 bg-pink-400/10'
+                        : 'text-dark-400 hover:text-pink-300 hover:bg-pink-400/10'
+                    }`}
+                    title={blurImages ? 'Unblur images' : 'Blur images'}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M2 12s3.636-7 10-7 10 7 10 7-3.636 7-10 7S2 12 2 12z"
+                      />
+                      <circle cx="12" cy="12" r="3" strokeWidth={2} />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4l16 16" />
+                    </svg>
+                  </button>
+
+                  <button
+                    onClick={handleResetChat}
+                    className="p-2 text-dark-400 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all duration-200"
+                    title="Reset History"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
 
             {/* Messages Area - Scrollable Only */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-              <div className="max-w-4xl mx-auto space-y-6">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 relative">
+              <div className="max-w-4xl mx-auto space-y-5">
                 <AnimatePresence>
                   {messages.map((message) => (
                     <motion.div
@@ -965,179 +1193,199 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -20 }}
-                      className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                      className="w-full"
                     >
-                      <div className={`max-w-md ${message.sender === 'user' ? 'order-2' : 'order-1'}`}>
-                        <div
-                          className={`px-5 py-3 rounded-2xl relative group/msg ${message.sender === 'user'
-                            ? 'bg-gradient-to-r from-pink-600 to-pink-500 text-white shadow-lg shadow-pink-500/20'
-                            : 'bg-dark-800/50 text-dark-200 border border-dark-700/50 backdrop-blur-sm'
-                            }`}
-                        >
-                          <div className="text-sm leading-relaxed">
-                            {/* Message Content */}
-                            {message.content.split(/(\*[^*]+\*)/).map((part, index) => {
-                              // Check if this part is enclosed in asterisks (internal thought)
-                              if (part.startsWith('*') && part.endsWith('*')) {
-                                const thoughtContent = part.slice(1, -1); // Remove asterisks
-                                return <span key={index} className="italic text-pink-300 opacity-80">{thoughtContent}</span>;
-                              } else {
-                                return <span key={index}>{part}</span>;
-                              }
-                            })}
-                            
-                            {/* Message Controls - Inline with content */}
-                            <span className={`inline-flex ${message.sender === 'user' ? 'float-left mr-2' : 'float-right ml-2'} opacity-0 group-hover/msg:opacity-100 transition-opacity`}>
+                      <div
+                        className={`flex w-full items-end gap-3 ${message.sender === 'user'
+                          ? 'justify-end'
+                          : message.sender === 'system'
+                            ? 'justify-center'
+                            : 'justify-start'
+                          }`}
+                      >
+                        {message.sender !== 'user' && message.sender !== 'system' && (
+                          <div className="w-9 h-9 rounded-2xl bg-dark-800/60 border border-dark-700/60 backdrop-blur-md flex items-center justify-center text-xs font-semibold text-pink-200 shadow-sm shadow-black/20 select-none">
+                            {(currentCharacter.name || 'C').charAt(0).toUpperCase()}
+                          </div>
+                        )}
+
+                        <div className={`${message.sender === 'system' ? 'max-w-2xl w-full' : 'max-w-[85%] sm:max-w-[75%] lg:max-w-[60%]'}`}>
+                          <div
+                            className={`px-5 py-4 rounded-3xl relative group/msg ring-1 ${message.sender === 'user'
+                              ? 'bg-gradient-to-r from-pink-600 to-pink-500 text-white shadow-lg shadow-pink-500/25 ring-pink-500/20'
+                              : message.sender === 'system'
+                                ? 'bg-dark-900/40 text-dark-200 border border-dark-700/60 ring-white/5'
+                                : 'bg-dark-800/40 text-dark-200 border border-dark-700/60 backdrop-blur-md shadow-md shadow-black/20 ring-white/5'
+                              }`}
+                          >
+                            <div className="relative">
+                              <div className="text-[15px] leading-relaxed whitespace-pre-wrap">
+                                {/* Message Content */}
+                                {message.content.split(/(\*[^*]+\*)/).map((part, index) => {
+                                  // Check if this part is enclosed in asterisks (internal thought)
+                                  if (part.startsWith('*') && part.endsWith('*')) {
+                                    const thoughtContent = part.slice(1, -1); // Remove asterisks
+                                    return <span key={index} className="italic text-pink-300 opacity-80">{thoughtContent}</span>;
+                                  } else {
+                                    return <span key={index}>{part}</span>;
+                                  }
+                                })}
+                              </div>
+                            </div>
+
+                            <div className={`mt-3 pt-3 border-t border-white/10 flex items-center justify-end gap-1 ${message.sender === 'system' ? 'hidden' : ''}`}>
                               {extractDialogueText(message.content) && (
                                 <TTSButton
                                   text={extractDialogueText(message.content)}
-                                  className="p-0.5 mr-1 text-pink-400/60 hover:text-pink-300 hover:bg-pink-500/10 rounded transition-all"
+                                  className="p-1 text-pink-300/70 hover:text-pink-200 hover:bg-pink-500/10 rounded-lg transition-all"
                                   title="Generate voice"
                                 />
                               )}
-                              {/* Regenerate Message */}
-                              {message.sender === 'character' && (
+                              {message.sender === 'character' && getMessageImageUrls(message).length === 0 && !message.isGeneratingImage && (
                                 <button
-                                  onClick={() => handleRegenerateCharacterMessage(message.id, message.content)}
-                                  className="p-0.5 text-pink-400/60 hover:text-pink-300 hover:bg-pink-500/10 rounded transition-all"
-                                  title="Regenerate message"
+                                  onClick={() => handleGenerateMessageImage(message.id, message.content)}
+                                  className="p-1 text-pink-300/70 hover:text-pink-200 hover:bg-pink-500/10 rounded-lg transition-all"
+                                  title="Generate image"
                                 >
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                   </svg>
                                 </button>
                               )}
-                              
-                              {/* Delete Message */}
-                              <button
-                                onClick={() => handleDeleteMessage(message.id)}
-                                className={`p-0.5 text-red-400/60 hover:text-red-300 hover:bg-red-500/10 rounded transition-all ${message.sender === 'character' ? 'ml-1' : ''}`}
-                                title="Delete message"
-                              >
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                              </button>
-                            </span>
-                          </div>
-
-                          {/* Generate Image Button for Character Messages */}
-                          {message.sender === 'character' && !message.imageUrl && !message.isGeneratingImage && (
-                            <div className="absolute -right-8 sm:-right-10 md:-right-12 top-0 flex items-center">
-                              <button
-                                onClick={() => handleGenerateMessageImage(message.id, message.content)}
-                                className="p-2 text-pink-400 hover:text-pink-300 opacity-0 group-hover/msg:opacity-100 transition-opacity bg-dark-800/80 rounded-lg backdrop-blur-sm border border-pink-500/20 shadow-xl"
-                                title="Generate image"
-                              >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                                </svg>
-                              </button>
-
-                              {/* Format Dropdown */}
-                              {showFormatSelector && pendingGeneration?.messageId === message.id && (
-                                <motion.div
-                                  initial={{ opacity: 0, scale: 0.95, y: -5 }}
-                                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                                  exit={{ opacity: 0, scale: 0.95, y: -5 }}
-                                  className="absolute left-full ml-2 top-0 bg-dark-800/95 border border-pink-500/30 rounded-lg shadow-xl backdrop-blur-sm z-50"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <div className="flex items-center p-2 space-x-3">
-                                    {[
-                                      { id: 'square' as AspectRatioId, label: 'Square', ratio: '1:1' },
-                                      { id: 'landscape' as AspectRatioId, label: 'Landscape', ratio: '4:3' },
-                                      { id: 'portrait' as AspectRatioId, label: 'Portrait', ratio: '3:4' },
-                                    ].map((format) => (
-                                      <button
-                                        key={format.id}
-                                        onClick={() => handleFormatSelectAndGenerate(format.id)}
-                                        className="flex flex-col items-center px-2 py-1 hover:bg-pink-600/20 rounded transition-colors group"
-                                      >
-                                        <div className="w-4 h-4 bg-pink-600/20 rounded mb-1 flex items-center justify-center">
-                                          <div className="w-2 h-2 bg-pink-300 rounded-sm" />
-                                        </div>
-                                        <span className="text-xs text-pink-300 group-hover:text-white">
-                                          {format.label}
-                                        </span>
-                                        <span className="text-[10px] text-pink-400 group-hover:text-pink-200">
-                                          {format.ratio}
-                                        </span>
-                                      </button>
-                                    ))}
-                                  </div>
-                                </motion.div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Generated Image Below Message */}
-                        {(message.imageUrl || message.isGeneratingImage) && (
-                          <div className="mt-2 relative rounded-xl overflow-hidden border border-pink-500/30 shadow-lg shadow-pink-500/10 max-w-[200px] group/img">
-                            {message.isGeneratingImage ? (
-                              <div className="aspect-[3/4] bg-dark-800/80 flex flex-col items-center justify-center space-y-3">
-                                <div className="w-6 h-6 border-2 border-pink-500 border-t-transparent rounded-full animate-spin" />
-                                <p className="text-[10px] text-pink-300 animate-pulse">Generating...</p>
-                              </div>
-                            ) : (
-                              <>
-                                <img
-                                  src={message.imageUrl}
-                                  alt="Scene"
-                                  className="w-full h-auto object-cover cursor-zoom-in hover:scale-105 transition-transform duration-500"
-                                  onClick={() => {
-                                    setZoomedImageUrl(message.imageUrl!);
-                                    setIsZoomed(true);
-                                  }}
-                                  onError={(e) => {
-                                    console.error('Failed to load message image:', message.imageUrl);
-                                    const target = e.target as HTMLImageElement;
-                                    target.style.display = 'none';
-                                  }}
-                                  onLoad={(e) => {
-                                    const target = e.target as HTMLImageElement;
-                                    target.style.display = 'block';
-                                  }}
-                                />
-                                {/* Regenerate Button */}
+                              {message.sender === 'character' && (
                                 <button
-                                  onClick={() => handleRegenerateMessageImage(message.id, message.content)}
-                                  className="absolute top-2 right-2 p-1.5 bg-black/60 backdrop-blur-md rounded-lg text-white opacity-0 group-hover/img:opacity-100 transition-opacity hover:text-pink-400"
-                                  title="Regenerate image"
+                                  onClick={() => handleRegenerateCharacterMessage(message.id, message.content)}
+                                  className="p-1 text-pink-300/70 hover:text-pink-200 hover:bg-pink-500/10 rounded-lg transition-all"
+                                  title="Regenerate message"
                                 >
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                   </svg>
                                 </button>
-                              </>
-                            )}
+                              )}
+
+                              <button
+                                onClick={() => handleDeleteMessage(message.id)}
+                                className="p-1 text-red-300/70 hover:text-red-200 hover:bg-red-500/10 rounded-lg transition-all"
+                                title="Delete message"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </div>
+
+                          {/* Generated Images Below Message */}
+                          {(getMessageImageUrls(message).length > 0 || message.isGeneratingImage) && (
+                            <div className="mt-2">
+                              <div className="flex items-start gap-2">
+                                <div className="flex items-start gap-2">
+                                  {getMessageImageUrls(message)
+                                    .slice(0, 2)
+                                    .map((url, idx) => (
+                                      <div
+                                        key={`${message.id}-img-${idx}`}
+                                        className="relative rounded-2xl overflow-hidden border border-pink-500/25 bg-black/10 shadow-lg shadow-black/30 w-[104px] group/img"
+                                      >
+                                        <img
+                                          src={url}
+                                          alt="Scene"
+                                          className="w-[104px] h-[132px] object-cover cursor-zoom-in hover:scale-105 transition-transform duration-500"
+                                          style={blurImages ? { filter: 'blur(12px)' } : undefined}
+                                          onClick={() => {
+                                            setZoomedImageUrl(url);
+                                            setIsZoomed(true);
+                                          }}
+                                        />
+                                        <div className="absolute top-2 right-2 flex gap-1">
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleRegenerateMessageImageAtIndex(message.id, message.content, idx);
+                                            }}
+                                            className="p-1.5 bg-black/60 backdrop-blur-md rounded-lg text-white hover:text-pink-200 border border-white/10 hover:border-pink-500/30 transition-all"
+                                            title="Regenerate image"
+                                          >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                            </svg>
+                                          </button>
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleDeleteMessageImageAtIndex(message.id, idx);
+                                            }}
+                                            className="p-1.5 bg-black/60 backdrop-blur-md rounded-lg text-white hover:text-red-200 border border-white/10 hover:border-red-500/30 transition-all"
+                                            title="Delete image"
+                                          >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ))}
+
+                                  {getMessageImageUrls(message).length > 2 && (
+                                    <button
+                                      onClick={() => openMessageImagesModal(message, 0)}
+                                      className="w-[104px] h-[132px] rounded-2xl border border-pink-500/25 bg-gradient-to-br from-dark-800/50 to-dark-900/30 text-pink-100 hover:bg-pink-500/10 transition-all duration-200 flex flex-col items-center justify-center gap-1"
+                                      title="View all images"
+                                    >
+                                      <span className="text-xl font-semibold">+{Math.max(getMessageImageUrls(message).length - 2, 1)}</span>
+                                      <span className="text-[11px] text-pink-200/80">View all</span>
+                                    </button>
+                                  )}
+                                </div>
+
+                                <div className="flex flex-col gap-2">
+                                  <button
+                                    onClick={() => handleGenerateMoreImagesForMessage(message.id, message.content)}
+                                    className="px-3 py-2 rounded-2xl text-xs font-semibold bg-gradient-to-r from-pink-600/15 to-dark-700/30 text-pink-100 border border-pink-500/20 hover:border-pink-500/35 hover:bg-pink-500/10 transition-all duration-200"
+                                    title="Generate another image for this message"
+                                  >
+                                    More images
+                                  </button>
+                                  {message.isGeneratingImage && (
+                                    <div className="px-3 py-2 rounded-2xl text-xs bg-dark-800/40 text-pink-200 border border-pink-500/15">
+                                      Generating...
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className={`mt-1 text-[11px] ${message.sender === 'user' ? 'text-right text-pink-200/70' : message.sender === 'system' ? 'text-center text-dark-400' : 'text-left text-dark-400'}`}>
+                          {message.timestamp instanceof Date ? message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                        </div>
+                      </div>
+
+                        {message.sender === 'user' && (
+                          <div className="w-9 h-9 rounded-2xl bg-pink-600/20 border border-pink-500/20 backdrop-blur-md flex items-center justify-center text-xs font-semibold text-pink-200 shadow-sm shadow-black/20 select-none" title="You">
+                            Y
                           </div>
                         )}
-                        <div className={`mt-1 text-xs text-pink-300 ${message.sender === 'user' ? 'text-right' : 'text-left'}`}>
-                          {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </div>
                       </div>
                     </motion.div>
                   ))}
-
-                  {isTyping && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="flex justify-start"
-                    >
-                      <div className="bg-dark-800/50 text-dark-200 px-5 py-3 rounded-2xl border border-pink-500/30 backdrop-blur-sm">
-                        <div className="flex space-x-1">
-                          <div className="w-2 h-2 bg-pink-500 rounded-full animate-bounce" />
-                          <div className="w-2 h-2 bg-pink-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-                          <div className="w-2 h-2 bg-pink-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
                 </AnimatePresence>
+                {isTyping && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex justify-start"
+                  >
+                    <div className="bg-dark-800/40 text-dark-200 px-5 py-3 rounded-3xl border border-dark-700/60 ring-1 ring-white/5 backdrop-blur-md shadow-md shadow-black/20">
+                      <div className="flex space-x-1">
+                        <div className="w-2 h-2 bg-pink-500 rounded-full animate-bounce" />
+                        <div className="w-2 h-2 bg-pink-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                        <div className="w-2 h-2 bg-pink-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
                 <div ref={messagesEndRef} />
               </div>
             </div>
@@ -1145,6 +1393,15 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
             {/* Message Input */}
             <div className="p-3 sm:p-4 lg:p-6 border-t border-dark-700/50 backdrop-blur-sm">
               <div className="max-w-4xl mx-auto">
+                {showFormatSelector && pendingGeneration && (
+                  <div className="flex justify-center mb-3" onClick={(e) => e.stopPropagation()}>
+                    <FormatSelector
+                      selectedFormat={selectedFormat}
+                      onFormatChange={handleFormatSelectAndGenerate}
+                      disabled={false}
+                    />
+                  </div>
+                )}
                 {/* Buttons Above Input */}
                 <div className="flex items-center justify-center space-x-3 mb-3">
                   {/* Gallery Button */}
@@ -1481,6 +1738,162 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                     </div>
                   </button>
                 ))}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* All Images Modal */}
+      <AnimatePresence>
+        {showAllImagesModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={closeAllImagesModal}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-gradient-to-br from-dark-800/95 to-dark-950/95 border border-dark-600/70 rounded-3xl w-full max-w-5xl max-h-[90vh] overflow-hidden shadow-2xl shadow-black/60"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+                <div className="flex flex-col">
+                  <h2 className="text-lg font-semibold text-pink-200">All Images</h2>
+                  <div className="text-xs text-dark-300">{activeMessageImageIndex + 1} / {activeMessageImages.length}</div>
+                </div>
+                <button
+                  onClick={closeAllImagesModal}
+                  className="w-10 h-10 flex items-center justify-center text-dark-300 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="p-6 overflow-y-auto">
+                {activeMessageImages.length > 0 && (
+                  <div className="mb-5">
+                    <div className="relative rounded-3xl overflow-hidden border border-pink-500/15 bg-gradient-to-br from-black/30 to-black/10">
+                      <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+                    <img
+                      src={activeMessageImages[activeMessageImageIndex]}
+                      alt="Message image"
+                      className="w-full h-[52vh] object-contain cursor-zoom-in"
+                      style={blurImages ? { filter: 'blur(12px)' } : undefined}
+                      onClick={() => {
+                        setZoomedImageUrl(activeMessageImages[activeMessageImageIndex]);
+                        setIsZoomed(true);
+                      }}
+                    />
+
+                    <div className="absolute top-4 right-4 flex gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!activeMessageId) return;
+                          handleRegenerateMessageImageAtIndex(activeMessageId, activeMessageContent, activeMessageImageIndex);
+                        }}
+                        className="w-11 h-11 rounded-2xl bg-black/50 backdrop-blur-md text-white flex items-center justify-center border border-white/10 hover:border-pink-500/30 hover:text-pink-200 hover:bg-black/60 transition-all"
+                        title="Regenerate this image"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!activeMessageId) return;
+                          handleDeleteMessageImageAtIndex(activeMessageId, activeMessageImageIndex);
+                        }}
+                        className="w-11 h-11 rounded-2xl bg-black/50 backdrop-blur-md text-white flex items-center justify-center border border-white/10 hover:border-red-500/30 hover:text-red-200 hover:bg-black/60 transition-all"
+                        title="Delete this image"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+
+                    {activeMessageImages.length > 1 && (
+                      <>
+                        <button
+                          onClick={() => setActiveMessageImageIndex((i) => (i - 1 + activeMessageImages.length) % activeMessageImages.length)}
+                          className="absolute left-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-2xl bg-black/50 backdrop-blur-md text-white flex items-center justify-center border border-white/10 hover:border-pink-500/30 hover:text-pink-200 hover:bg-black/60 transition-all"
+                          title="Previous"
+                        >
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => setActiveMessageImageIndex((i) => (i + 1) % activeMessageImages.length)}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-2xl bg-black/50 backdrop-blur-md text-white flex items-center justify-center border border-white/10 hover:border-pink-500/30 hover:text-pink-200 hover:bg-black/60 transition-all"
+                          title="Next"
+                        >
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  </div>
+                )}
+
+                <div className="flex gap-3 overflow-x-auto pb-2">
+                  {activeMessageImages.map((url, idx) => (
+                    <button
+                      key={`message-img-${idx}`}
+                      className={`relative shrink-0 rounded-2xl overflow-hidden border transition-all duration-200 group/thumb ${idx === activeMessageImageIndex
+                        ? 'border-pink-500/80 ring-2 ring-pink-500/20'
+                        : 'border-white/10 hover:border-pink-500/35'
+                        }`}
+                      onClick={() => setActiveMessageImageIndex(idx)}
+                    >
+                      <img
+                        src={url}
+                        alt="Chat image"
+                        className="w-[128px] h-[84px] object-cover"
+                        style={blurImages ? { filter: 'blur(12px)' } : undefined}
+                      />
+                      <div className="absolute top-1 right-1 flex gap-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!activeMessageId) return;
+                            handleRegenerateMessageImageAtIndex(activeMessageId, activeMessageContent, idx);
+                          }}
+                          className="p-1 bg-black/60 backdrop-blur-md rounded-lg text-white hover:text-pink-200 border border-white/10 hover:border-pink-500/30 transition-all"
+                          title="Regenerate"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!activeMessageId) return;
+                            handleDeleteMessageImageAtIndex(activeMessageId, idx);
+                          }}
+                          className="p-1 bg-black/60 backdrop-blur-md rounded-lg text-white hover:text-red-200 border border-white/10 hover:border-red-500/30 transition-all"
+                          title="Delete"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
             </motion.div>
           </motion.div>
