@@ -64,12 +64,86 @@ const joinAndDedupeTags = (...pieces: Array<string | undefined | null | false>):
   return dedupeCommaTags(joined);
 };
 
+const removeCommaTags = (input: string, removeTagsLower: Set<string>): string => {
+  const parts = String(input || '')
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  const result: string[] = [];
+  for (const part of parts) {
+    const key = part.toLowerCase();
+    if (removeTagsLower.has(key)) continue;
+    result.push(part);
+  }
+  return result.join(', ');
+};
+
+const COMPOSITION_TRIGGER_TAGS_LOWER = new Set<string>([
+  'side by side',
+  'split screen',
+  'reference sheet',
+  'character sheet',
+  'turnaround',
+  'multiple views',
+  'two views',
+  'three views',
+  'collage',
+  'panel',
+  'panels',
+  'comic',
+  'comic panel'
+]);
+
+const sanitizeCompositionTagsFromPrompt = (commaTags: string): string => {
+  return removeCommaTags(commaTags, COMPOSITION_TRIGGER_TAGS_LOWER);
+};
+
+const shouldPreferNonFullBodyFromCameraTags = (cameraTags: string[]): boolean => {
+  const lower = (Array.isArray(cameraTags) ? cameraTags : []).map((t) => String(t || '').toLowerCase());
+  return (
+    lower.some((t) => t.includes('close-up') || t.includes('close up')) ||
+    lower.some((t) => t.includes('portrait')) ||
+    lower.some((t) => t.includes('upper body')) ||
+    lower.some((t) => t.includes('lower body'))
+  );
+};
+
+const SOLO_ENFORCING_TAGS_LOWER = new Set<string>([
+  'solo',
+  'single character',
+  'single character composition',
+  'one subject centered',
+  'one subject',
+  'one subject centered composition',
+]);
+
 const ensureSoloPromptTags = (input: string): string => {
-  const base = String(input || '').trim();
-  if (!base) return 'solo';
+  const cleaned = removeCommaTags(String(input || '').trim(), SOLO_ENFORCING_TAGS_LOWER);
+  if (!cleaned) return 'solo';
 
   const mustIncludeLower = ['solo', '1girl', 'single character'];
-  const parts = base
+  const parts = cleaned
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean);
+  const lower = parts.map((p) => p.toLowerCase());
+
+  for (const tag of mustIncludeLower) {
+    if (!lower.includes(tag)) {
+      parts.unshift(tag);
+      lower.unshift(tag);
+    }
+  }
+  return dedupeCommaTags(parts.join(', '));
+};
+
+const ensureCouplePromptTags = (input: string): string => {
+  const cleaned = removeCommaTags(String(input || '').trim(), SOLO_ENFORCING_TAGS_LOWER);
+  if (!cleaned) return '1girl, 1boy';
+
+  const mustIncludeLower = ['1girl', '1boy'];
+  const parts = cleaned
     .split(',')
     .map((p) => p.trim())
     .filter(Boolean);
@@ -90,11 +164,11 @@ const detectOralSexIntentFromMessage = (messageContent?: string) => {
   const mentionsOral =
     t.includes('blowjob') ||
     t.includes('deepthroat') ||
+    t.includes('oral') ||
     t.includes('suck') ||
     t.includes('sucking') ||
     t.includes('lick') ||
-    t.includes('licking') ||
-    t.includes('oral');
+    t.includes('licking');
   const explicitOral = mentionsCock && mentionsOral;
   return {
     explicitOral,
@@ -115,6 +189,123 @@ const ensureNoMultiSubjectNegativeTags = (input: string): string => {
     'orgy',
     'multiple people',
     'extra person',
+    'duplicate',
+    'duplicates'
+  );
+};
+
+const ensureNoReferenceSheetNegativeTags = (input: string): string => {
+  return joinAndDedupeTags(
+    input,
+    'reference sheet',
+    'character sheet',
+    'turnaround',
+    'multiple views',
+    'two views',
+    'three views',
+    'split screen',
+    'collage',
+    'comic',
+    'comic panel',
+    'panel',
+    'panels',
+    'triptych'
+  );
+};
+
+const shouldSuppressReferenceSheetFromText = (text?: string): boolean => {
+  const t = String(text || '').toLowerCase();
+  if (!t) return false;
+  return (
+    t.includes('side by side') ||
+    t.includes('multiple views') ||
+    t.includes('two views') ||
+    t.includes('three views') ||
+    t.includes('front view') ||
+    t.includes('back view') ||
+    t.includes('reference sheet') ||
+    t.includes('character sheet') ||
+    t.includes('turnaround') ||
+    t.includes('split screen') ||
+    t.includes('collage') ||
+    t.includes('comic panel')
+  );
+};
+
+const shouldIncludeMalePartnerFromCurrentText = (messageContent?: string): boolean => {
+  const t = String(messageContent || '').toLowerCase();
+  if (!t) return false;
+
+  // Only add a male partner when the CURRENT text strongly implies another person
+  // or a partnered act. Do NOT infer a male partner from nudity/anatomy alone.
+  const partnerCues = [
+    '1boy',
+    'boy',
+    'man',
+    'with him',
+    'with a man',
+    'with a boy',
+    'couple',
+    'couples',
+    'kissing',
+    'kiss',
+    'make out',
+    'making out',
+    'hugging',
+    'hug',
+    'cuddling',
+    'cuddle',
+    'holding hands',
+    'handholding',
+    'hand holding',
+    'dancing',
+    'dance',
+    'cock',
+    'dick',
+    'penis',
+    'balls',
+    'blowjob',
+    'deepthroat',
+    'handjob',
+    'throat fuck',
+    'throatfuck',
+    'vaginal sex',
+    'anal sex',
+    'penetration',
+    'fuck',
+    'fucking',
+    'intercourse',
+    'creampie',
+    'cumshot',
+    'cum in',
+  ];
+  return partnerCues.some((cue) => t.includes(cue));
+};
+
+const isSelfActionFromCurrentText = (messageContent?: string): boolean => {
+  const t = String(messageContent || '').toLowerCase();
+  if (!t) return false;
+
+  const selfRef = t.includes('herself') || t.includes('her own') || t.includes('by herself');
+  if (!selfRef) return false;
+
+  const actCues = ['blowjob', 'deepthroat', 'oral', 'suck', 'sucking'];
+  return actCues.some((cue) => t.includes(cue));
+};
+
+const PARTNER_BLOCKING_NEGATIVE_TAGS_LOWER = new Set<string>(['multiple people', 'extra person']);
+
+const ensureNoExtraPeopleNegativeTagsForCouple = (input: string): string => {
+  return joinAndDedupeTags(
+    input,
+    'multiple girls',
+    '2girls',
+    'two girls',
+    '3girls',
+    'three girls',
+    'group',
+    'threesome',
+    'orgy',
     'duplicate',
     'duplicates'
   );
@@ -194,7 +385,7 @@ const applyHiresFixSettings = (payload: any, settings?: any): any => {
     ...payload,
     enable_hr: true,
     hr_scale: typeof settings?.hiresScale === 'number' ? settings.hiresScale : 2,
-    hr_upscaler: typeof settings?.hiresUpscaler === 'string' ? settings.hiresUpscaler : 'Latent',
+    hr_upscaler: typeof settings?.hiresUpscaler === 'string' ? settings.hiresUpscaler : 'R-ESRGAN 4x+ Anime6B',
     hr_second_pass_steps: typeof settings?.hiresSteps === 'number' ? settings.hiresSteps : 0,
     denoising_strength: typeof settings?.hiresDenoise === 'number' ? settings.hiresDenoise : 0.35,
   };
@@ -491,7 +682,6 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle, settings?: an
     mainTagLower.includes('doggy style') ||
     mainTagLower.includes('missionary') ||
     mainTagLower.includes('cowgirl') ||
-    mainTagLower.includes('reverse cowgirl') ||
     mainTagLower.includes('riding') ||
     mainTagLower.includes('cock') ||
     mainTagLower.includes('dick') ||
@@ -546,7 +736,6 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle, settings?: an
     specialPromptLower.includes('doggy style') ||
     specialPromptLower.includes('missionary') ||
     specialPromptLower.includes('cowgirl') ||
-    specialPromptLower.includes('reverse cowgirl') ||
     specialPromptLower.includes('riding') ||
     specialPromptLower.includes('cock') ||
     specialPromptLower.includes('dick') ||
@@ -611,7 +800,7 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle, settings?: an
 
   const isMinor = ageNumber !== null && ageNumber < 18;
   const subjectDescriptor = isMinor ? 'loli, small, mini size, shortstack, goblin size, tiny size, petite size, small legs, small hands' : 'woman';
-  const malePartnerPrompt = (hasSexualContent && !isSelfAction) ? 'male, man' : '';
+  const malePartnerPrompt = (!isSelfAction && shouldIncludeMalePartnerFromCurrentText(messageContent)) ? 'male, man' : '';
   const soloDescriptor = hasSexualContent ? '' : 'solo';
   const ageDescriptor =
     ageNumber === null
@@ -847,6 +1036,7 @@ const buildNegativePrompt = (draft?: CharacterDraft, messageContent?: string): s
     specialPromptSexual.includes('intercourse') ||
     specialPromptSexual.includes('blowjob') ||
     specialPromptSexual.includes('deepthroat') ||
+    specialPromptSexual.includes('autofellatio') ||
     specialPromptSexual.includes('fucking') ||
     specialPromptSexual.includes('penetration') ||
     specialPromptSexual.includes('anal') ||
@@ -1450,11 +1640,32 @@ export const automatic1111API = {
         body: JSON.stringify({ payload })
       });
 
+      const contentType = response.headers.get('content-type') || '';
+      const raw = await response.text();
+
       if (!response.ok) {
-        throw new Error(`Automatic1111 API error: ${response.statusText}`);
+        let details = raw;
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object') {
+            details =
+              typeof (parsed as any).details === 'string'
+                ? (parsed as any).details
+                : typeof (parsed as any).message === 'string'
+                  ? (parsed as any).message
+                  : raw;
+          }
+        } catch {
+          // ignore
+        }
+
+        throw new Error(`Automatic1111 API error (${response.status}): ${details || response.statusText}`);
       }
 
-      const result = await response.json();
+      const result = contentType.includes('application/json') ? JSON.parse(raw) : null;
+      if (!result) {
+        throw new Error('Automatic1111 API returned a non-JSON response');
+      }
 
       if (!result.images || result.images.length === 0) {
         throw new Error('No images returned from Automatic1111');
@@ -1522,6 +1733,7 @@ export const automatic1111API = {
     const rawEnvironments = imagePlan?.environments && imagePlan.environments.length > 0 ? imagePlan.environments : [];
     const rawClothing = imagePlan?.clothing && imagePlan.clothing.length > 0 ? imagePlan.clothing : [];
     const rawNegative = imagePlan?.negative && imagePlan.negative.length > 0 ? imagePlan.negative : [];
+    const rawCamera = imagePlan?.camera && imagePlan.camera.length > 0 ? imagePlan.camera : [];
 
     if (rawEmotionsFull.length > 1) {
       console.log('[IMAGE PLAN] normalized emotions (keeping last):', { before: rawEmotionsFull, after: rawEmotions });
@@ -1592,6 +1804,7 @@ export const automatic1111API = {
       : '';
 
     const customPromptBase = joinAndDedupeTags(
+      rawCamera.length > 0 ? rawCamera.join(', ') : '',
       rawActions.length > 0 ? rawActions.join(', ') : '',
       rawDetails.length > 0 ? rawDetails.join(', ') : '',
       normalizedPosesResult.poses.length > 0 ? normalizedPosesResult.poses.join(', ') : '',
@@ -1601,7 +1814,18 @@ export const automatic1111API = {
       oralBoostPrompt
     );
 
-    const customPrompt = oralIntent.explicitOral ? customPromptBase : ensureSoloPromptTags(customPromptBase);
+    const shouldSuppressReferenceSheet = shouldSuppressReferenceSheetFromText(customPromptBase);
+    const sanitizedCustomPromptBase = sanitizeCompositionTagsFromPrompt(customPromptBase);
+
+    const wantsPartner =
+      !isSelfActionFromCurrentText(messageContent) &&
+      (shouldIncludeMalePartnerFromCurrentText(messageContent) || shouldIncludeMalePartnerFromCurrentText(customPromptBase));
+
+    const customPrompt = oralIntent.explicitOral
+      ? sanitizedCustomPromptBase
+      : wantsPartner
+        ? ensureCouplePromptTags(sanitizedCustomPromptBase)
+        : ensureSoloPromptTags(sanitizedCustomPromptBase);
     
 
     console.log(`[PROMPT DEBUG] Custom prompt built: "${customPrompt}"`);
@@ -1625,9 +1849,22 @@ export const automatic1111API = {
       )
     };
 
-    messageDraft.specialNegativePrompt = ensureNoMultiSubjectNegativeTags(messageDraft.specialNegativePrompt);
+    if (wantsPartner) {
+      messageDraft.specialNegativePrompt = removeCommaTags(messageDraft.specialNegativePrompt, PARTNER_BLOCKING_NEGATIVE_TAGS_LOWER);
+      messageDraft.specialNegativePrompt = ensureNoExtraPeopleNegativeTagsForCouple(messageDraft.specialNegativePrompt);
+    } else {
+      messageDraft.specialNegativePrompt = ensureNoMultiSubjectNegativeTags(messageDraft.specialNegativePrompt);
+    }
+    if (shouldSuppressReferenceSheet) {
+      messageDraft.specialNegativePrompt = ensureNoReferenceSheetNegativeTags(messageDraft.specialNegativePrompt);
+    }
 
     console.log(`[PROMPT DEBUG] Final specialPrompt: "${messageDraft.specialPrompt}"`);
+
+    const preferNonFullBody = shouldPreferNonFullBodyFromCameraTags(rawCamera);
+    if (preferNonFullBody) {
+      messageDraft.specialPrompt = joinAndDedupeTags('(lower body:1.1)', messageDraft.specialPrompt);
+    }
 
     const payloadForMessage = this.buildPayloadForMessageImage(messageDraft, style, model, aspectRatio, messageContent);
     const imageUrl = await this.generateImageWithPayload(payloadForMessage, messageDraft, style, model);
@@ -1662,6 +1899,17 @@ export const automatic1111API = {
 
     let prompt = buildPrompt(draft, style, settings, messageContent);
     let negativePrompt = buildNegativePrompt(draft, messageContent);
+
+    const cameraLower = String(draft?.specialPrompt || '').toLowerCase();
+    const wantsNonFullBody =
+      cameraLower.includes('close-up') ||
+      cameraLower.includes('close up') ||
+      cameraLower.includes('portrait') ||
+      cameraLower.includes('upper body') ||
+      cameraLower.includes('lower body');
+    if (wantsNonFullBody) {
+      prompt = removeCommaTags(prompt, new Set<string>(['full body']));
+    }
 
     // Apply model-specific score tags
     if (style === CharacterStyle.REALISTIC || model === AIModel.CYBERREALISTIC) {
@@ -1701,7 +1949,6 @@ export const automatic1111API = {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer YOUR_API_KEY' // Add API key to the headers
         },
         body: JSON.stringify(payload)
       });
@@ -1754,31 +2001,56 @@ export const automatic1111API = {
   async generateHiresImage(payload: any): Promise<string> {
     try {
       // Enable hires fix with upscaling
-      const hiresPayload = {
+      const preferredUpscaler =
+        typeof payload?.hr_upscaler === 'string' && payload.hr_upscaler.trim().length > 0
+          ? payload.hr_upscaler
+          : 'R-ESRGAN 4x+ Anime6B';
+
+      const makeHiresPayload = (hr_upscaler: string) => ({
         ...payload,
         enable_hr: true,
         hr_scale: 1.5, // Reduced from 2.0 to prevent artifacts
-        hr_upscaler: '4x-UltraSharp', // Better upscaler than Latent
+        hr_upscaler,
         hr_second_pass_steps: Math.floor(payload.steps * 0.7), // More steps for better quality
-        hr_resize_x: payload.width * 1.5,
-        hr_resize_y: payload.height * 1.5,
+        hr_resize_x: Math.round(payload.width * 1.5),
+        hr_resize_y: Math.round(payload.height * 1.5),
         denoising_strength: 0.5, // Reduced from 0.7 to prevent artifacts
-      };
-
-      const response = await fetch(`${AUTOMATIC1111_URL}/sdapi/v1/txt2img`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer YOUR_API_KEY'
-        },
-        body: JSON.stringify(hiresPayload)
       });
 
-      if (!response.ok) {
-        throw new Error(`Automatic1111 API error: ${response.statusText}`);
+      const attempt = async (hr_upscaler: string) => {
+        const response = await fetch(`${AUTOMATIC1111_URL}/sdapi/v1/txt2img`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(makeHiresPayload(hr_upscaler))
+        });
+
+        const contentType = response.headers.get('content-type') || '';
+        const raw = await response.text();
+
+        return { response, contentType, raw, hr_upscaler };
+      };
+
+      let attemptResult = await attempt(preferredUpscaler);
+
+      if (!attemptResult.response.ok) {
+        const message = String(attemptResult.raw || '');
+        const maybeUpscalerError = message.toLowerCase().includes('could not find upscaler named');
+        if (maybeUpscalerError && preferredUpscaler !== 'Latent') {
+          attemptResult = await attempt('Latent');
+        }
       }
 
-      const result = await response.json();
+      if (!attemptResult.response.ok) {
+        throw new Error(
+          `Automatic1111 API error (${attemptResult.response.status}): ${attemptResult.raw || attemptResult.response.statusText}`
+        );
+      }
+
+      const result = attemptResult.contentType.includes('application/json')
+        ? JSON.parse(attemptResult.raw)
+        : JSON.parse(attemptResult.raw);
 
       if (!result.images || result.images.length === 0) {
         throw new Error('No images returned from Automatic1111');

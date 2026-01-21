@@ -75,6 +75,193 @@ const getRaceKeyFromCharacter = (character: CharacterDraft): string => {
     return 'human';
 };
 
+const IMAGE_PLAN_KEYS = [
+    'camera',
+    'actions',
+    'poses',
+    'emotions',
+    'environments',
+    'clothing',
+    'negative',
+    'details'
+] as const;
+
+const buildImagePlanSystemPrompt = (env: string, clothing: string): string => {
+    const parts: string[] = [
+        'Output ONLY valid JSON. No markdown. No extra text.',
+        `Return exactly one JSON object with keys: ${IMAGE_PLAN_KEYS.join(', ')}.`,
+        'Every value must be an array of strings (or empty array).',
+        'Convert the latest chat intent into concise Stable Diffusion style tags (not prose).',
+        'Focus on the latest turn only.',
+        'High recall: copy concrete visual phrases from the text into tags (short 1-6 words). Preserve adjectives/colors/body parts.',
+        'Use details[] for explicit visible body parts and notable visible specifics (e.g. colors, wetness, "puckered", "both visible").',
+        'Use actions[] for physical actions (e.g. "lifting hips", "revealing", "winking").',
+        'Use poses[] for posture/body positioning inferred directly from the described action (do not guess).',
+        'If the text describes explicit anatomy/details that must be visible, set camera[] to help composition (e.g. "close-up", "lower body").',
+        'Avoid composition terms that often create multi-panel/reference-sheet images (e.g. "reference sheet", "split screen", "multiple views", "side by side").',
+        'emotions[]: character facial expression/mood only (max 1).',
+        'negative[]: ONLY if the user explicitly negates something ("no X", "don\'t show X", "keep clothes on"). Never invent negatives.'
+    ];
+    if (env) parts.push(`If location is not specified, use this default environment: ${JSON.stringify(env)}.`);
+    if (clothing) parts.push(`If clothing is not specified, keep this default clothing: ${JSON.stringify(clothing)}.`);
+    parts.push(
+        'Examples (style reference; do not repeat these, just follow the pattern):',
+        'INPUT: "giggles and lifts her body up slightly, revealing both of her pink slit and puckered anus side by side. gives you a playful wink"',
+        'OUTPUT: {"camera":["close-up","lower body"],"actions":["lifting body up","revealing","winking"],"poses":["hips lifted"],"emotions":["playful"],"environments":[],"clothing":["nude"],"negative":[],"details":["pink slit","puckered anus","both visible"]}',
+        'INPUT: "smiles softly, sitting on the couch"',
+        'OUTPUT: {"camera":[],"actions":[],"poses":["sitting"],"emotions":["soft smile"],"environments":["on a couch"],"clothing":[],"negative":[],"details":[]}'
+    );
+    return parts.join(' ');
+};
+
+const extractFirstJsonObject = (text: string): string => {
+    const s = String(text || '');
+    const start = s.indexOf('{');
+    if (start === -1) return s.trim();
+    let depth = 0;
+    for (let i = start; i < s.length; i++) {
+        const ch = s[i];
+        if (ch === '{') depth++;
+        if (ch === '}') depth--;
+        if (depth === 0) return s.slice(start, i + 1).trim();
+    }
+    return s.slice(start).trim();
+};
+
+const tryParseJson = (text: string): any => {
+    const raw = String(text || '').trim();
+    const trimmed = extractFirstJsonObject(raw);
+    try {
+        return JSON.parse(trimmed);
+    } catch {
+        const repaired = trimmed
+            .replace(/^[\s\S]*?\{/m, '{')
+            .replace(/\}[\s\S]*$/m, '}')
+            .replace(/[“”]/g, '"')
+            .replace(/[‘’]/g, "'")
+            .replace(/,\s*([\]}])/g, '$1');
+        return JSON.parse(repaired);
+    }
+};
+
+const normalizeStringArray = (value: any): string[] => {
+    const raw = Array.isArray(value) ? value : [];
+    const exploded = raw.flatMap((item) => {
+        const s = String(item ?? '').trim();
+        if (!s) return [];
+        if (s.includes(',')) {
+            return s
+                .split(',')
+                .map((p) => p.trim())
+                .filter(Boolean);
+        }
+        return [s];
+    });
+
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const item of exploded) {
+        const cleaned = String(item || '').trim().replace(/^"+|"+$/g, '');
+        if (!cleaned) continue;
+        const key = cleaned.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(cleaned.length > 80 ? cleaned.slice(0, 80) : cleaned);
+        if (out.length >= 48) break;
+    }
+    return out;
+};
+
+const coerceImagePlan = (parsed: any): ImageGenerationPlan => {
+    const p = parsed && typeof parsed === 'object' ? parsed : {};
+    const plan: ImageGenerationPlan = {
+        camera: normalizeStringArray((p as any).camera),
+        actions: normalizeStringArray((p as any).actions),
+        poses: normalizeStringArray((p as any).poses),
+        emotions: normalizeStringArray((p as any).emotions),
+        environments: normalizeStringArray((p as any).environments),
+        clothing: normalizeStringArray((p as any).clothing),
+        negative: normalizeStringArray((p as any).negative),
+        details: normalizeStringArray((p as any).details),
+    };
+    if (plan.emotions && plan.emotions.length > 1) plan.emotions = [plan.emotions[0]];
+    return plan;
+};
+
+const backfillFromTranscript = (plan: ImageGenerationPlan, transcriptText: string): ImageGenerationPlan => {
+    return plan;
+};
+
+const sanitizeNegativesFromTranscript = (plan: ImageGenerationPlan, transcriptText: string): ImageGenerationPlan => {
+    const t = String(transcriptText || '').toLowerCase();
+    const current = Array.isArray(plan.negative) ? plan.negative : [];
+    if (current.length === 0) return plan;
+
+    const hasNegationCue =
+        t.includes('no ') ||
+        t.includes("don't") ||
+        t.includes('dont') ||
+        t.includes('do not') ||
+        t.includes('without') ||
+        t.includes('never') ||
+        t.includes('avoid') ||
+        t.includes('not show') ||
+        t.includes("don't show") ||
+        t.includes('dont show') ||
+        t.includes('keep clothes on') ||
+        t.includes('keep her clothes on') ||
+        t.includes('keep your clothes on');
+
+    if (!hasNegationCue) {
+        plan.negative = [];
+        return plan;
+    }
+
+    const extracted: string[] = [];
+    const add = (s: string) => {
+        const v = String(s || '').trim();
+        if (!v) return;
+        extracted.push(v);
+    };
+
+    for (const m of t.matchAll(/\bno\s+([a-z0-9]+(?:\s+[a-z0-9]+){0,2})/g)) {
+        add(`no ${m[1]}`);
+    }
+    for (const m of t.matchAll(/\b(?:dont|don't|do not)\s+(?:show|include|add|generate|draw)\s+([a-z0-9]+(?:\s+[a-z0-9]+){0,2})/g)) {
+        add(`no ${m[1]}`);
+    }
+
+    const merged = normalizeStringArray([...extracted, ...current.filter((n) => t.includes(String(n || '').toLowerCase()))]);
+
+    const mentionsAnus = t.includes('anus') || t.includes('asshole') || (t.includes('puckered') && t.includes('anus'));
+    const mentionsPussy =
+        t.includes('pussy') ||
+        t.includes('vagina') ||
+        t.includes('vulva') ||
+        (t.includes('slit') && (t.includes('pink') || t.includes('wet') || t.includes('revealing')));
+    const explicitlyNegatesAnus =
+        t.includes('no anus') || t.includes('no asshole') || t.includes("don't show anus") || t.includes('dont show anus') || t.includes('do not show anus');
+    const explicitlyNegatesPussy =
+        t.includes('no pussy') ||
+        t.includes('no vagina') ||
+        t.includes('no vulva') ||
+        t.includes("don't show pussy") ||
+        t.includes('dont show pussy') ||
+        t.includes('do not show pussy') ||
+        t.includes("don't show vagina") ||
+        t.includes('dont show vagina') ||
+        t.includes('do not show vagina');
+
+    plan.negative = merged.filter((n) => {
+        const nl = String(n || '').toLowerCase();
+        if (mentionsAnus && !explicitlyNegatesAnus && nl.includes('anus')) return false;
+        if (mentionsPussy && !explicitlyNegatesPussy && (nl.includes('pussy') || nl.includes('vagina') || nl.includes('vulva'))) return false;
+        return true;
+    });
+
+    return plan;
+};
+
 export const lmStudioService = {
     async sendMessage(messages: ChatMessage[], character: CharacterDraft) {
         const systemPrompt = this.constructSystemPrompt(character);
@@ -127,55 +314,7 @@ export const lmStudioService = {
     async generateImagePlan(messages: ChatMessage[], character: CharacterDraft): Promise<ImageGenerationPlan> {
         const env = String(character.appearance?.environment || '').trim();
         const clothing = String(character.appearance?.clothing || '').trim();
-        const envInstruction = env
-            ? `If the scene location is NOT explicitly specified by the user, use the character environment: "${env}". `
-            : 'If the scene location is NOT explicitly specified by the user, omit environments (or return an empty array). ';
-        const systemPrompt =
-            'You are a deterministic information-extraction tool that outputs ONLY valid JSON. No markdown, no explanations. ' +
-            'Return EXACTLY one JSON object with keys: camera, actions, poses, emotions, environments, clothing, negative, details. ' +
-            'Each key value must be an array of strings (or an empty array). Never return non-array values. ' +
-            'Your goal: convert the latest chat intent into concise Stable Diffusion style tags. Prefer concrete visual tags, not prose. ' +
-            'Scope: focus on what is happening NOW in the latest turn (latest user message and/or latest character message). Do not import earlier scene actions unless they are reaffirmed in the latest turn. ' +
-            'Character vs user: emotions describe ONLY the character\'s facial expression/mood. If both user and character text exists, use character text as primary source for emotions and the combined latest turn for actions/poses. ' +
-            'Return AT MOST ONE emotion (dominant). ' +
-            'NEVER hallucinate. If the latest turn is dialogue-only (talking/insulting/flirting/threats/desires with no physical act described), actions must be empty (except non-sexual conversational-safe physical acts explicitly stated like "slaps you" or "hugs you"). ' +
-            'Critical: do not output sexual actions unless an explicit sexual ACT is described in the latest turn (clear physical act words). Desire/intent alone ("i want", "i\'d like", "make love") is NOT an act. ' +
-            'Violence/injury extraction (only when explicit): if the text describes cutting, stabbing, amputation, blood, wounds, or self-inflicted injury, include concrete visual tags like "cutting", "cutting off hand", "bleeding", "blood", "injury" (keep them short). Do not invent gore if it is not mentioned. ' +
-            'Use details[] for specific interaction targets and explicit contact mechanics (e.g., "cock to nipple", "nipple penetration", "penetrating nipple", "tip touching nipple", "hand on breast", "mouth on nipple"). Keep these short (1-4 words) and only include if explicitly described. ' +
-            'Normalization: prefer these canonical tags when applicable (use only those supported by the text): ' +
-            'Sex acts: "vaginal sex", "anal sex", "blowjob", "deepthroat", "throat fucking", "handjob", "fingering", "cunnilingus", "rimming", "facial", "cumshot", "creampie", "cumming", "cum in mouth", "spitroast", "double penetration". ' +
-            'Non-sex intimacy: "kissing", "making out", "hugging", "cuddling", "caressing", "groping", "grinding", "lap sitting", "neck kiss", "breast fondling". ' +
-            'Aggression/force (only if explicit): "slapping", "choking", "hair pulling", "pushing", "pinning", "spanking", "scratching", "biting", "tearing clothes". ' +
-            'Injury/violence (only if explicit): "cutting", "stabbing", "bleeding", "injury", "wounded", "blood". ' +
-            'Body exposure: "nude", "topless", "panties down", "spread legs", "showing pussy", "showing ass", "showing anus", "presenting anus", "arched back". ' +
-            'Camera tags: "close-up", "portrait", "upper body", "full body", "wide shot", "over-the-shoulder", "POV", "low angle", "high angle", "rear view", "front view", "side view". ' +
-            'Pose tags (pick coherent ones): "standing", "kneeling", "on knees", "lying down", "on back", "on stomach", "sitting", "straddling", "bent over", "doggystyle position", "missionary position", "cowgirl position", "reverse cowgirl", "legs up", "spread legs", "presenting pose". ' +
-            'Color/descriptor extraction: include visually relevant adjectives from the text (colors, wetness, tears, sweat, bruises, lipstick, mascara, blush) as tags, e.g. "teary eyes", "sweaty", "messy hair", "red lipstick". ' +
-            'Negations: if the text says NOT to include something ("no anal", "don\'t show nipples", "keep clothes on", "no cum"), then add the forbidden items as negative tags and do not include them in actions/poses. ' +
-            'Ambiguity rules (choose the safest accurate tag): ' +
-            '1) "from behind" is a camera/pose tag, not automatically sex. Only output "vaginal sex"/"anal sex" if penetration is explicitly described. ' +
-            '2) "penetrated from behind" implies penetration but canal may be unclear: ' +
-            '   - If anus/ass/anal is mentioned => "anal sex". ' +
-            '   - Else if pussy/vagina is mentioned => "vaginal sex". ' +
-            '   - Else use "vaginal sex" only if the text explicitly indicates vaginal; otherwise omit sex act and use a neutral pose tag like "from behind" + "penetration" is NOT allowed as a tag. ' +
-            '3) "balls deep"/"gagging"/"choking on cock" => include "deepthroat" and optionally "throat bulge" if explicitly implied by swelling/bulge. ' +
-            '4) "pulling head back to expose neck" => "neck exposure" (not oral sex). ' +
-            '5) If an act is described but the performer is unclear, assume the character is performing it unless the user explicitly says the user/other person is acting. ' +
-            'Pose coherence constraints: ' +
-            '1) Oral sex tags ("blowjob", "deepthroat", "throat fucking") require face-to-front orientation. Do not include "from behind"/"rear view" as a pose for oral. ' +
-            '2) Rear-penetration tags ("anal sex"/"vaginal sex" when described from behind) may include "from behind"/"rear view" and "bent over"/"doggystyle position". ' +
-            '3) Aggressive actions like "slapping", "punching", "kicking", "tearing clothes" imply "standing" or a confrontational posture; do not pick "kneeling" unless text explicitly says kneeling. ' +
-            '4) Do not include both "sitting" and "lying down" unless the text explicitly contains both. ' +
-            envInstruction +
-            'Do NOT include bathtub/tub/bathroom unless explicitly mentioned by the user. ' +
-            `If clothing is not explicitly requested, keep clothing consistent with: "${clothing}". ` +
-            'Clothing extraction: only include clothing changes if explicitly stated ("take off", "strip", "wear", "put on", "in lingerie", "in bikini"). If text says keep clothes on, add "nude"/"topless" to negative. ' +
-            'Environment extraction: prefer descriptive tags like "bedroom", "in a shower", "on a couch", "city street at night". If no environment is specified, follow the environment rule above. ' +
-            'Output hygiene: ' +
-            '1) Arrays must contain unique strings (no duplicates). ' +
-            '2) Keep tags short (1-4 words). ' +
-            '3) If you are unsure, omit rather than guess. ' +
-            'Example output format (do not copy content unless supported by the transcript): {"camera":[],"actions":[],"poses":[],"emotions":[],"environments":[],"clothing":[],"negative":[],"details":[]} ';
+        const systemPrompt = buildImagePlanSystemPrompt(env, clothing);
 
         const all = Array.isArray(messages) ? messages : [];
         // Only consider the latest turn to avoid contradictory actions/emotions from older messages.
@@ -190,44 +329,27 @@ export const lmStudioService = {
             { role: 'system', content: systemPrompt },
             {
                 role: 'user',
-                content: JSON.stringify({
-                    task: 'Build ImageGenerationPlan JSON from the chat transcript. Reflect the latest user intent for pose and location.',
-                    character: {
-                        environment: env,
-                        clothing
-                    },
-                    transcript: last.map((m) => ({ role: m.sender, content: m.content }))
-                })
+                content: [
+                    `Defaults: environment=${env || 'n/a'}; clothing=${clothing || 'n/a'}.`,
+                    'Latest messages:',
+                    ...last.map((m) => `${m.sender.toUpperCase()}: ${String(m.content || '')}`)
+                ].join('\n')
             }
         ];
 
-        const requestBodyBase: any = {
-            model: 'local-model',
-            messages: formattedMessages,
-            temperature: 0,
-            max_tokens: 256,
-            stream: false,
-        };
-
-        const tryFetch = async (body: any) => {
-            const response = await fetch(PROXY_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(body),
-            });
-            return response;
-        };
-
-        let response = await tryFetch({
-            ...requestBodyBase,
-            response_format: { type: 'json_object' },
+        const response = await fetch(PROXY_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                model: 'local-model',
+                messages: formattedMessages,
+                temperature: 0.1,
+                max_tokens: 256,
+                stream: false,
+            }),
         });
-
-        if (!response.ok) {
-            response = await tryFetch(requestBodyBase);
-        }
 
         if (!response.ok) {
             throw new Error(`LM Studio error: ${response.statusText}`);
@@ -236,182 +358,23 @@ export const lmStudioService = {
         const data = await response.json();
         const content = String(data?.choices?.[0]?.message?.content || '').trim();
 
-        const jsonStart = content.indexOf('{');
-        const jsonEnd = content.lastIndexOf('}');
-        const jsonText = jsonStart !== -1 && jsonEnd !== -1 ? content.slice(jsonStart, jsonEnd + 1) : content;
-
         let parsed: any;
         try {
-            parsed = JSON.parse(jsonText);
+            parsed = tryParseJson(content);
         } catch (e) {
             console.error('[IMAGE PLAN] failed to parse JSON:', content);
-            throw e;
+            parsed = null;
         }
 
-        const normalize = (v: any): string[] =>
-            Array.isArray(v)
-                ? v.map((x) => String(x || '').trim()).filter((x) => x.length > 0)
-                : [];
-
-        const plan: ImageGenerationPlan = {
-            camera: normalize(parsed.camera),
-            actions: normalize(parsed.actions),
-            poses: normalize(parsed.poses),
-            emotions: normalize(parsed.emotions),
-            environments: normalize(parsed.environments),
-            clothing: normalize(parsed.clothing),
-            negative: normalize(parsed.negative),
-            details: normalize(parsed.details),
-        };
+        const plan: ImageGenerationPlan = coerceImagePlan(parsed);
 
         const transcriptText = last
             .map((m) => String(m?.content || ''))
             .join(' ')
             .toLowerCase();
-        const actions = Array.isArray(plan.actions) ? plan.actions : [];
-        const poses = Array.isArray(plan.poses) ? plan.poses : [];
-        const actionLower = actions.map((a) => String(a || '').toLowerCase());
-        const poseLower = poses.map((p) => String(p || '').toLowerCase());
-        const wantsJumping =
-            transcriptText.includes('jump') ||
-            transcriptText.includes('jumping') ||
-            transcriptText.includes('leap') ||
-            transcriptText.includes('leaping') ||
-            transcriptText.includes('bounce') ||
-            transcriptText.includes('bouncing') ||
-            actionLower.some((a) => a.includes('jump') || a.includes('leap') || a.includes('bounce'));
 
-        if (wantsJumping) {
-            const hasJumpPose = poseLower.some((p) => p.includes('jump'));
-            const onlyStanding = poseLower.length > 0 && poseLower.every((p) => p.includes('standing'));
-            if (!hasJumpPose && (poseLower.length === 0 || onlyStanding)) {
-                plan.poses = ['jumping'];
-            }
-            if (!actionLower.some((a) => a.includes('jump'))) {
-                plan.actions = Array.from(new Set([...actions, 'jumping']));
-            }
-        }
-
-        // Post-normalization for visually-specific explicit interactions that are often under-extracted.
-        // Only add when the transcript explicitly contains strong cues.
-        const details = Array.isArray(plan.details) ? plan.details : [];
-        const detailLower = details.map((d: string) => String(d || '').toLowerCase());
-        const addDetail = (d: string) => {
-            const dl = d.toLowerCase();
-            if (!detailLower.includes(dl)) details.push(d);
-        };
-
-        const negative = Array.isArray(plan.negative) ? plan.negative : [];
-        const removeNegative = (n: string) => {
-            const nl = n.toLowerCase();
-            for (let i = negative.length - 1; i >= 0; i--) {
-                if (String(negative[i] || '').toLowerCase() === nl) negative.splice(i, 1);
-            }
-        };
-
-        const addAction = (a: string) => {
-            const al = a.toLowerCase();
-            const current = Array.isArray(plan.actions) ? plan.actions : [];
-            if (!current.map((x) => String(x || '').toLowerCase()).includes(al)) {
-                plan.actions = [...current, a];
-            }
-        };
-
-        const mentionsNipple = transcriptText.includes('nipple') || transcriptText.includes('nipples');
-        const mentionsCock = transcriptText.includes('cock') || transcriptText.includes('dick') || transcriptText.includes('penis');
-        const mentionsInsert = transcriptText.includes('insert') || transcriptText.includes('inserting') || transcriptText.includes('push in') || transcriptText.includes('pushing in') || transcriptText.includes('slide in') || transcriptText.includes('sliding in');
-
-        if (mentionsNipple && mentionsCock) {
-            if (transcriptText.includes('tip') && transcriptText.includes('nipple')) {
-                addDetail('tip on nipple');
-            }
-            if (mentionsInsert && (transcriptText.includes('into') || transcriptText.includes('inside'))) {
-                addDetail('nipple penetration');
-                addDetail('cock to nipple');
-            }
-        }
-
-        const mentionsCutOffHand =
-            (transcriptText.includes('cut off') || transcriptText.includes('cuts off') || transcriptText.includes('cutting off')) &&
-            (transcriptText.includes('hand') || transcriptText.includes('hands'));
-        const mentionsBlood =
-            transcriptText.includes('blood') ||
-            transcriptText.includes('bleed') ||
-            transcriptText.includes('bleeding');
-        const mentionsPainVocal =
-            transcriptText.includes('pained cry') ||
-            transcriptText.includes('pain') ||
-            transcriptText.includes('scream') ||
-            transcriptText.includes('screams') ||
-            transcriptText.includes('cry') ||
-            transcriptText.includes('cries');
-
-        if (mentionsCutOffHand) {
-            addAction('cutting off hand');
-            addDetail('severed hand');
-            addDetail('injury');
-        }
-
-        if (mentionsBlood) {
-            addAction('bleeding');
-            addDetail('blood');
-        }
-
-        if (mentionsPainVocal) {
-            addAction('screaming');
-        }
-
-        if (transcriptText.includes('shudder')) {
-            addAction('shuddering');
-        }
-
-        if (transcriptText.includes('look away') || transcriptText.includes('looks away')) {
-            addAction('looking away');
-        }
-
-        if (transcriptText.includes('hand') || transcriptText.includes('hands') || transcriptText.includes('arm') || transcriptText.includes('arms')) {
-            removeNegative('handless');
-            removeNegative('armless');
-        }
-
-        const hasProneCue =
-            transcriptText.includes('lying') ||
-            transcriptText.includes('laying') ||
-            transcriptText.includes('on back') ||
-            transcriptText.includes('on her back') ||
-            transcriptText.includes('on my back');
-        if (!hasProneCue) {
-            const nextPoses = (Array.isArray(plan.poses) ? plan.poses : []).filter((p) => {
-                const pl = String(p || '').toLowerCase();
-                return pl !== 'lying down' && pl !== 'on back' && pl !== 'on stomach';
-            });
-            plan.poses = nextPoses;
-        }
-
-        plan.details = Array.from(
-            new Set(
-                details
-                    .map((x: string) => String(x || '').trim())
-                    .filter((x: string) => x.length > 0)
-            )
-        );
-
-        const dedupe = (arr: string[] | undefined) =>
-            Array.from(
-                new Set(
-                    (Array.isArray(arr) ? arr : [])
-                        .map((x) => String(x || '').trim())
-                        .filter((x) => x.length > 0)
-                )
-            );
-
-        plan.camera = dedupe(plan.camera);
-        plan.actions = dedupe(plan.actions);
-        plan.poses = dedupe(plan.poses);
-        plan.emotions = dedupe(plan.emotions).slice(0, 1);
-        plan.environments = dedupe(plan.environments);
-        plan.clothing = dedupe(plan.clothing);
-        plan.negative = dedupe(negative);
+        backfillFromTranscript(plan, transcriptText);
+        sanitizeNegativesFromTranscript(plan, transcriptText);
 
         return plan;
     },
