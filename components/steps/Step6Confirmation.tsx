@@ -127,6 +127,10 @@ export const Step6Confirmation: React.FC = () => {
               <p className="text-dark-400">Environment</p>
               <p className="text-white font-medium">{formatValue(draft.appearance.environment)}</p>
             </div>
+            <div className="md:col-span-3">
+              <p className="text-dark-400">Persistent Details</p>
+              <p className="text-white font-medium">{draft.persistentPrompt?.trim() ? draft.persistentPrompt : 'None'}</p>
+            </div>
           </div>
         </motion.div>
 

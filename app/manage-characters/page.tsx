@@ -221,7 +221,7 @@ export default function ManageCharactersPage() {
             },
             personality: {
                 archetype: 'custom',
-                isCustom: false,
+                isCustom: true,
                 traits: {
                     submissiveDominant: 50,
                     insecureConfident: 50,

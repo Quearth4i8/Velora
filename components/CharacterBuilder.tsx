@@ -15,6 +15,7 @@ import { Step2BodyProportions } from './steps/Step2BodyProportions';
 import { Step3HairFace } from './steps/Step3HairFace';
 import { Step4BodyProportions } from './steps/Step4BodyProportions';
 import { Step5Personality } from './steps/Step5Personality';
+import { Step6PersistentDetails } from './steps/Step6PersistentDetails';
 import { Step6Confirmation } from './steps/Step6Confirmation';
 
 export function CharacterBuilder() {
@@ -23,7 +24,7 @@ export function CharacterBuilder() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  const totalSteps = 7;
+  const totalSteps = 8;
   const currentStep = draft.currentStep || 0;
 
   useEffect(() => {
@@ -124,6 +125,8 @@ export function CharacterBuilder() {
       case 5:
         return <Step5Personality />;
       case 6:
+        return <Step6PersistentDetails />;
+      case 7:
         return <Step6Confirmation />;
       default:
         return <Step0NameAge />;
@@ -145,6 +148,8 @@ export function CharacterBuilder() {
       case 5:
         return 'Personality';
       case 6:
+        return 'Persistent Details';
+      case 7:
         return 'Review & Generate';
       default:
         return 'Character Creation';
@@ -166,6 +171,8 @@ export function CharacterBuilder() {
       case 5:
         return 'Set personality traits and character archetype';
       case 6:
+        return 'Add tattoos, freckles, makeup, accessories, and other always-on details';
+      case 7:
         return 'Review your character details, then generate';
       default:
         return 'Create your AI companion';
@@ -193,6 +200,8 @@ export function CharacterBuilder() {
       case 5:
         return Boolean(draft.personality.archetype);
       case 6:
+        return true;
+      case 7:
         return true; // Confirmation step doesn't require additional validation
       default:
         return false;

@@ -1,5 +1,7 @@
 import { CharacterDraft, Height, Physique, Ethnicity } from './types';
 
+const PERSISTENT_PROMPT_DELIMITER = '||PERSISTENT_PROMPT||';
+
 export const serializeCharacter = (draft: CharacterDraft): Record<string, any> => {
   // Debug logging
   console.log('Serializing character draft:', draft);
@@ -22,6 +24,13 @@ export const serializeCharacter = (draft: CharacterDraft): Record<string, any> =
       ? draft.loraNames.join(', ')
       : draft.loraName || null;
 
+  const specialPrompt = typeof draft.specialPrompt === 'string' ? draft.specialPrompt.trim() : '';
+  const persistentPrompt = typeof draft.persistentPrompt === 'string' ? draft.persistentPrompt.trim() : '';
+
+  const serializedSpecialPrompt = persistentPrompt
+    ? `${specialPrompt}${specialPrompt ? '\n' : ''}${PERSISTENT_PROMPT_DELIMITER}${persistentPrompt}`
+    : (specialPrompt || null);
+
   const serialized = {
     name: draft.name,
     character_type: draft.characterType || 'custom',
@@ -29,7 +38,7 @@ export const serializeCharacter = (draft: CharacterDraft): Record<string, any> =
     main_tag: draft.mainTag || null,
     lora_name: serializedLoraName,
     lora_weight: draft.loraWeight ?? null,
-    special_prompt: draft.specialPrompt || null,
+    special_prompt: serializedSpecialPrompt,
     special_negative_prompt: draft.specialNegativePrompt || null,
     age: draft.identity?.age ?? null,
     ethnicity: draft.identity?.ethnicity ?? null,
@@ -126,6 +135,18 @@ export const deserializeCharacter = (data: Record<string, any>): CharacterDraft 
     return null;
   };
 
+  const rawSpecialPrompt = typeof data.special_prompt === 'string' ? data.special_prompt : '';
+  let deserializedSpecialPrompt = rawSpecialPrompt.trim() || undefined;
+  let deserializedPersistentPrompt = '';
+
+  const delimiterIndex = rawSpecialPrompt.indexOf(PERSISTENT_PROMPT_DELIMITER);
+  if (delimiterIndex !== -1) {
+    const before = rawSpecialPrompt.slice(0, delimiterIndex).trim();
+    const after = rawSpecialPrompt.slice(delimiterIndex + PERSISTENT_PROMPT_DELIMITER.length).trim();
+    deserializedSpecialPrompt = before || undefined;
+    deserializedPersistentPrompt = after || '';
+  }
+
   return {
     id: data.id,
     name: data.name,
@@ -135,8 +156,9 @@ export const deserializeCharacter = (data: Record<string, any>): CharacterDraft 
     loraNames: normalizeLoraNames(data.lora_names, data.lora_name),
     loraName: data.lora_name || undefined,
     loraWeight: data.lora_weight ?? undefined,
-    specialPrompt: data.special_prompt || undefined,
+    specialPrompt: deserializedSpecialPrompt,
     specialNegativePrompt: data.special_negative_prompt || undefined,
+    persistentPrompt: deserializedPersistentPrompt,
     currentStep: 5,
     identity: {
       age: data.age,
@@ -162,11 +184,11 @@ export const deserializeCharacter = (data: Record<string, any>): CharacterDraft 
       archetype: data.personality_archetype,
       isCustom: data.personality_archetype === 'custom',
       traits: {
-        submissiveDominant: data.personality_traits?.submissiveDominant || 50,
-        insecureConfident: data.personality_traits?.insecureConfident || 50,
-        coldPassionate: data.personality_traits?.coldPassionate || 50,
-        reservedOutgoing: data.personality_traits?.reservedOutgoing || 50,
-        seriousPlayful: data.personality_traits?.seriousPlayful || 50,
+        submissiveDominant: data.personality_traits?.submissiveDominant ?? 50,
+        insecureConfident: data.personality_traits?.insecureConfident ?? 50,
+        coldPassionate: data.personality_traits?.coldPassionate ?? 50,
+        reservedOutgoing: data.personality_traits?.reservedOutgoing ?? 50,
+        seriousPlayful: data.personality_traits?.seriousPlayful ?? 50,
       },
       customSpecialty: data.personality_traits?.customSpecialty || undefined,
     },

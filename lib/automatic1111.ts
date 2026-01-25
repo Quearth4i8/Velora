@@ -628,7 +628,8 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle, settings?: an
   }
 
   // Combine all tags
-  const allAdditionalTags = [additionalTags, futaTags].filter(tag => tag.trim()).join(', ').trim();
+  const persistentPrompt = draft.persistentPrompt?.trim() || '';
+  const allAdditionalTags = joinAndDedupeTags(additionalTags, futaTags, persistentPrompt);
 
   // Check if prompt contains sexual content that should allow male presence
   // Also check if it's a self-action to avoid adding male partner for solo activities
@@ -799,7 +800,7 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle, settings?: an
   const age = ageNumber !== null ? `${ageNumber} years old` : '';
 
   const isMinor = ageNumber !== null && ageNumber < 18;
-  const subjectDescriptor = isMinor ? 'loli, small, mini size, shortstack, goblin size, tiny size, petite size, small legs, small hands' : 'woman';
+  const subjectDescriptor = isMinor ? 'loli, small, mini size, shortstack, goblin size, tiny size, petite size, petite childlike female,' : 'woman';
   const malePartnerPrompt = (!isSelfAction && shouldIncludeMalePartnerFromCurrentText(messageContent)) ? 'male, man' : '';
   const soloDescriptor = hasSexualContent ? '' : 'solo';
   const ageDescriptor =
@@ -850,35 +851,85 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle, settings?: an
   const clothing = appearance.clothing?.toLowerCase() || '';
   const environment = appearance.environment?.toLowerCase().replace('_', ' ') || '';
 
-  // Personality characteristics
-  const archetype = personality.archetype?.toLowerCase() || '';
-  let personalityDescription = '';
-  
-  if (isSpecialCharacter && personality.customSpecialty) {
-    // Use custom specialty for special characters
-    personalityDescription = personality.customSpecialty;
-  } else if (personality.traits) {
-    // Build detailed personality description from traits for regular characters
-    const personalityTraits = [];
-    const { submissiveDominant, insecureConfident, coldPassionate, reservedOutgoing, seriousPlayful } = personality.traits;
+  const getPersonalityPromptTags = (): string[] => {
+    const tags: string[] = [];
 
-    if (submissiveDominant <= 3) personalityTraits.push('submissive');
-    else if (submissiveDominant >= 7) personalityTraits.push('dominant');
+    const archetype = personality.archetype?.toLowerCase() || '';
+    const isCustomArchetype = archetype === 'custom';
 
-    if (insecureConfident <= 3) personalityTraits.push('insecure');
-    else if (insecureConfident >= 7) personalityTraits.push('confident');
+    const addSplitTags = (value: string) => {
+      value
+        .split(',')
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .forEach((tag) => tags.push(tag));
+    };
 
-    if (coldPassionate <= 3) personalityTraits.push('cold');
-    else if (coldPassionate >= 7) personalityTraits.push('passionate');
+    if (isSpecialCharacter && personality.customSpecialty?.trim()) {
+      addSplitTags(personality.customSpecialty);
+      return tags;
+    }
 
-    if (reservedOutgoing <= 3) personalityTraits.push('reserved');
-    else if (reservedOutgoing >= 7) personalityTraits.push('outgoing');
+    if (!isCustomArchetype) {
+      switch (archetype) {
+        case 'jealous-flame':
+          return [
+            'jealous expression',
+            'possessive',
+            'intense gaze',
+            'seductive smile',
+          ];
+        case 'cunning-innocent':
+          return [
+            'playful expression',
+            'mischievous smile',
+            'teasing',
+            'innocent look',
+          ];
+        case 'power-play':
+          return [
+            'dominant',
+            'confident',
+            'commanding presence',
+            'assertive posture',
+          ];
+        case 'mysterious-lover':
+          return [
+            'mysterious expression',
+            'alluring',
+            'soft smile',
+            'half-lidded eyes',
+          ];
+      }
+    }
 
-    if (seriousPlayful <= 3) personalityTraits.push('serious');
-    else if (seriousPlayful >= 7) personalityTraits.push('playful');
+    const traits = personality.traits;
+    const low = 35;
+    const high = 65;
 
-    personalityDescription = personalityTraits.length > 0 ? personalityTraits.join(', ') : archetype;
-  }
+    if (traits.submissiveDominant <= low) tags.push('submissive', 'shy', 'timid');
+    else if (traits.submissiveDominant >= high) tags.push('dominant', 'assertive');
+
+    if (traits.insecureConfident <= low) tags.push('nervous', 'bashful', 'blushing');
+    else if (traits.insecureConfident >= high) tags.push('confident', 'self-assured');
+
+    if (traits.coldPassionate <= low) tags.push('cold expression', 'stoic');
+    else if (traits.coldPassionate >= high) tags.push('passionate', 'sensual');
+
+    if (traits.reservedOutgoing <= low) tags.push('reserved', 'quiet');
+    else if (traits.reservedOutgoing >= high) tags.push('outgoing', 'energetic');
+
+    if (traits.seriousPlayful <= low) tags.push('serious expression', 'calm');
+    else if (traits.seriousPlayful >= high) tags.push('playful expression', 'teasing');
+
+    if (personality.customSpecialty?.trim()) {
+      addSplitTags(personality.customSpecialty);
+    }
+
+    return tags;
+  };
+
+  const personalityPromptTags = getPersonalityPromptTags();
 
   const eyeTypeDescriptions = EYE_TYPE_DESCRIPTIONS;
 
@@ -946,7 +997,7 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle, settings?: an
     eyeColorTag,
     eyeTypeTag,
     environmentTag,
-    personalityDescription ? `${personalityDescription} personality` : '',
+    personalityPromptTags.join(', '),
     allAdditionalTags
   );
 

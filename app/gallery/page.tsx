@@ -256,6 +256,11 @@ export default function GalleryPage() {
     if (filter === 'nsfw') return isNSFWImage(img);
     if (filter === 'gallery') return img.isGalleryOnly;
     return true;
+  }).sort((a, b) => {
+    // Sort by createdAt (newest first) - handle undefined dates by putting them at the end
+    const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return dateB - dateA; // Descending order (newest first)
   });
 
   // Generation settings

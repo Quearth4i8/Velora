@@ -285,7 +285,13 @@ export const CHARACTER_CONFIG = {
       id,
       ...def,
     })) as LoraPreset[],
-    [CharacterStyle.ANIME_ILLUSTRIOUS]: Object.entries(RACE_DEFINITIONS[CharacterStyle.SPECIAL].races).map(([id, def]) => ({
+    [CharacterStyle.ANIME_ILLUSTRIOUS]: Object.entries({
+      ...RACE_DEFINITIONS[CharacterStyle.ANIME].races,
+      ...RACE_DEFINITIONS[CharacterStyle.ARTISTIC].races,
+      ...RACE_DEFINITIONS[CharacterStyle.REALISTIC].races,
+      ...RACE_DEFINITIONS[CharacterStyle.SPECIAL].races,
+      ...RACE_DEFINITIONS[CharacterStyle.ANIME_ILLUSTRIOUS].races,
+    }).map(([id, def]) => ({
       id,
       ...def,
     })) as LoraPreset[],

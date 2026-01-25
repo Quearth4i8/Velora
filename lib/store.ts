@@ -30,6 +30,7 @@ interface CharacterBuilderStore {
 const initialDraft: CharacterDraft = {
   currentStep: 0,
   name: '',
+  persistentPrompt: '',
   identity: {
     age: null,
     ethnicity: null,

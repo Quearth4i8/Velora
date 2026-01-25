@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import { useCharacterBuilder } from '@/lib/store';
 import { PersonalityTraits } from '@/lib/types';
@@ -77,15 +77,19 @@ const archetypes: PersonalityArchetype[] = [
 
 export const Step5Personality: React.FC = () => {
   const { draft, setPersonality, setPersonalityTraits } = useCharacterBuilder();
-  const [isCustom, setIsCustom] = useState(draft.personality.isCustom);
+  const isCustom = draft.personality.archetype === 'custom';
 
   const handleArchetypeSelect = (archetype: PersonalityArchetype) => {
     setPersonality({
       archetype: archetype.id,
       isCustom: archetype.id === 'custom',
       traits: archetype.traits,
+      customSpecialty: archetype.id === 'custom' ? draft.personality.customSpecialty : undefined,
     });
-    setIsCustom(archetype.id === 'custom');
+
+    if (archetype.id !== 'custom' && draft.personality.customSpecialty) {
+      setPersonality({ customSpecialty: undefined });
+    }
   };
 
   const handleTraitChange = (traitKey: keyof PersonalityTraits, value: number) => {
@@ -138,6 +142,18 @@ export const Step5Personality: React.FC = () => {
           transition={{ duration: 0.3 }}
         >
           <h2 className="text-2xl font-bold text-white mb-6">Adjust Traits</h2>
+
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-dark-200">Custom personality tags (comma-separated)</label>
+            <textarea
+              value={draft.personality.customSpecialty || ''}
+              onChange={(e) => setPersonality({ customSpecialty: e.target.value })}
+              rows={3}
+              className="w-full px-4 py-3 bg-dark-950/60 text-white rounded-lg border border-dark-700 focus:ring-2 focus:ring-pink-500 focus:border-pink-500 outline-none resize-none"
+              placeholder="Example: flirty, teasing, jealous, confident, playful expression"
+            />
+          </div>
+
           {traitLabels.map(({ key, left, right }) => (
             <div key={key} className="space-y-2">
               <div className="flex justify-between items-center">

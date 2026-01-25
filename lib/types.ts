@@ -213,6 +213,7 @@ export interface CharacterDraft {
   loraWeight?: number | null;
   specialPrompt?: string;
   specialNegativePrompt?: string;
+  persistentPrompt?: string;
   currentStep: number;
   identity: CharacterIdentity;
   body: CharacterBody;
