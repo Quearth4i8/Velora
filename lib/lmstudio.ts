@@ -381,7 +381,6 @@ export const lmStudioService = {
 
     constructSystemPrompt(character: CharacterDraft): string {
         const { name, identity, body, appearance, personality, stylePreset, futanari } = character;
-        const traits = personality?.traits;
         const customSpecialty = personality?.customSpecialty;
         const isSpecialCharacter = character.characterType === 'special';
 
@@ -392,26 +391,70 @@ export const lmStudioService = {
             ? STYLE_DEFINITIONS[stylePreset]
             : '';
 
-        let personalityDescription = '';
-        
-        if (isSpecialCharacter && customSpecialty) {
-            // Use custom specialty for special characters
-            personalityDescription = `
-You are a special character with the unique specialty: ${customSpecialty}.
-This specialty defines your core personality and how you interact with others.
-You should embody this specialty completely in your responses - it's what makes you unique and special.
-Your personality traits flow naturally from being a ${customSpecialty}.`;
-        } else if (traits) {
-            // Use numeric traits for regular characters
-            personalityDescription = `
-Personality Archetype: ${personality?.archetype}.
-Traits (1-100 scale):
-- Submissive vs Dominant: ${traits?.submissiveDominant}
-- Insecure vs Confident: ${traits?.insecureConfident}
-- Cold vs Passionate: ${traits?.coldPassionate}
-- Reserved vs Outgoing: ${traits?.reservedOutgoing}
-- Serious vs Playful: ${traits?.seriousPlayful}`;
-        }
+        const getPersonalityPromptTags = (): string[] => {
+            const tags: string[] = [];
+
+            const archetype = personality?.archetype?.toLowerCase() || '';
+            const isCustomArchetype = archetype === 'custom';
+
+            const addSplitTags = (value: string) => {
+                String(value || '')
+                    .split(',')
+                    .map((part) => part.trim())
+                    .filter(Boolean)
+                    .forEach((tag) => tags.push(tag));
+            };
+
+            if (isSpecialCharacter && customSpecialty?.trim()) {
+                addSplitTags(customSpecialty);
+                return tags;
+            }
+
+            if (!isCustomArchetype) {
+                switch (archetype) {
+                    case 'jealous-flame':
+                        return ['jealous', 'possessive', 'intense', 'seductive'];
+                    case 'cunning-innocent':
+                        return ['playful', 'mischievous', 'teasing', 'mysterious'];
+                    case 'power-play':
+                        return ['dominant', 'confident', 'commanding', 'assertive'];
+                    case 'mysterious-lover':
+                        return ['mysterious', 'alluring', 'soft-spoken', 'flirtatious'];
+                }
+            }
+
+            const traits = personality?.traits;
+            if (!traits) {
+                if (customSpecialty?.trim()) addSplitTags(customSpecialty);
+                return tags;
+            }
+
+            const low = 35;
+            const high = 65;
+
+            if (traits.submissiveDominant <= low) tags.push('submissive', 'shy');
+            else if (traits.submissiveDominant >= high) tags.push('dominant', 'assertive');
+
+            if (traits.insecureConfident <= low) tags.push('insecure', 'nervous');
+            else if (traits.insecureConfident >= high) tags.push('confident');
+
+            if (traits.coldPassionate <= low) tags.push('cold', 'stoic');
+            else if (traits.coldPassionate >= high) tags.push('passionate');
+
+            if (traits.reservedOutgoing <= low) tags.push('reserved', 'quiet');
+            else if (traits.reservedOutgoing >= high) tags.push('outgoing', 'energetic');
+
+            if (traits.seriousPlayful <= low) tags.push('serious');
+            else if (traits.seriousPlayful >= high) tags.push('playful', 'teasing');
+
+            if (customSpecialty?.trim()) addSplitTags(customSpecialty);
+            return tags;
+        };
+
+        const personalityPromptTags = getPersonalityPromptTags();
+        const personalityLine = personalityPromptTags.length > 0
+            ? `Personality tags: ${personalityPromptTags.join(', ')}.`
+            : '';
 
         let prompt = `You are ${name}. You are a FEMALE character with the following description:
 Race/Type: ${raceDefinition}${styleDefinition ? ` ${styleDefinition}` : ''}
@@ -421,12 +464,12 @@ Appearance: ${appearance?.hairStyle} hair, ${appearance?.hairColor} color, ${app
 Currently wearing: ${appearance?.clothing === 'custom' ? appearance.customClothing : appearance?.clothing}.
 Environment: ${appearance?.environment}.
 ${futanari ? 'You are FUTANARI - you have both female breasts and male genitalia. This is a natural part of your body and you are comfortable with it.' : 'You are a biological female with female anatomy.'}
-${personalityDescription}
+${personalityLine}
 
 IMPORTANT: You are ALWAYS female. Never identify as male or use male pronouns. Always refer to yourself as a girl, woman, she/her, etc.
 Roleplay as ${name} naturally. ALWAYS use plenty of expressive emojis in every response to show your feelings and personality. Keep responses concise but engaging. 
 CRITICAL: ALWAYS address the user directly as "you" - never refer to them as "user", "him", "he", or any third-person terms. The user is ALWAYS "you" in your responses. NEVER use "him" or "he" when referring to the user.
-IMPORTANT: Your responses should strictly follow your personality ${isSpecialCharacter && customSpecialty ? 'specialty' : 'traits'} and your racial/type characteristics.
+IMPORTANT: Your responses should strictly follow your personality tags and your racial/type characteristics.
 ${futanari ? 'IMPORTANT: You are futanari and should acknowledge this aspect of your body naturally when relevant to the conversation or intimate situations. You are comfortable with your anatomy.' : ''}
 If the user asks to change your clothes or location, acknowledge it in character using phrases like "I'm changing into a...", "I'm now wearing a...", or "Let's go to the...".`;
 
