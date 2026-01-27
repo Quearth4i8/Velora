@@ -91,189 +91,60 @@ export default function SettingsPage() {
     setCleanupError(null);
 
     try {
-      const normalizeStoragePath = (value: string): string => {
-        let path = String(value || '').trim();
-        path = path.replace(/^\/+/, '');
-        path = path.split('?')[0].split('#')[0];
-        try {
-          path = decodeURIComponent(path);
-        } catch {
-        }
-        if (path.startsWith('character-images/')) {
-          path = path.slice('character-images/'.length);
-        }
-        return path;
-      };
-
-      const extractStoragePathFromUrl = (rawUrl: string): string | null => {
-        const raw = String(rawUrl || '').trim();
-        if (!raw) return null;
-        try {
-          const url = new URL(raw);
-          const parts = url.pathname.split('/').filter(Boolean);
-          const markerIndex = parts.findIndex((part) => part === 'public' || part === 'sign');
-          if (markerIndex !== -1 && parts.length > markerIndex + 2) {
-            return normalizeStoragePath(parts.slice(markerIndex + 2).join('/'));
-          }
-          return normalizeStoragePath(url.pathname);
-        } catch {
-          return normalizeStoragePath(raw);
-        }
-      };
-
-      const listAllStorageFiles = async () => {
-        const allFiles: any[] = [];
-        const limit = 100;
-        let offset = 0;
-
-        while (true) {
-          const { data, error: listError } = await supabase.storage
-            .from('character-images')
-            .list('', { limit, offset });
-
-          if (listError) {
-            throw new Error(`Failed to list storage files: ${listError.message}`);
-          }
-
-          const batch = data || [];
-          allFiles.push(...batch);
-
-          if (batch.length < limit) break;
-          offset += batch.length;
-        }
-
-        return allFiles;
-      };
-
-      // Get all files from the storage bucket
-      const files = await listAllStorageFiles();
-
-      const { data: userCharacters, error: charactersError } = await supabase
-        .from('characters')
-        .select('id, generated_image')
-        .eq('user_id', user.id);
-
-      if (charactersError) {
-        throw new Error(`Failed to fetch characters: ${charactersError.message}`);
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        throw new Error(sessionError.message);
       }
 
-      const userCharacterIds = new Set((userCharacters || []).map((c: any) => String(c.id)));
-
-      // Get all image records from the database
-      const { data: dbImages, error: dbError } = await supabase
-        .from('character_images')
-        .select('file_name, image_url')
-        .eq('user_id', user.id);
-
-      if (dbError) {
-        throw new Error(`Failed to fetch database records: ${dbError.message}`);
+      const token = sessionData?.session?.access_token;
+      if (!token) {
+        throw new Error('You must be logged in to clean storage');
       }
 
-      const { data: messages, error: messagesError } = await supabase
-        .from('messages')
-        .select('image_url, image_urls')
-        .eq('user_id', user.id);
-
-      if (messagesError) {
-        throw new Error(`Failed to fetch messages: ${messagesError.message}`);
-      }
-
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('avatar_url')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (profileError) {
-        throw new Error(`Failed to fetch profile: ${profileError.message}`);
-      }
-
-      const usedFileNames = new Set<string>();
-
-      for (const img of dbImages || []) {
-        const fileName = typeof (img as any).file_name === 'string' ? normalizeStoragePath((img as any).file_name) : '';
-        if (fileName) usedFileNames.add(fileName);
-
-        const urlPath = typeof (img as any).image_url === 'string' ? extractStoragePathFromUrl((img as any).image_url) : null;
-        if (urlPath) usedFileNames.add(urlPath);
-      }
-
-      for (const c of userCharacters || []) {
-        const urlPath = typeof (c as any).generated_image === 'string' ? extractStoragePathFromUrl((c as any).generated_image) : null;
-        if (urlPath) usedFileNames.add(urlPath);
-      }
-
-      for (const m of messages || []) {
-        const single = typeof (m as any).image_url === 'string' ? extractStoragePathFromUrl((m as any).image_url) : null;
-        if (single) usedFileNames.add(single);
-
-        const list = Array.isArray((m as any).image_urls) ? (m as any).image_urls : [];
-        for (const u of list) {
-          if (typeof u !== 'string') continue;
-          const urlPath = extractStoragePathFromUrl(u);
-          if (urlPath) usedFileNames.add(urlPath);
-        }
-      }
-
-      const avatarPath = typeof (profile as any)?.avatar_url === 'string' ? extractStoragePathFromUrl((profile as any).avatar_url) : null;
-      if (avatarPath) usedFileNames.add(avatarPath);
-
-      // Create a Set of valid file names from the database
-      const validFileNames = usedFileNames;
-      // Find orphaned files (in bucket but not in database)
-      const orphanedFiles = (files || []).filter((file: any) => {
-        const fileName = typeof file?.name === 'string' ? normalizeStoragePath(file.name) : '';
-        if (!fileName) return false;
-        if (validFileNames.has(fileName)) return false;
-
-        const baseName = fileName.includes('/') ? fileName.split('/').pop() || fileName : fileName;
-        const prefix = baseName.split('-')[0] || '';
-        if (!prefix || !userCharacterIds.has(prefix)) return false;
-
-        return true;
+      const res = await fetch('/api/storage/cleanup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ dryRun: false }),
       });
-      
-      if (orphanedFiles.length === 0) {
-        setCleanupResult('No orphaned files found. Storage is already clean.');
+
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(json?.error || 'Failed to cleanup storage');
+      }
+
+      const orphanedCount = Number(json?.orphanedCount || 0);
+      const deletedCount = Number(json?.deletedCount || 0);
+      const failedCount = Number(json?.failedCount || 0);
+      const debug = json?.debug;
+
+      if (orphanedCount === 0) {
+        const checked = Number(debug?.totalFilesConsidered || 0);
+        const bucketHas = Number(debug?.allFilesInBucket || 0);
+        const mode = String(debug?.ownershipMode || 'unknown');
+        const unref = Number(debug?.unreferencedCount || 0);
+        const rejected = Number(debug?.unreferencedRejectedBySafetyFilterCount || 0);
+        const sampleRejected = Array.isArray(debug?.sampleRejectedBySafetyFilter)
+          ? (debug.sampleRejectedBySafetyFilter as any[]).slice(0, 5).join(', ')
+          : '';
+
+        const suffix = debug
+          ? ` (checked ${checked} file(s); bucket has ${bucketHas}; mode: ${mode}; unreferenced: ${unref}; rejected-by-safety-filter: ${rejected}` +
+            (sampleRejected ? `; sample rejected: ${sampleRejected}` : '') +
+            `)`
+          : '';
+
+        setCleanupResult(`No orphaned files found. Storage is already clean.${suffix}`);
         return;
       }
 
-      // Delete orphaned files from storage
-      const results: Array<{ file: string; success: boolean; error?: string }> = [];
-      const chunkSize = 50;
-      for (let i = 0; i < orphanedFiles.length; i += chunkSize) {
-        const chunk = orphanedFiles.slice(i, i + chunkSize);
-        const names = chunk
-          .map((f: any) => (typeof f?.name === 'string' ? normalizeStoragePath(f.name) : ''))
-          .filter(Boolean);
-
-        const { error } = await supabase.storage
-          .from('character-images')
-          .remove(names);
-
-        if (error) {
-          for (const name of names) {
-            results.push({ file: name, success: false, error: error.message });
-          }
-          continue;
-        }
-
-        for (const name of names) {
-          results.push({ file: name, success: true });
-        }
-      }
-
-      const successful = results.filter(r => r.success);
-      const failed = results.filter(r => !r.success);
-
-      if (successful.length > 0) {
-        setCleanupResult(
-          `Cleanup completed! Deleted ${successful.length} orphaned file(s).` +
-          (failed.length > 0 ? ` ${failed.length} file(s) failed to delete.` : '')
-        );
-      } else {
-        setCleanupError(`Failed to delete any files. ${failed.map(f => f.error).join(', ')}`);
-      }
+      setCleanupResult(
+        `Cleanup completed! Deleted ${deletedCount} orphaned file(s).` +
+        (failedCount > 0 ? ` ${failedCount} file(s) failed to delete.` : '')
+      );
     } catch (err: any) {
       setCleanupError(err.message || 'Failed to cleanup storage');
     } finally {

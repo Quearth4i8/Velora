@@ -96,6 +96,12 @@ export default function ManageCharactersPage() {
         [CharacterStyle.SPECIAL]: 'Special',
     };
 
+    const styleLabelWithModel = (style: CharacterStyle): string => {
+        const label = styleLabelMap[style] || style;
+        const model = automatic1111API.getModelForStyle(style);
+        return `${label} (${model})`;
+    };
+
     const invalidateCharacterCaches = (characterId?: string) => {
         try {
             if (typeof window === 'undefined') return;
@@ -637,7 +643,7 @@ export default function ManageCharactersPage() {
                                 >
                                     {styleOptions.map((style) => (
                                         <option key={style} value={style}>
-                                            {styleLabelMap[style] || style}
+                                            {styleLabelWithModel(style)}
                                         </option>
                                     ))}
                                 </select>
