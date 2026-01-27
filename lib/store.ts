@@ -31,6 +31,7 @@ const initialDraft: CharacterDraft = {
   currentStep: 0,
   name: '',
   persistentPrompt: '',
+  heat: 25,
   identity: {
     age: null,
     ethnicity: null,

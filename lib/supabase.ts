@@ -272,6 +272,14 @@ export const characterService = {
       console.log('Adding futanari to update payload:', draft.futanari);
     }
 
+    // Add heat if present
+    if (draft.heat !== undefined) {
+      const heatValue = typeof draft.heat === 'number' && Number.isFinite(draft.heat)
+        ? Math.min(100, Math.max(0, Math.round(draft.heat)))
+        : null;
+      updatePayload.heat = heatValue;
+    }
+
     console.log('Final update payload:', updatePayload);
 
     const { data, error } = await supabase

@@ -31,6 +31,11 @@ export const serializeCharacter = (draft: CharacterDraft): Record<string, any> =
     ? `${specialPrompt}${specialPrompt ? '\n' : ''}${PERSISTENT_PROMPT_DELIMITER}${persistentPrompt}`
     : (specialPrompt || null);
 
+  const heatValueRaw = draft.heat;
+  const heatValue = typeof heatValueRaw === 'number' && Number.isFinite(heatValueRaw)
+    ? Math.min(100, Math.max(0, Math.round(heatValueRaw)))
+    : null;
+
   const serialized = {
     name: draft.name,
     character_type: draft.characterType || 'custom',
@@ -64,6 +69,7 @@ export const serializeCharacter = (draft: CharacterDraft): Record<string, any> =
     generated_image: draft.generation?.generatedImage,
     is_gallery_only: draft.isGalleryOnly || false,
     futanari: draft.futanari || false,
+    heat: heatValue,
     user_id: draft.userId || null,
   };
 
@@ -71,6 +77,11 @@ export const serializeCharacter = (draft: CharacterDraft): Record<string, any> =
 };
 
 export const deserializeCharacter = (data: Record<string, any>): CharacterDraft => {
+  const clampHeat = (value: any): number | undefined => {
+    const n = typeof value === 'number' ? value : Number(value);
+    if (!Number.isFinite(n)) return undefined;
+    return Math.min(100, Math.max(0, Math.round(n)));
+  };
   const normalizeLoraNames = (value: any, fallbackSingle?: any): string[] | undefined => {
     const result: string[] = [];
 
@@ -201,6 +212,7 @@ export const deserializeCharacter = (data: Record<string, any>): CharacterDraft 
     },
     isGalleryOnly: data.is_gallery_only || false,
     futanari: data.futanari || false,
+    heat: clampHeat(data.heat),
     userId: data.user_id,
     createdAt: data.created_at ? new Date(data.created_at) : undefined,
     updatedAt: data.updated_at ? new Date(data.updated_at) : undefined,

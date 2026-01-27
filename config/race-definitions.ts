@@ -171,8 +171,8 @@ export const RACE_DEFINITIONS: Record<CharacterStyle, { races: Record<string, Ra
         mainTag: 'vampire',
         specialPrompt:
           'Vampire Fangs, cute freckled vampire woman, Extremely high-resolution details, photographic, realism pushed to extreme, fine texture, beautiful detailed eyes, perfect symmetrical eyes, clear pupils, sharp eye details, expressive eyes',
-        loraName: 'vampire.safetensors',
-        loraWeight: 0.8,
+        loraName: '',
+        loraWeight: null,
       },
       'cyberpunk-girl': {
         label: 'Cyberpunk Girl',

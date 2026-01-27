@@ -43,6 +43,7 @@ export default function ManageCharactersPage() {
     type SpecialCharacterFormState = {
         name: string;
         age: string;
+        heat: string;
         ethnicity: Ethnicity;
         style: CharacterStyle;
         mainTag: string;
@@ -56,6 +57,7 @@ export default function ManageCharactersPage() {
     const getEmptySpecialCharacterForm = (): SpecialCharacterFormState => ({
         name: '',
         age: '22',
+        heat: '25',
         ethnicity: Ethnicity.EAST_ASIAN,
         style: CharacterStyle.ANIME,
         mainTag: '',
@@ -160,6 +162,7 @@ export default function ManageCharactersPage() {
         setSpecialForm({
             name: character.name || '',
             age: character.identity?.age ? String(character.identity.age) : '22',
+            heat: typeof character.heat === 'number' && Number.isFinite(character.heat) ? String(character.heat) : '25',
             ethnicity: (character.identity?.ethnicity || Ethnicity.EAST_ASIAN) as Ethnicity,
             style: (character.generation?.style || CharacterStyle.ANIME) as CharacterStyle,
             mainTag: character.mainTag || '',
@@ -187,6 +190,8 @@ export default function ManageCharactersPage() {
 
     const buildSpecialCharacterDraft = (form: SpecialCharacterFormState): CharacterDraft => {
         const ageNumber = Number(form.age);
+        const heatNumber = form.heat.trim() === '' ? 25 : Number(form.heat);
+        const heat = Number.isFinite(heatNumber) ? Math.min(100, Math.max(0, Math.round(heatNumber))) : 25;
         const parsedWeight = form.loraWeight.trim() === '' ? null : Number(form.loraWeight);
         const loraWeight = Number.isFinite(parsedWeight) ? parsedWeight : null;
         const resolvedModel = automatic1111API.getModelForStyle(form.style);
@@ -195,6 +200,7 @@ export default function ManageCharactersPage() {
             currentStep: 7,
             name: form.name.trim(),
             characterType: 'special',
+            heat,
             mainTag: form.mainTag.trim() || undefined,
             loraName: form.loraName.trim() || undefined,
             loraWeight,
@@ -245,6 +251,8 @@ export default function ManageCharactersPage() {
 
         const name = specialForm.name.trim();
         const ageNumber = Number(specialForm.age);
+        const heatNumber = specialForm.heat.trim() === '' ? 25 : Number(specialForm.heat);
+        const heat = Number.isFinite(heatNumber) ? Math.min(100, Math.max(0, Math.round(heatNumber))) : 25;
 
         if (!name) {
             setSpecialModalError('Name is required');
@@ -258,6 +266,11 @@ export default function ManageCharactersPage() {
 
         if (!Number.isFinite(ageNumber) || ageNumber < 0) {
             setSpecialModalError('Age must be 0+');
+            return;
+        }
+
+        if (!Number.isFinite(heatNumber) || heat < 0 || heat > 100) {
+            setSpecialModalError('Heat must be between 0 and 100');
             return;
         }
 
@@ -286,6 +299,7 @@ export default function ManageCharactersPage() {
             const updateResult = await characterAPI.updateCharacterDirect(editingSpecialCharacterId, {
                 name,
                 age: ageNumber,
+                heat,
                 ethnicity: specialForm.ethnicity,
                 style: specialForm.style,
                 model: resolvedModel,
@@ -597,6 +611,19 @@ export default function ManageCharactersPage() {
                                     ))}
                                 </select>
                             </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-dark-300 mb-1">Heat (0-100)</label>
+                            <input
+                                type="number"
+                                min={0}
+                                max={100}
+                                value={specialForm.heat}
+                                onChange={(e) => setSpecialForm((prev) => ({ ...prev, heat: e.target.value }))}
+                                disabled={savingSpecialCharacter}
+                                className="w-full px-3 py-2 bg-dark-950/60 text-white rounded-lg border border-dark-700 focus:ring-2 focus:ring-pink-500 focus:border-pink-500 outline-none"
+                            />
                         </div>
 
                         <div className="grid grid-cols-1 gap-4">

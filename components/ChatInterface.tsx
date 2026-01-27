@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { CharacterDraft, ChatMessage, ClothingStyle, Environment, Conversation, CharacterStyle } from '@/lib/types';
 import { CharacterGalleryComponent } from './CharacterGallery';
 import { FormatSelector } from './ui/FormatSelector';
+import { HeatMeter } from './ui/HeatMeter';
 import { TTSButton } from './ui/TTSButton';
 import { useRouter } from 'next/navigation';
 import { characterAPI } from '@/lib/api';
@@ -48,6 +49,130 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
   const isMountedRef = useRef(true);
   const router = useRouter();
   const dialog = useDialog();
+
+  const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
+  const heatStorageKey = currentCharacter.id ? `heat_${currentCharacter.id}` : null;
+  const [heat, setHeat] = useState<number>(() => clamp((character?.heat ?? 25) as number, 0, 100));
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!heatStorageKey) return;
+    try {
+      const dbHeat = currentCharacter?.heat;
+      if (typeof dbHeat === 'number' && Number.isFinite(dbHeat)) {
+        setHeat(clamp(dbHeat, 0, 100));
+        return;
+      }
+
+      const raw = window.localStorage.getItem(heatStorageKey);
+      const parsed = raw === null ? NaN : Number(raw);
+      if (Number.isFinite(parsed)) setHeat(clamp(parsed, 0, 100));
+    } catch {
+      // ignore
+    }
+  }, [heatStorageKey]);
+
+  useEffect(() => {
+    const dbHeat = currentCharacter?.heat;
+    if (typeof dbHeat === 'number' && Number.isFinite(dbHeat)) {
+      setHeat(clamp(dbHeat, 0, 100));
+    }
+  }, [currentCharacter?.heat, currentCharacter?.id]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!heatStorageKey) return;
+    try {
+      window.localStorage.setItem(heatStorageKey, String(Math.round(clamp(heat, 0, 100))));
+    } catch {
+      // ignore
+    }
+  }, [heat, heatStorageKey]);
+
+  const computeHeatDelta = (text: string, current: number): number => {
+    const t = String(text || '').toLowerCase();
+    if (!t.trim()) return 0;
+
+    const hasAny = (words: string[]) => words.some((w) => t.includes(w));
+
+    const positive = [
+      'thank',
+      'thanks',
+      'please',
+      'sorry',
+      'cute',
+      'beautiful',
+      'pretty',
+      'adorable',
+      'sweet',
+      'good girl',
+      'i like you',
+      'i love you',
+      'hug',
+      'kiss',
+    ];
+
+    const negative = [
+      'shut up',
+      'stupid',
+      'idiot',
+      'hate you',
+      'ugly',
+      'bitch',
+      'whore',
+      'slut',
+      'die',
+      'kill yourself',
+    ];
+
+    const flirty = ['flirt', 'tease', 'blush', 'turn me on', 'hot', 'sexy'];
+
+    const explicit = [
+      'sex',
+      'fuck',
+      'blowjob',
+      'deepthroat',
+      'pussy',
+      'cock',
+      'dick',
+      'cum',
+      'orgasm',
+      'anal',
+      'nude',
+      'naked',
+      'undress',
+      'undressed',
+      'strip',
+      'topless',
+    ];
+
+    let delta = 0;
+    if (hasAny(positive)) delta += 3;
+    if (hasAny(flirty)) delta += 2;
+    if (hasAny(negative)) delta -= 8;
+
+    if (hasAny(explicit)) {
+      delta += current < 40 ? -6 : 2;
+    }
+
+    if (delta === 0) delta -= 1;
+    return delta;
+  };
+
+  const applyHeatUpdateFromUserText = (text: string): number => {
+    const next = clamp(heat + computeHeatDelta(text, heat), 0, 100);
+    setHeat(next);
+    setCurrentCharacter((prev) => ({ ...prev, heat: next }));
+
+    if (currentCharacter?.id) {
+      characterAPI.updateCharacter(currentCharacter.id, { heat: next } as any).then((res) => {
+        if (!res?.success) {
+          console.error('Failed to persist heat:', res?.error);
+        }
+      });
+    }
+    return next;
+  };
 
   const getMessageImageUrls = (m: ChatMessage): string[] => {
     const list = Array.isArray((m as any).imageUrls) ? (m as any).imageUrls : [];
@@ -486,6 +611,8 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
     const userMessageContent = inputMessage;
     setInputMessage('');
 
+    const nextHeat = applyHeatUpdateFromUserText(userMessageContent);
+
     const userMsg: Partial<ChatMessage> = {
       conversationId: conversation.id,
       characterId: currentCharacter.id,
@@ -511,7 +638,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
       // Get LLM response using either saved message or fallback to optimistic
       const messageForContext = savedUserMsg.success ? savedUserMsg.data : optimisticMsg;
       const chatContext = [...messages, messageForContext];
-      const llmResponse = await lmStudioService.sendMessage(chatContext, currentCharacter);
+      const llmResponse = await lmStudioService.sendMessage(chatContext, currentCharacter, { heat: nextHeat });
 
       const characterMsg: Partial<ChatMessage> = {
         conversationId: conversation.id,
@@ -821,7 +948,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
       // Generate a new response
       setIsTyping(true);
       const chatContext = [...previousMessages.filter(m => m.id !== messageId), lastUserMessage];
-      const llmResponse = await lmStudioService.sendMessage(chatContext, currentCharacter);
+      const llmResponse = await lmStudioService.sendMessage(chatContext, currentCharacter, { heat });
 
       const characterMsg: Partial<ChatMessage> = {
         conversationId: conversation?.id || 'temp',
@@ -1117,7 +1244,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
 
           {/* Chat Area - Left Side Only */}
           <div
-            className={`flex-1 flex flex-col bg-gradient-to-b from-dark-900/30 to-dark-800/30 mt-0 transition-[margin] duration-500 ease-in-out ${
+            className={`flex-1 min-h-0 flex flex-col bg-gradient-to-b from-dark-900/30 to-dark-800/30 mt-0 transition-[margin] duration-500 ease-in-out ${
               isLargeScreen ? 'mr-[450px]' : 'mr-0'
             }`}
           >
@@ -1183,18 +1310,24 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
               </div>
             </div>
 
-            {/* Messages Area - Scrollable Only */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 relative">
-              <div className="max-w-4xl mx-auto space-y-5">
-                <AnimatePresence>
-                  {messages.map((message) => (
-                    <motion.div
-                      key={message.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -20 }}
-                      className="w-full"
-                    >
+            {/* Messages Area */}
+            <div className="flex-1 min-h-0 relative">
+              <div className="absolute left-4 sm:left-6 lg:left-8 top-4 bottom-4 hidden lg:block pointer-events-none">
+                <HeatMeter value={heat} variant="embedded" className="h-full" />
+              </div>
+
+              {/* Scrollable Only */}
+              <div className="h-full min-h-0 overflow-y-auto p-4 sm:p-6 lg:p-8">
+                <div className="max-w-4xl mx-auto space-y-5 lg:pl-20">
+                  <AnimatePresence>
+                    {messages.map((message) => (
+                      <motion.div
+                        key={message.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        className="w-full"
+                      >
                       <div
                         className={`flex w-full items-end gap-3 ${message.sender === 'user'
                           ? 'justify-end'
@@ -1207,7 +1340,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                           <div className="w-9 h-9 rounded-2xl bg-dark-800/60 border border-dark-700/60 backdrop-blur-md flex items-center justify-center text-xs font-semibold text-pink-200 shadow-sm shadow-black/20 select-none">
                             {(currentCharacter.name || 'C').charAt(0).toUpperCase()}
                           </div>
-                        )}
+                          )}
 
                         <div className={`${message.sender === 'system' ? 'max-w-2xl w-full' : 'max-w-[85%] sm:max-w-[75%] lg:max-w-[60%]'}`}>
                           <div
@@ -1369,8 +1502,8 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                         )}
                       </div>
                     </motion.div>
-                  ))}
-                </AnimatePresence>
+                    ))}
+                  </AnimatePresence>
                 {isTyping && (
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
@@ -1386,7 +1519,8 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                     </div>
                   </motion.div>
                 )}
-                <div ref={messagesEndRef} />
+                  <div ref={messagesEndRef} />
+                </div>
               </div>
             </div>
 

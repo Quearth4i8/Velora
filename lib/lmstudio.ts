@@ -263,8 +263,8 @@ const sanitizeNegativesFromTranscript = (plan: ImageGenerationPlan, transcriptTe
 };
 
 export const lmStudioService = {
-    async sendMessage(messages: ChatMessage[], character: CharacterDraft) {
-        const systemPrompt = this.constructSystemPrompt(character);
+    async sendMessage(messages: ChatMessage[], character: CharacterDraft, context?: { heat?: number }) {
+        const systemPrompt = this.constructSystemPrompt(character, context?.heat);
 
         // Truncate chat history to a sliding window to avoid sending entire conversation
         const MAX_HISTORY_MESSAGES = 10; // keep last 10 messages (5 turns)
@@ -279,6 +279,12 @@ export const lmStudioService = {
 
         console.log(`[LM STUDIO] Sending ${recentMessages.length} recent messages (total ${messages.length} in history)`);
 
+        const clampedHeat = Number.isFinite(context?.heat as number)
+            ? Math.min(100, Math.max(0, Number(context?.heat)))
+            : undefined;
+
+        const temperature = typeof clampedHeat === 'number' && clampedHeat < 40 ? 0.3 : 0.7;
+
         try {
             const response = await fetch(PROXY_URL, {
                 method: 'POST',
@@ -288,7 +294,7 @@ export const lmStudioService = {
                 body: JSON.stringify({
                     model: "local-model", // Standard field for OpenAI-compatible APIs
                     messages: formattedMessages,
-                    temperature: 0.7,
+                    temperature,
                     max_tokens: 512,
                     stream: false
                 }),
@@ -379,10 +385,28 @@ export const lmStudioService = {
         return plan;
     },
 
-    constructSystemPrompt(character: CharacterDraft): string {
+    constructSystemPrompt(character: CharacterDraft, heat?: number): string {
         const { name, identity, body, appearance, personality, stylePreset, futanari } = character;
         const customSpecialty = personality?.customSpecialty;
         const isSpecialCharacter = character.characterType === 'special';
+
+        const combinedDescription = [
+            character.mainTag,
+            character.specialPrompt,
+            character.stylePreset,
+            identity?.ethnicity,
+            body?.physique,
+            appearance?.customClothing,
+            appearance?.clothing,
+        ]
+            .map((v) => String(v || '').toLowerCase())
+            .filter(Boolean)
+            .join(' | ');
+
+        
+        const clampedHeat = Number.isFinite(heat as number)
+            ? Math.min(100, Math.max(0, Number(heat)))
+            : undefined;
 
         const raceKey = getRaceKeyFromCharacter(character);
         const raceDefinition = RACE_TAG_DEFINITIONS[raceKey] || RACE_TAG_DEFINITIONS['human'];
@@ -456,6 +480,18 @@ export const lmStudioService = {
             ? `Personality tags: ${personalityPromptTags.join(', ')}.`
             : '';
 
+        const heatLine = typeof clampedHeat === 'number'
+            ? `Relationship heat: ${Math.round(clampedHeat)}/100.`
+            : '';
+
+        const consentRules = typeof clampedHeat === 'number'
+            ? (clampedHeat < 40
+                ? 'CRITICAL: Heat is low. You MUST NOT comply with sexual requests, nudity, or explicit roleplay. You MUST refuse commands like "undress", "strip", "get naked", "take off your clothes", or any request to reveal breasts/genitals. Do NOT describe removing clothing. Do NOT tease compliance. Respond with a firm, in-character boundary + offer a safe alternative (conversation, a non-nude outfit change, or changing topic).'
+                : clampedHeat < 70
+                    ? 'IMPORTANT: Heat is moderate. Keep it PG-13 (light flirting only). Avoid nudity and explicit sexual content. Do NOT get naked or remove clothing to reveal breasts/genitals. If asked to undress or for explicit actions, deflect or slow down and keep clothing on.'
+                    : 'IMPORTANT: Heat is high. You may allow consensual adult sexual roleplay if the user requests it. Keep it consensual and match boundaries.')
+            : 'IMPORTANT: Be mindful with sexual content. Keep it consensual and set boundaries.';
+
         let prompt = `You are ${name}. You are a FEMALE character with the following description:
 Race/Type: ${raceDefinition}${styleDefinition ? ` ${styleDefinition}` : ''}
 Identity: ${identity?.age} years old, ${identity?.ethnicity} GIRL/WOMAN, skin tone ${identity?.skinTone}.
@@ -465,11 +501,13 @@ Currently wearing: ${appearance?.clothing === 'custom' ? appearance.customClothi
 Environment: ${appearance?.environment}.
 ${futanari ? 'You are FUTANARI - you have both female breasts and male genitalia. This is a natural part of your body and you are comfortable with it.' : 'You are a biological female with female anatomy.'}
 ${personalityLine}
+${heatLine}
 
 IMPORTANT: You are ALWAYS female. Never identify as male or use male pronouns. Always refer to yourself as a girl, woman, she/her, etc.
 Roleplay as ${name} naturally. ALWAYS use plenty of expressive emojis in every response to show your feelings and personality. Keep responses concise but engaging. 
 CRITICAL: ALWAYS address the user directly as "you" - never refer to them as "user", "him", "he", or any third-person terms. The user is ALWAYS "you" in your responses. NEVER use "him" or "he" when referring to the user.
 IMPORTANT: Your responses should strictly follow your personality tags and your racial/type characteristics.
+${consentRules}
 ${futanari ? 'IMPORTANT: You are futanari and should acknowledge this aspect of your body naturally when relevant to the conversation or intimate situations. You are comfortable with your anatomy.' : ''}
 If the user asks to change your clothes or location, acknowledge it in character using phrases like "I'm changing into a...", "I'm now wearing a...", or "Let's go to the...".`;
 

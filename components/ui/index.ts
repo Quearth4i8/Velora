@@ -13,3 +13,4 @@ export { DialogProvider, useDialog } from './DialogProvider';
 export { Toast } from './Toast';
 export { Badge } from './Badge';
 export { Divider } from './Divider';
+export { HeatMeter } from './HeatMeter';
