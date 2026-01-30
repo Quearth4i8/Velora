@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ASPECT_RATIO_OPTIONS, getDimensionsFromAspectRatio } from '@/config/aspect-ratios';
+import { getAspectRatioOptionsForModel, getDimensionsFromAspectRatio } from '@/config/aspect-ratios';
 import { characterAPI } from '@/lib/api';
 
 interface GenerationSettings {
@@ -130,7 +130,7 @@ export function GenerationSettingsModal({
                   onChange={(e) => onSettingsChange({ ...settings, aspectRatio: e.target.value })}
                   className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white text-sm"
                 >
-                  {ASPECT_RATIO_OPTIONS.map((option) => {
+                  {getAspectRatioOptionsForModel(selectedModel).map((option) => {
                     const dims = getDimensionsFromAspectRatio(option.id, selectedModel);
                     return (
                       <option key={option.id} value={option.id}>

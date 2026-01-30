@@ -9,7 +9,7 @@ import { CharacterStyle, Ethnicity, Height, Physique, ChestSize, ButtSize, HairS
 import { useBlurNSFW } from '@/lib/useBlurNSFW';
 import { useDialog } from '@/components/ui/DialogProvider';
 import { Eye, Sparkles } from 'lucide-react';
-import { ASPECT_RATIO_OPTIONS, getDimensionsFromAspectRatio, MODEL_DEFAULT_SETTINGS } from '@/config/aspect-ratios';
+import { getAspectRatioOptionsForModel, getDimensionsFromAspectRatio, MODEL_DEFAULT_SETTINGS } from '@/config/aspect-ratios';
 
 export default function GalleryPage() {
   const [filter, setFilter] = useState<'all' | 'sfw' | 'nsfw' | 'gallery'>('all');
@@ -78,6 +78,8 @@ export default function GalleryPage() {
         'high quality, best quality, masterpiece, highres, very aesthetic, absurdres, anime art, illustration, clean lineart, vibrant colors',
       [CharacterStyle.ANIME_ILLUSTRIOUS]:
         'masterpiece, best quality, amazing quality, absurdres, high quality, best quality, amazing quality, anime art, illustration, clean lineart, vibrant colors',
+      [CharacterStyle.MOE_FUSSION]:
+        'masterpiece, best quality, 1girl, solo, full body',
       [CharacterStyle.REALISTIC]:
         'high quality, best quality, masterpiece, highres, very aesthetic, absurdres, photorealistic, professional photography, high resolution',
       [CharacterStyle.ARTISTIC]:
@@ -764,6 +766,7 @@ export default function GalleryPage() {
               <option value={CharacterStyle.REALISTIC}>Realistic</option>
               <option value={CharacterStyle.ANIME}>Anime</option>
               <option value={CharacterStyle.ANIME_ILLUSTRIOUS}>Anime Illustrative</option>
+              <option value={CharacterStyle.MOE_FUSSION}>Moe Fussion</option>
               <option value={CharacterStyle.ARTISTIC}>Artistic</option>
               <option value={CharacterStyle.SPECIAL}>Special</option>
             </select>
@@ -789,7 +792,7 @@ export default function GalleryPage() {
               onChange={(e) => setGenerationSettings(prev => ({ ...prev, aspectRatio: e.target.value }))}
               className="w-full p-2 text-sm bg-dark-900 text-white rounded-lg border border-dark-700 focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
             >
-              {ASPECT_RATIO_OPTIONS.map((option) => {
+              {getAspectRatioOptionsForModel(require('@/lib/automatic1111').automatic1111API.getModelForStyle(generationSettings.style)).map((option) => {
                 const { automatic1111API } = require('@/lib/automatic1111');
                 const selectedModel = automatic1111API.getModelForStyle(generationSettings.style);
                 const dims = getDimensionsFromAspectRatio(option.id, selectedModel);

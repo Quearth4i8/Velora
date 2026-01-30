@@ -230,6 +230,7 @@ export interface CharacterDraft {
 export enum CharacterStyle {
   ANIME = 'anime',
   ANIME_ILLUSTRIOUS = 'anime_illustrious',
+  MOE_FUSSION = 'moe_fussion',
   REALISTIC = 'realistic',
   ARTISTIC = 'artistic',
   SPECIAL = 'special',
@@ -237,6 +238,7 @@ export enum CharacterStyle {
 
 export enum AIModel {
   CYBERREALISTIC = 'cyberrealisticPony_v140.safetensors',
+  MOE_FUSSION_V1_5_0_Z_VZ = 'moeFussionV1.5.0_Z_vz.safetensors',
   ONEOBSESSION = 'oneObsession_v18.safetensors',
   PERFECTDELIBERATE = 'perfectdeliberate_v30.safetensors',
   PREFECT_ILLUSTRIOUS = 'prefectIllustriousXL_v3.safetensors',

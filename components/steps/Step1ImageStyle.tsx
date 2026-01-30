@@ -7,9 +7,12 @@ import { CharacterStyle } from '@/lib/types';
 import { automatic1111API } from '@/lib/automatic1111';
 import { CHARACTER_CONFIG } from '@/config/character-config';
 
+type StylePreset = (typeof CHARACTER_CONFIG.imageStylePresets)[CharacterStyle][number];
+
 const styleOptions = [
   { id: CharacterStyle.ANIME, label: 'Anime', description: 'Stylized anime aesthetic' },
   { id: CharacterStyle.ANIME_ILLUSTRIOUS, label: 'Anime Illustrative', description: 'High-quality anime illustration style' },
+  { id: CharacterStyle.MOE_FUSSION, label: 'Moe Fussion', description: 'Moe-style anime renders' },
   { id: CharacterStyle.REALISTIC, label: 'Realistic', description: 'Photorealistic appearance' },
   { id: CharacterStyle.ARTISTIC, label: 'Artistic', description: 'Artistic and creative style' },
   { id: CharacterStyle.SPECIAL, label: 'Special', description: 'Monster girls and exotic species' },
@@ -25,7 +28,7 @@ export const Step1ImageStyle: React.FC = () => {
   const presets = React.useMemo(() => {
     if (!searchQuery.trim()) return allPresets;
     const query = searchQuery.toLowerCase();
-    return allPresets.filter(preset =>
+    return allPresets.filter((preset: StylePreset) =>
       preset.label.toLowerCase().includes(query) ||
       (preset.description && preset.description.toLowerCase().includes(query)) ||
       (preset.loraName && preset.loraName.toLowerCase().includes(query))
@@ -39,12 +42,12 @@ export const Step1ImageStyle: React.FC = () => {
       return draft.stylePreset;
     }
 
-    const matchByLora = allPresets.find((preset) =>
+    const matchByLora = allPresets.find((preset: StylePreset) =>
       preset.loraName && typeof draft.loraName === 'string' ? preset.loraName === draft.loraName : false
     );
     if (matchByLora) return matchByLora.id;
 
-    const matchByMainTag = allPresets.find((preset) =>
+    const matchByMainTag = allPresets.find((preset: StylePreset) =>
       preset.mainTag && typeof draft.mainTag === 'string' ? preset.mainTag === draft.mainTag : false
     );
     if (matchByMainTag) return matchByMainTag.id;
@@ -68,7 +71,7 @@ export const Step1ImageStyle: React.FC = () => {
   };
 
   const handlePresetSelect = (presetId: string) => {
-    const preset = allPresets.find((item) => item.id === presetId);
+    const preset = allPresets.find((item: StylePreset) => item.id === presetId);
     if (!preset) return;
 
     updateCharacter({
@@ -151,7 +154,7 @@ export const Step1ImageStyle: React.FC = () => {
           <div className="bg-dark-900/30 rounded-xl border border-dark-800 p-2 max-h-[500px] overflow-y-auto scrollbar-thin scrollbar-thumb-dark-700 scrollbar-track-transparent">
             {presets.length > 0 ? (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {presets.map((preset) => (
+                {presets.map((preset: StylePreset) => (
                   <motion.button
                     key={preset.id}
                     onClick={() => handlePresetSelect(preset.id)}

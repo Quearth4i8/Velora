@@ -91,6 +91,7 @@ export default function ManageCharactersPage() {
     const styleLabelMap: Record<CharacterStyle, string> = {
         [CharacterStyle.ANIME]: 'Anime',
         [CharacterStyle.ANIME_ILLUSTRIOUS]: 'Anime Illustrative',
+        [CharacterStyle.MOE_FUSSION]: 'Moe Fussion',
         [CharacterStyle.REALISTIC]: 'Realistic',
         [CharacterStyle.ARTISTIC]: 'Artistic',
         [CharacterStyle.SPECIAL]: 'Special',

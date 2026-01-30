@@ -12,39 +12,44 @@ type RaceDefinition = {
   imageSrc?: string;
 };
 
+const ANIME_RACES: Record<string, RaceDefinition> = {
+  human: {
+    label: 'Human',
+    description: 'Default human appearance',
+    loraName: undefined,
+    loraWeight: null,
+  },
+  angel: {
+    label: 'Angel',
+    mainTag: 'angel',
+    specialPrompt: 'long shiny white wings, barefoot, angel_wings',
+    loraName: 'angel_wings.safetensors',
+    loraWeight: 0.8,
+  },
+  elf: {
+    label: 'Elf',
+    mainTag: 'elf',
+    specialPrompt:
+      'long pointed ears, longer ears, slender figure, long legs, beautiful detailed eyes, perfect symmetrical eyes, clear pupils, sharp eye details, expressive eyes',
+    loraName: undefined,
+    loraWeight: null,
+  },
+  fairy: {
+    label: 'Fairy',
+    mainTag: 'fairy',
+    specialPrompt:
+      'butterfly wings, blue wings, fairy, fairymge, pointy ears, fairy wings, tiny fairy, petite fairy, beautiful detailed eyes, perfect symmetrical eyes, clear pupils, sharp eye details, expressive eyes',
+    loraName: 'fairy.safetensors',
+    loraWeight: 1,
+  },
+};
+
 export const RACE_DEFINITIONS: Record<CharacterStyle, { races: Record<string, RaceDefinition> }> = {
   [CharacterStyle.ANIME]: {
-    races: {
-      human: {
-        label: 'Human',
-        description: 'Default human appearance',
-        loraName: undefined,
-        loraWeight: null,
-      },
-      angel: {
-        label: 'Angel',
-        mainTag: 'angel',
-        specialPrompt: 'long shiny white wings, barefoot, angel_wings',
-        loraName: 'angel_wings.safetensors',
-        loraWeight: 0.8,
-      },
-      elf: {
-        label: 'Elf',
-        mainTag: 'elf',
-        specialPrompt:
-          'long pointed ears, longer ears, slender figure, long legs, beautiful detailed eyes, perfect symmetrical eyes, clear pupils, sharp eye details, expressive eyes',
-        loraName: undefined,
-        loraWeight: null,
-      },
-      fairy: {
-        label: 'Fairy',
-        mainTag: 'fairy',
-        specialPrompt:
-          'butterfly wings, blue wings, fairy, fairymge, pointy ears, fairy wings, tiny fairy, petite fairy, beautiful detailed eyes, perfect symmetrical eyes, clear pupils, sharp eye details, expressive eyes',
-        loraName: 'fairy.safetensors',
-        loraWeight: 1,
-      },
-    },
+    races: ANIME_RACES,
+  },
+  [CharacterStyle.MOE_FUSSION]: {
+    races: ANIME_RACES,
   },
   [CharacterStyle.ANIME_ILLUSTRIOUS]: {
     races: {

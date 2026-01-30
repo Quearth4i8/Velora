@@ -65,6 +65,10 @@ export const normalizeAspectRatioId = (aspectRatio: string | undefined | null): 
 };
 
 export const MODEL_SPECIFIC_RESOLUTIONS: Record<string, Partial<Record<AspectRatioId, { width: number; height: number }>>> = {
+  'moeFussionV1.5.0_Z_vz.safetensors': {
+    portrait: { width: 832, height: 1144 },
+    square: { width: 1536, height: 1536 },
+  },
   'oneObsession_v18.safetensors': {
     portrait: { width: 768, height: 1344 },
     mobile: { width: 832, height: 1216 },
@@ -149,6 +153,13 @@ export const ASPECT_RATIO_OPTIONS: AspectRatioDefinition[] = [
   ASPECT_RATIOS.mobile,
   ASPECT_RATIOS.wide,
 ];
+
+export const getAspectRatioOptionsForModel = (model?: string | null): AspectRatioDefinition[] => {
+  if (model === 'moeFussionV1.5.0_Z_vz.safetensors') {
+    return [ASPECT_RATIOS.portrait, ASPECT_RATIOS.square];
+  }
+  return ASPECT_RATIO_OPTIONS;
+};
 
 export const NON_HUMAN_LEGS_LANDSCAPE_CINEMATIC_VARIED_POSES: string[] = [
   'lying on her side, full body visible, head resting on arm, relaxed and natural pose, gentle curves',

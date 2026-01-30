@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ASPECT_RATIO_OPTIONS, getDimensionsFromAspectRatio, MODEL_DEFAULT_SETTINGS } from '@/config/aspect-ratios';
+import { getDimensionsFromAspectRatio, MODEL_DEFAULT_SETTINGS } from '@/config/aspect-ratios';
 import { CharacterDraft, ChatMessage, CharacterImage } from '@/lib/types';
 import { automatic1111API } from '@/lib/automatic1111';
 import { characterAPI } from '@/lib/api';

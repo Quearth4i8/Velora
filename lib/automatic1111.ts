@@ -32,9 +32,72 @@ import {
 const AUTOMATIC1111_URL = process.env.AUTOMATIC1111_URL || 'http://127.0.0.1:7860';
 const AUTOMATIC1111_PROXY_URL = '/api/automatic1111/txt2img';
 
+type SdModelEntry = {
+  title?: string;
+  model_name?: string;
+  hash?: string;
+  sha256?: string;
+  filename?: string;
+};
+
+let cachedSdModels: { at: number; data: SdModelEntry[] } | null = null;
+const resolvedCheckpointCache = new Map<string, string>();
+
+const fetchSdModels = async (): Promise<SdModelEntry[]> => {
+  const now = Date.now();
+  if (cachedSdModels && now - cachedSdModels.at < 60_000) {
+    return cachedSdModels.data;
+  }
+
+  const res = await fetch(`${AUTOMATIC1111_URL}/sdapi/v1/sd-models`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch A1111 sd-models: ${res.status} ${res.statusText}`);
+  }
+
+  const data = (await res.json()) as SdModelEntry[];
+  cachedSdModels = { at: now, data: Array.isArray(data) ? data : [] };
+  return cachedSdModels.data;
+};
+
+const resolveSdModelCheckpoint = async (checkpoint: string): Promise<string> => {
+  const input = String(checkpoint || '').trim();
+  if (!input) return input;
+
+  const cached = resolvedCheckpointCache.get(input);
+  if (cached) return cached;
+
+  // If it's already in "title [hash]" form, keep it.
+  if (/\[[0-9a-f]{6,}\]$/i.test(input)) {
+    resolvedCheckpointCache.set(input, input);
+    return input;
+  }
+
+  try {
+    const models = await fetchSdModels();
+    const byExactTitle = models.find((m) => m.title === input);
+    const byModelName = models.find((m) => m.model_name === input);
+    const byFilename = models.find((m) => {
+      const f = String(m.filename || '').replace(/\\/g, '/');
+      return f.endsWith(`/${input}`) || f.endsWith(input);
+    });
+    const byTitlePrefix = models.find((m) => typeof m.title === 'string' && m.title.startsWith(`${input} [`));
+
+    const resolved =
+      (byExactTitle?.title || byModelName?.title || byFilename?.title || byTitlePrefix?.title || input).trim();
+
+    resolvedCheckpointCache.set(input, resolved);
+    return resolved;
+  } catch {
+    // If resolving fails, fall back to the original string.
+    resolvedCheckpointCache.set(input, input);
+    return input;
+  }
+};
+
 export const STYLE_TO_MODEL_MAP: Record<CharacterStyle, AIModel> = {
   [CharacterStyle.ANIME]: AIModel.PREFECT_ILLUSTRIOUS,
   [CharacterStyle.ANIME_ILLUSTRIOUS]: AIModel.WAI_ILLUSTRIOUS_SDXL,
+  [CharacterStyle.MOE_FUSSION]: AIModel.MOE_FUSSION_V1_5_0_Z_VZ,
   [CharacterStyle.REALISTIC]: AIModel.CYBERREALISTIC,
   [CharacterStyle.ARTISTIC]: AIModel.PERFECTDELIBERATE,
   [CharacterStyle.SPECIAL]: AIModel.PREFECT_ILLUSTRIOUS,
@@ -373,6 +436,27 @@ const applyModelPromptDefaults = (model: AIModel, prompt: string, negativePrompt
     return {
       prompt: joinAndDedupeTags('masterpiece', 'best quality', 'amazing quality', '1girl', prompt),
       negativePrompt: joinAndDedupeTags('bad quality', 'worst quality', 'worst detail', 'sketch', 'censor', negativePrompt),
+    };
+  }
+  if (model === AIModel.MOE_FUSSION_V1_5_0_Z_VZ) {
+    return {
+      prompt: joinAndDedupeTags('masterpiece', 'best quality', '1girl', 'solo', 'full body', prompt),
+      negativePrompt: joinAndDedupeTags(
+        'lowres',
+        'worst quality',
+        'low quality',
+        'old',
+        'early',
+        'bad anatomy',
+        'bad hands',
+        '4koma',
+        'comic',
+        'greyscale',
+        'censored',
+        'jpeg artifacts',
+        'aged up',
+        negativePrompt
+      ),
     };
   }
   return { prompt, negativePrompt };
@@ -800,7 +884,7 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle, settings?: an
   const age = ageNumber !== null ? `${ageNumber} years old` : '';
 
   const isMinor = ageNumber !== null && ageNumber < 18;
-  const subjectDescriptor = isMinor ? 'loli, small, mini size, shortstack, goblin size, tiny size, petite size, petite childlike female,' : 'woman';
+  const subjectDescriptor = isMinor ? 'loli, small, mini size, shortstack, tiny size, petite size, petite childlike female,' : 'woman';
   const malePartnerPrompt = (!isSelfAction && shouldIncludeMalePartnerFromCurrentText(messageContent)) ? 'male, man' : '';
   const soloDescriptor = hasSexualContent ? '' : 'solo';
   const ageDescriptor =
@@ -1506,6 +1590,8 @@ export const automatic1111API = {
 
   async switchModel(modelName: string): Promise<boolean> {
     try {
+      const resolvedModelName = await resolveSdModelCheckpoint(modelName);
+
       // Get current options
       const optionsResponse = await fetch(`${AUTOMATIC1111_URL}/sdapi/v1/options`);
       if (!optionsResponse.ok) {
@@ -1513,7 +1599,7 @@ export const automatic1111API = {
       }
 
       const options = await optionsResponse.json();
-      options.sd_model_checkpoint = modelName;
+      options.sd_model_checkpoint = resolvedModelName;
 
       // Update options to switch model
       const updateResponse = await fetch(`${AUTOMATIC1111_URL}/sdapi/v1/options`, {
@@ -1575,7 +1661,7 @@ export const automatic1111API = {
         specialPrompt: joinAndDedupeTags(draft.specialPrompt, randomPose, handPoseVariation)
       };
 
-      let prompt = buildPrompt(modifiedDraft, style, settings);
+      let prompt = buildPrompt(modifiedDraft, style);
       let negativePrompt = buildNegativePrompt(modifiedDraft);
 
       ({ prompt, negativePrompt } = applyModelPromptDefaults(model, prompt, negativePrompt));
@@ -1617,7 +1703,7 @@ export const automatic1111API = {
         )
       };
 
-      let prompt = buildPrompt(modifiedDraft, style, settings);
+      let prompt = buildPrompt(modifiedDraft, style);
       let negativePrompt = buildNegativePrompt(modifiedDraft);
 
       ({ prompt, negativePrompt } = applyModelPromptDefaults(model, prompt, negativePrompt));
@@ -1683,6 +1769,10 @@ export const automatic1111API = {
 
   async generateImageWithPayload(payload: any, draft: CharacterDraft, style: CharacterStyle, model: string): Promise<string> {
     try {
+      if (payload?.override_settings?.sd_model_checkpoint && typeof payload.override_settings.sd_model_checkpoint === 'string') {
+        payload.override_settings.sd_model_checkpoint = await resolveSdModelCheckpoint(payload.override_settings.sd_model_checkpoint);
+      }
+
       const response = await fetch(AUTOMATIC1111_PROXY_URL, {
         method: 'POST',
         headers: {
