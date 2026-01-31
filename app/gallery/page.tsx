@@ -128,6 +128,11 @@ export default function GalleryPage() {
       const resolvedModel = automatic1111API.getModelForStyle(generationSettings.style);
       const dimensions = getDimensionsFromAspectRatio(generationSettings.aspectRatio || 'portrait', resolvedModel);
 
+      const modelSwitched = await automatic1111API.switchModel(resolvedModel);
+      if (!modelSwitched) {
+        console.warn(`Failed to switch to model: ${resolvedModel}, using current model`);
+      }
+
       const finalPrompt = buildSpecialPrompt(specialPrompt, generationSettings.style);
       const finalNegativePrompt = buildSpecialNegativePrompt(specialNegativePrompt);
 
@@ -141,6 +146,9 @@ export default function GalleryPage() {
         sampler_name: generationSettings.sampler || 'DPM++ 2M Karras',
         seed: generationSettings.seed === -1 ? -1 : generationSettings.seed,
         model_name: resolvedModel,
+        override_settings: {
+          sd_model_checkpoint: resolvedModel,
+        },
       };
 
       const AUTOMATIC1111_URL = process.env.AUTOMATIC1111_URL || 'http://127.0.0.1:7860';
@@ -434,15 +442,22 @@ export default function GalleryPage() {
       }
 
       // Enhanced prompt function to match character generation quality
-      const getEnhancedPrompt = (userPrompt: string, style: string) => {
-        const stylePrompts = {
-          'anime': 'masterpiece, best quality, highres, very aesthetic, absurdres, lazypos, anime art, illustration, clean lineart, vibrant colors, solo, full body',
-          'realistic': 'masterpiece, best quality, highres, very aesthetic, absurdres, lazypos, photorealistic, professional photography, sharp focus, solo, full body',
-          'artistic': 'masterpiece, best quality, highres, very aesthetic, absurdres, lazypos, digital painting, concept art, detailed, solo, full body',
-          'special': 'masterpiece, best quality, amazing quality, absurdres,',
+      const getEnhancedPrompt = (userPrompt: string, style: CharacterStyle) => {
+        const stylePrompts: Record<CharacterStyle, string> = {
+          [CharacterStyle.ANIME]:
+            'masterpiece, best quality, highres, very aesthetic, absurdres, lazypos, anime art, illustration, clean lineart, vibrant colors, solo, full body',
+          [CharacterStyle.ANIME_ILLUSTRIOUS]:
+            'masterpiece, best quality, highres, very aesthetic, absurdres, lazypos, anime art, illustration, clean lineart, vibrant colors, solo, full body',
+          [CharacterStyle.MOE_FUSSION]:
+            'masterpiece, best quality, highres, very aesthetic, absurdres, lazypos, anime art, illustration, clean lineart, vibrant colors, solo, full body',
+          [CharacterStyle.REALISTIC]:
+            'masterpiece, best quality, highres, very aesthetic, absurdres, lazypos, photorealistic, professional photography, sharp focus, solo, full body',
+          [CharacterStyle.ARTISTIC]:
+            'masterpiece, best quality, highres, very aesthetic, absurdres, lazypos, digital painting, concept art, detailed, solo, full body',
+          [CharacterStyle.SPECIAL]: 'masterpiece, best quality, amazing quality, absurdres,',
         };
 
-        const stylePrefix = stylePrompts[style as keyof typeof stylePrompts] || stylePrompts.realistic;
+        const stylePrefix = stylePrompts[style] || stylePrompts[CharacterStyle.REALISTIC];
 
         const cleaned = String(userPrompt || '').trim();
         const isCentaur = /(^|\b)(centaur|taur)(\b|$)/i.test(cleaned);
@@ -451,8 +466,13 @@ export default function GalleryPage() {
         return joinAndDedupeTags(stylePrefix, centaurAnatomy, cleaned);
       };
 
-      const dimensions = getDimensionsFromAspectRatio(generationSettings.aspectRatio || 'portrait');
       const resolvedModel = automatic1111API.getModelForStyle(generationSettings.style);
+      const dimensions = getDimensionsFromAspectRatio(generationSettings.aspectRatio || 'portrait', resolvedModel);
+
+      const modelSwitched = await automatic1111API.switchModel(resolvedModel);
+      if (!modelSwitched) {
+        console.warn(`Failed to switch to model: ${resolvedModel}, using current model`);
+      }
 
       const cleanedPrompt = String(prompt || '').trim();
       const isCentaur = /(^|\b)(centaur|taur)(\b|$)/i.test(cleanedPrompt);
@@ -500,6 +520,9 @@ export default function GalleryPage() {
         sampler_name: generationSettings.sampler || 'DPM++ 2M Karras',
         seed: generationSettings.seed === -1 ? -1 : generationSettings.seed,
         model_name: resolvedModel,
+        override_settings: {
+          sd_model_checkpoint: resolvedModel,
+        },
       };
 
       console.log('Generating image with prompt:', prompt);
