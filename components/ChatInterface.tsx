@@ -34,6 +34,15 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
   const [showWardrobe, setShowWardrobe] = useState(false);
   const [showEnvironment, setShowEnvironment] = useState(false);
   const [currentCharacter, setCurrentCharacter] = useState<CharacterDraft>(character);
+  const [wardrobeTab, setWardrobeTab] = useState<'regular' | 'adult' | 'custom'>('regular');
+  const [wardrobeSearch, setWardrobeSearch] = useState('');
+  const [pendingWardrobeClothing, setPendingWardrobeClothing] = useState<ClothingStyle | null>(
+    (character?.appearance?.clothing as ClothingStyle) || null
+  );
+  const [pendingWardrobeCustomClothing, setPendingWardrobeCustomClothing] = useState<string>(
+    character?.appearance?.customClothing || ''
+  );
+  const [wardrobeOutfitColors, setWardrobeOutfitColors] = useState<Record<string, string>>({});
   const [isZoomed, setIsZoomed] = useState(false);
   const [zoomedImageUrl, setZoomedImageUrl] = useState<string | null>(null);
   const [blurImages, setBlurImages] = useState(false);
@@ -52,6 +61,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
 
   const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
   const heatStorageKey = currentCharacter.id ? `heat_${currentCharacter.id}` : null;
+  const wardrobeColorsStorageKey = currentCharacter.id ? `wardrobe_colors_${currentCharacter.id}` : null;
   const [heat, setHeat] = useState<number>(() => clamp((character?.heat ?? 25) as number, 0, 100));
 
   useEffect(() => {
@@ -71,6 +81,36 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
       // ignore
     }
   }, [heatStorageKey]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!wardrobeColorsStorageKey) return;
+    try {
+      const raw = window.localStorage.getItem(wardrobeColorsStorageKey);
+      const parsed = raw ? (JSON.parse(raw) as Record<string, string>) : null;
+      if (parsed && typeof parsed === 'object') setWardrobeOutfitColors(parsed);
+    } catch {
+      // ignore
+    }
+  }, [wardrobeColorsStorageKey]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!wardrobeColorsStorageKey) return;
+    try {
+      window.localStorage.setItem(wardrobeColorsStorageKey, JSON.stringify(wardrobeOutfitColors));
+    } catch {
+      // ignore
+    }
+  }, [wardrobeOutfitColors, wardrobeColorsStorageKey]);
+
+  useEffect(() => {
+    if (!showWardrobe) return;
+    setWardrobeTab('regular');
+    setWardrobeSearch('');
+    setPendingWardrobeClothing((currentCharacter?.appearance?.clothing as ClothingStyle) || null);
+    setPendingWardrobeCustomClothing(currentCharacter?.appearance?.customClothing || '');
+  }, [showWardrobe, currentCharacter?.appearance?.clothing, currentCharacter?.appearance?.customClothing]);
 
   useEffect(() => {
     const dbHeat = currentCharacter?.heat;
@@ -722,6 +762,157 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
     }
   };
 
+  const wardrobeColorOptions = [
+    { id: 'default', label: 'Default', value: '' },
+    { id: 'black', label: 'Black', value: 'black' },
+    { id: 'white', label: 'White', value: 'white' },
+    { id: 'red', label: 'Red', value: 'red' },
+    { id: 'blue', label: 'Blue', value: 'blue' },
+    { id: 'emerald', label: 'Emerald', value: 'emerald' },
+    { id: 'pink', label: 'Pink', value: 'pink' },
+    { id: 'purple', label: 'Purple', value: 'purple' },
+    { id: 'amber', label: 'Amber', value: 'amber' },
+    { id: 'rose', label: 'Rose', value: 'rose' },
+    { id: 'cyan', label: 'Cyan', value: 'cyan' },
+    { id: 'violet', label: 'Violet', value: 'violet' },
+  ];
+
+  const wardrobeRegularOutfits: Array<{ id: ClothingStyle; label: string; image: string; description: string }> = [
+    { id: ClothingStyle.CASUAL, label: 'Casual', image: '/clothes/cute.jpg', description: 'Relaxed everyday style - comfortable and approachable look' },
+    { id: ClothingStyle.FORMAL, label: 'Formal', image: '/clothes/formal.png', description: 'Classic evening elegance - refined and sophisticated outfit' },
+    { id: ClothingStyle.SPORTY, label: 'Sporty', image: '/clothes/sport.jpg', description: 'Active and energetic - athletic vibe with practical details' },
+    { id: ClothingStyle.ELEGANT, label: 'Elegant', image: '/clothes/elegent.jpg', description: 'Timeless sophistication - graceful, polished appearance' },
+    { id: ClothingStyle.CUTE, label: 'Cute', image: '/clothes/cute.jpg', description: 'Adorable and sweet - charming and playful look' },
+    { id: ClothingStyle.EDGY, label: 'Edgy', image: '/clothes/edgy.jpg', description: 'Bold modern style - confident attitude with striking accents' },
+    { id: ClothingStyle.TRADITIONAL, label: 'Traditional', image: '/clothes/traditional.jpg', description: 'Cultural elegance - rich patterns and traditional details' },
+    { id: ClothingStyle.FANTASY, label: 'Fantasy', image: '/clothes/fantasy.jpg', description: 'Magical and dreamy - enchanting fairytale outfit' },
+  ];
+
+  const wardrobeAdultOutfits: Array<{ id: ClothingStyle; label: string; image: string; description: string }> = [
+    { id: ClothingStyle.LINGERIE, label: 'Lingerie', image: '/clothes/lingerie.jpg', description: 'Intimate apparel - delicate lace lingerie set for romantic moments' },
+    { id: ClothingStyle.NAKED, label: 'Naked', image: '/clothes/nude.jpg', description: 'Natural beauty - completely nude, embracing natural form' },
+    { id: ClothingStyle.BIKINI, label: 'Bikini', image: '/clothes/bikini.jpg', description: 'Beach ready - revealing bikini perfect for sunny days' },
+    { id: ClothingStyle.UNDERWEAR, label: 'Underwear', image: '/clothes/underwear.jpg', description: 'Intimate wear - sexy underwear set for private moments' },
+    { id: ClothingStyle.REVEALING, label: 'Revealing', image: '/clothes/revealing.jpg', description: 'Bold style - daring outfit that shows more skin' },
+    { id: ClothingStyle.BODYSUIT, label: 'Bodysuit', image: '/clothes/bodysuit.jpg', description: 'Form fitting - tight bodysuit that accentuates curves' },
+    { id: ClothingStyle.CROTCHLESS, label: 'Crotchless Panties', image: '/clothes/lingerie.jpg', description: 'Extremely explicit - sheer lace panties with fully open crotch, designed for instant access and maximum exposure' },
+    { id: ClothingStyle.NIPPLE_PASTIES, label: 'Nipple Pasties', image: '/clothes/Nipple Pasties.jpg', description: 'Tiny pasties only, otherwise topless, provocative minimalist lingerie' },
+  ];
+
+  const WardrobeOutfitCard = ({
+    outfit,
+  }: {
+    outfit: { id: ClothingStyle; label: string; image: string; description: string };
+  }) => {
+    const selected = pendingWardrobeClothing === outfit.id;
+    const colorKey = outfit.id;
+    const selectedColor = wardrobeOutfitColors[colorKey] || '';
+    const showColorPicker = outfit.id !== ClothingStyle.NAKED;
+    const matchesSearch =
+      !wardrobeSearch.trim() ||
+      `${outfit.label} ${outfit.description}`.toLowerCase().includes(wardrobeSearch.trim().toLowerCase());
+
+    if (!matchesSearch) return null;
+
+    return (
+      <motion.div
+        whileHover={{ scale: 1.01 }}
+        whileTap={{ scale: 0.99 }}
+        onClick={() => setPendingWardrobeClothing(outfit.id)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') setPendingWardrobeClothing(outfit.id);
+        }}
+        className={`group relative overflow-hidden rounded-2xl border transition-all duration-150 cursor-pointer ${selected
+          ? 'border-pink-500/70 bg-pink-500/10 ring-2 ring-pink-500/15'
+          : 'border-dark-600/80 bg-dark-800/40 hover:border-pink-500/35 hover:bg-dark-800/60'
+          }`}
+      >
+        <div className="relative aspect-[16/18] bg-gradient-to-br from-dark-700 to-dark-900">
+          <img
+            src={outfit.image}
+            alt={outfit.label}
+            className="w-full h-full object-cover opacity-80 transition-opacity duration-150"
+            loading="lazy"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+          <div className="absolute bottom-0 left-0 right-0 h-1/2 bg-gradient-to-t from-black/60 to-transparent backdrop-blur-[2px]" />
+
+          {selected && (
+            <div className="absolute top-3 right-3">
+              <div className="px-2.5 py-1 rounded-full bg-pink-500/20 border border-pink-500/30 text-pink-200 text-xs font-medium">
+                Selected
+              </div>
+            </div>
+          )}
+
+          <div className="absolute bottom-0 left-0 right-0 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h4 className="text-white font-semibold tracking-tight truncate">{outfit.label}</h4>
+              </div>
+            </div>
+
+            {showColorPicker && (
+              <div className="mt-2">
+                <div className="flex flex-wrap justify-start gap-1.5 mt-2 px-1">
+                  {wardrobeColorOptions.map((c) => {
+                    const isActive = (selectedColor || '') === (c.value || '');
+                    const bg =
+                      c.id === 'default'
+                        ? 'bg-gradient-to-br from-gray-600 to-gray-700'
+                        : c.id === 'white'
+                          ? 'bg-gradient-to-br from-white to-gray-100'
+                          : c.id === 'black'
+                            ? 'bg-gradient-to-br from-black to-gray-900'
+                            : c.id === 'red'
+                              ? 'bg-gradient-to-br from-red-400 to-red-600'
+                              : c.id === 'blue'
+                                ? 'bg-gradient-to-br from-blue-400 to-blue-600'
+                                : c.id === 'emerald'
+                                  ? 'bg-gradient-to-br from-emerald-400 to-emerald-600'
+                                  : c.id === 'pink'
+                                    ? 'bg-gradient-to-br from-pink-400 to-pink-600'
+                                    : c.id === 'purple'
+                                      ? 'bg-gradient-to-br from-purple-400 to-purple-600'
+                                      : c.id === 'amber'
+                                        ? 'bg-gradient-to-br from-amber-400 to-amber-600'
+                                        : c.id === 'rose'
+                                          ? 'bg-gradient-to-br from-rose-400 to-rose-600'
+                                          : c.id === 'cyan'
+                                            ? 'bg-gradient-to-br from-cyan-400 to-cyan-600'
+                                            : 'bg-gradient-to-br from-violet-400 to-violet-600';
+
+                    return (
+                      <button
+                        key={`${outfit.id}-${c.id}`}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setWardrobeOutfitColors((prev) => ({
+                            ...prev,
+                            [colorKey]: c.value,
+                          }));
+                        }}
+                        className={`w-5 h-5 rounded-full border-2 aspect-square transition-all duration-150 shadow-lg ${bg} ${c.id === 'white' ? 'border-gray-300' : 'border-white/30'} ${isActive
+                          ? 'ring-2 ring-white ring-offset-2 ring-offset-dark-900 scale-110 shadow-xl'
+                          : 'hover:scale-105'
+                          }`}
+                        title={c.label}
+                        aria-label={c.label}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </motion.div>
+    );
+  };
+
   const handleResetChat = async () => {
     if (!conversation) return;
 
@@ -981,7 +1172,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
     onCharacterUpdate?.(updatedCharacter);
   };
 
-  const handleOutfitChange = async (clothing: ClothingStyle) => {
+  const handleOutfitChange = async (clothing: ClothingStyle, color?: string) => {
     // Update character's clothing
     const updatedCharacter = {
       ...currentCharacter,
@@ -1018,10 +1209,11 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
     }
 
     // Add a message about the outfit change
+    const colorLabel = color ? ` (${color})` : '';
     const outfitMessage: Partial<ChatMessage> = {
       conversationId: conversation?.id || 'temp',
       characterId: currentCharacter.id || 'temp',
-      content: `*${currentCharacter.name || 'The character'} changes into a ${clothing} outfit*`,
+      content: `*${currentCharacter.name || 'The character'} changes into a ${clothing}${colorLabel} outfit*`,
       sender: 'character',
     };
 
@@ -1606,217 +1798,253 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
             onClick={() => setShowWardrobe(false)}
           >
             <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
+              initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-gradient-to-br from-dark-800 to-dark-900 border border-dark-600 rounded-3xl p-8 max-w-6xl w-full max-h-[90vh] overflow-y-auto"
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="bg-gradient-to-br from-dark-800 to-dark-900 border border-dark-600 rounded-3xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between mb-8">
-                <div>
-                  <h2 className="text-3xl font-bold text-pink-300 mb-2">Wardrobe</h2>
-                  <p className="text-pink-400">Choose the perfect outfit for your character</p>
+              <div className="shrink-0 bg-gradient-to-br from-dark-800/95 to-dark-900/95 backdrop-blur-md border-b border-dark-600/60 px-6 py-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <h2 className="text-2xl font-bold text-pink-200 tracking-tight">Wardrobe</h2>
+                  </div>
+                  <button
+                    onClick={() => setShowWardrobe(false)}
+                    className="w-10 h-10 flex items-center justify-center text-dark-300 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-150"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
                 </div>
-                <button
-                  onClick={() => setShowWardrobe(false)}
-                  className="w-10 h-10 flex items-center justify-center text-pink-400 hover:text-white hover:bg-pink-600 rounded-xl transition-all duration-200"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+
+                <div className="mt-4 flex flex-col lg:flex-row lg:items-center gap-3">
+                  <div className="flex items-center gap-2 p-1 bg-dark-950/30 border border-dark-600/60 rounded-2xl w-fit">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setWardrobeTab('regular');
+                        const wardrobeContent = document.getElementById('wardrobe-content');
+                        if (wardrobeContent) {
+                          wardrobeContent.scrollTop = 0;
+                        }
+                      }}
+                      className={`h-9 px-4 rounded-xl text-sm font-medium transition-all ${wardrobeTab === 'regular'
+                        ? 'bg-pink-500/20 text-pink-200 border border-pink-500/30'
+                        : 'text-dark-300 hover:text-white'
+                        }`}
+                    >
+                      Regular
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setWardrobeTab('adult');
+                        const wardrobeContent = document.getElementById('wardrobe-content');
+                        if (wardrobeContent) {
+                          wardrobeContent.scrollTop = 0;
+                        }
+                      }}
+                      className={`h-9 px-4 rounded-xl text-sm font-medium transition-all ${wardrobeTab === 'adult'
+                        ? 'bg-pink-500/20 text-pink-200 border border-pink-500/30'
+                        : 'text-dark-300 hover:text-white'
+                        }`}
+                    >
+                      Adult
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setWardrobeTab('custom');
+                        const wardrobeContent = document.getElementById('wardrobe-content');
+                        if (wardrobeContent) {
+                          wardrobeContent.scrollTop = 0;
+                        }
+                      }}
+                      className={`h-9 px-4 rounded-xl text-sm font-medium transition-all ${wardrobeTab === 'custom'
+                        ? 'bg-pink-500/20 text-pink-200 border border-pink-500/30'
+                        : 'text-dark-300 hover:text-white'
+                        }`}
+                    >
+                      Custom
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="p-2 bg-pink-500/10 rounded-lg border border-pink-500/20">
+                      <svg className="w-4 h-4 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs text-pink-400">Current</div>
+                      <div className="text-sm text-white font-medium truncate">
+                        {currentCharacter.appearance?.clothing === ClothingStyle.CUSTOM ? (
+                          <span className="text-green-400">Custom</span>
+                        ) : (
+                          <span className="capitalize">{currentCharacter.appearance?.clothing || 'Default'}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="w-full lg:w-[360px]">
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={wardrobeSearch}
+                        onChange={(e) => setWardrobeSearch(e.target.value)}
+                        placeholder="Search outfits..."
+                        className="w-full h-11 px-4 bg-dark-950/30 text-white rounded-2xl border border-dark-600/60 focus:border-pink-500/40 focus:outline-none focus:ring-2 focus:ring-pink-500/15 placeholder:text-dark-400"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              {/* Current Outfit Display */}
-              <div className="mb-8 p-4 bg-dark-700/30 rounded-2xl border border-pink-500/20">
-                <div className="flex items-start gap-4">
-                  <div className="p-3 bg-pink-500/10 rounded-xl">
-                    <svg className="w-6 h-6 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
+              <div id="wardrobe-content" className="flex-1 px-6 py-6 overflow-y-auto">
+
+              {/* Regular Outfits Section */}
+              {wardrobeTab === 'regular' && (
+                <div className="mb-8">
+                  <div className="flex items-center mb-4">
+                    <div className="w-2 h-2 bg-pink-500 rounded-full mr-3"></div>
+                    <h3 className="text-xl font-semibold text-pink-300">Regular Outfits</h3>
                   </div>
-                  <div>
-                    <h3 className="text-sm font-medium text-pink-400 mb-1">Current Outfit</h3>
-                    <div className="text-lg text-white font-medium">
-                      {currentCharacter.appearance?.clothing === ClothingStyle.CUSTOM ? (
-                        <div className="flex flex-col">
-                          <span className="text-green-400">Custom Outfit</span>
-                          <span className="text-sm text-dark-300 font-normal mt-1 italic">
-                            "{currentCharacter.appearance?.customClothing || 'No description provided'}"
-                          </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {wardrobeRegularOutfits.map((outfit) => (
+                      <WardrobeOutfitCard key={outfit.id} outfit={outfit} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* NSFW Outfits Section */}
+              {wardrobeTab === 'adult' && (
+                <div className="mb-8">
+                  <div className="flex items-center mb-4">
+                    <div className="w-2 h-2 bg-pink-500 rounded-full mr-3"></div>
+                    <h3 className="text-xl font-semibold text-pink-300">Adult Outfits</h3>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {wardrobeAdultOutfits.map((outfit) => (
+                      <WardrobeOutfitCard key={outfit.id} outfit={outfit} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Custom Outfit Section */}
+              {wardrobeTab === 'custom' && (
+                <div className="border-t border-dark-700 pt-6">
+                  <div className="flex items-center mb-4">
+                    <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
+                    <h3 className="text-xl font-semibold text-pink-300">Custom Outfit</h3>
+                  </div>
+                  <div className="bg-dark-700/30 rounded-2xl p-4 border border-dark-600">
+                    <p className="text-pink-400 text-sm mb-3">Describe your custom outfit in detail:</p>
+                    <div className="flex flex-col gap-3">
+                      <div className="flex flex-col lg:flex-row gap-3">
+                        <input
+                          type="text"
+                          placeholder="e.g., Victorian gothic dress with lace trim and corset..."
+                          className="flex-1 px-4 py-3 bg-dark-800/50 text-white rounded-xl border border-pink-500/50 focus:border-green-500/50 focus:outline-none focus:ring-2 focus:ring-green-500/20 placeholder-pink-400"
+                          value={pendingWardrobeCustomClothing}
+                          onChange={(e) => setPendingWardrobeCustomClothing(e.target.value)}
+                        />
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.99 }}
+                          onClick={() => {
+                            setPendingWardrobeClothing(ClothingStyle.CUSTOM);
+                          }}
+                          className={`px-6 py-3 rounded-xl transition-all duration-200 shadow-lg font-medium ${pendingWardrobeClothing === ClothingStyle.CUSTOM
+                            ? 'bg-green-500/20 text-green-200 border border-green-500/30 shadow-green-500/10'
+                            : 'bg-dark-800/40 text-dark-200 border border-dark-600 hover:border-green-500/40 hover:text-white'
+                            }`}
+                        >
+                          Select Custom
+                        </motion.button>
+                      </div>
+
+                      {currentCharacter.appearance?.customClothing && (
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-dark-400 text-sm">Last used:</span>
+                          <button
+                            onClick={() => setPendingWardrobeCustomClothing(currentCharacter.appearance.customClothing!)}
+                            className="text-left text-sm text-green-400 hover:text-green-300 hover:underline truncate max-w-xl"
+                          >
+                            "{currentCharacter.appearance.customClothing}"
+                          </button>
                         </div>
-                      ) : (
-                        <span className="capitalize">{currentCharacter.appearance?.clothing || 'Default'}</span>
                       )}
                     </div>
                   </div>
                 </div>
+              )}
               </div>
 
-              {/* Regular Outfits Section */}
-              <div className="mb-8">
-                <div className="flex items-center mb-4">
-                  <div className="w-2 h-2 bg-pink-500 rounded-full mr-3"></div>
-                  <h3 className="text-xl font-semibold text-pink-300">Regular Outfits</h3>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {[ 
-                    { id: 'casual', label: 'Casual', image: '/images/velora.png', description: 'Relaxed everyday style - comfortable and approachable look' },
-                    { id: 'formal', label: 'Formal', image: '/images/velora.png', description: 'Classic evening elegance - refined and sophisticated outfit' },
-                    { id: 'sporty', label: 'Sporty', image: '/images/velora.png', description: 'Active and energetic - athletic vibe with practical details' },
-                    { id: 'elegant', label: 'Elegant', image: '/images/velora.png', description: 'Timeless sophistication - graceful, polished appearance' },
-                    { id: 'cute', label: 'Cute', image: '/images/velora.png', description: 'Adorable and sweet - charming and playful look' },
-                    { id: 'edgy', label: 'Edgy', image: '/images/velora.png', description: 'Bold modern style - confident attitude with striking accents' },
-                    { id: 'traditional', label: 'Traditional', image: '/images/velora.png', description: 'Cultural elegance - rich patterns and traditional details' },
-                    { id: 'fantasy', label: 'Fantasy', image: '/images/velora.png', description: 'Magical and dreamy - enchanting fairytale outfit' }
-                  ].map((outfit) => (
-                    <motion.button
-                      key={outfit.id}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => handleOutfitChange(outfit.id as ClothingStyle)}
-                      className={`relative overflow-hidden rounded-2xl border-2 transition-all duration-200 ${currentCharacter.appearance?.clothing === outfit.id
-                        ? 'border-pink-500 bg-pink-500/20 shadow-lg shadow-pink-500/30'
-                        : 'border-dark-600 bg-dark-700/50 hover:border-pink-500/50 hover:bg-pink-500/10'
-                        }`}
-                    >
-                      <div className="aspect-video bg-gradient-to-br from-dark-600 to-dark-700 relative">
-                        <img
-                          src={outfit.image}
-                          alt={outfit.label}
-                          className="w-full h-full object-cover opacity-80"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.style.display = 'none';
-                            const placeholder = target.nextElementSibling as HTMLElement;
-                            if (placeholder) placeholder.style.display = 'flex';
-                          }}
-                        />
-                        <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-200 bg-black/50">
-                          <span className="text-white text-sm font-medium">Select</span>
-                        </div>
-                        {/* Fallback placeholder */}
-                        <div className="absolute inset-0 flex items-center justify-center" style={{ display: 'none' }}>
-                          <svg className="w-12 h-12 text-dark-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                          </svg>
-                        </div>
+              <div className="shrink-0 border-t border-dark-600/60 px-6 py-4 bg-dark-950/20">
+                <div className="flex flex-col md:flex-row md:items-center gap-3">
+                  <div className="text-sm text-dark-300">
+                    {pendingWardrobeClothing ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-dark-400">Selected:</span>
+                        <span className="text-white font-medium capitalize">{pendingWardrobeClothing}</span>
+                        {pendingWardrobeClothing !== ClothingStyle.CUSTOM && pendingWardrobeClothing !== ClothingStyle.NAKED && wardrobeOutfitColors[pendingWardrobeClothing] && (
+                          <span className="text-pink-200">({wardrobeOutfitColors[pendingWardrobeClothing]})</span>
+                        )}
                       </div>
-                      <div className="p-3">
-                        <h4 className="text-white font-medium mb-1">{outfit.label}</h4>
-                        <p className="text-dark-400 text-xs line-clamp-2">{outfit.description}</p>
-                      </div>
-                    </motion.button>
-                  ))}
-                </div>
-              </div>
-
-              {/* NSFW Outfits Section */}
-              <div className="mb-8">
-                <div className="flex items-center mb-4">
-                  <div className="w-2 h-2 bg-pink-500 rounded-full mr-3"></div>
-                  <h3 className="text-xl font-semibold text-pink-300">Adult Outfits</h3>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {[
-                    { id: 'lingerie', label: 'Lingerie', image: '/images/velora.png', description: 'Intimate apparel - delicate lace lingerie set for romantic moments' },
-                    { id: 'naked', label: 'Naked', image: '/images/velora.png', description: 'Natural beauty - completely nude, embracing natural form' },
-                    { id: 'bikini', label: 'Bikini', image: '/images/velora.png', description: 'Beach ready - revealing bikini perfect for sunny days' },
-                    { id: 'underwear', label: 'Underwear', image: '/images/velora.png', description: 'Intimate wear - sexy underwear set for private moments' },
-                    { id: 'revealing', label: 'Revealing', image: '/images/velora.png', description: 'Bold style - daring outfit that shows more skin' },
-                    { id: 'bodysuit', label: 'Bodysuit', image: '/images/velora.png', description: 'Form fitting - tight bodysuit that accentuates curves' },
-                    { id: 'crotchless', label: 'Crotchless Panties', image: '/images/velora.png', description: 'Extremely explicit - sheer lace panties with fully open crotch, designed for instant access and maximum exposure' },
-                    { id: 'nipple-pasties', label: 'Nipple Pasties', image: '/images/velora.png', description: 'tiny pasties over nipples, completely topless otherwise with thong or nothing below for ultimate tease, sheer lace panties' }
-                  ].map((outfit) => (
-                    <motion.button
-                      key={outfit.id}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => handleOutfitChange(outfit.id as ClothingStyle)}
-                      className={`relative overflow-hidden rounded-2xl border-2 transition-all duration-200 ${currentCharacter.appearance?.clothing === outfit.id
-                        ? 'border-pink-500 bg-pink-500/20 shadow-lg shadow-pink-500/30'
-                        : 'border-dark-600 bg-dark-700/50 hover:border-pink-500/50 hover:bg-pink-500/10'
-                        }`}
-                    >
-                      <div className="aspect-video bg-gradient-to-br from-dark-600 to-dark-700 relative">
-                        <img
-                          src={outfit.image}
-                          alt={outfit.label}
-                          className="w-full h-full object-cover opacity-80"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.style.display = 'none';
-                            const placeholder = target.nextElementSibling as HTMLElement;
-                            if (placeholder) placeholder.style.display = 'flex';
-                          }}
-                        />
-                        <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-200 bg-black/50">
-                          <span className="text-white text-sm font-medium">Select</span>
-                        </div>
-                        {/* Fallback placeholder */}
-                        <div className="absolute inset-0 flex items-center justify-center" style={{ display: 'none' }}>
-                          <svg className="w-12 h-12 text-dark-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                          </svg>
-                        </div>
-                      </div>
-                      <div className="p-3">
-                        <h4 className="text-white font-medium mb-1">{outfit.label}</h4>
-                        <p className="text-dark-400 text-xs line-clamp-2">{outfit.description}</p>
-                      </div>
-                    </motion.button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Custom Outfit Section */}
-              <div className="border-t border-dark-700 pt-6">
-                <div className="flex items-center mb-4">
-                  <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-                  <h3 className="text-xl font-semibold text-pink-300">Custom Outfit</h3>
-                </div>
-                <div className="bg-dark-700/30 rounded-2xl p-4 border border-dark-600">
-                  <p className="text-pink-400 text-sm mb-3">Describe your custom outfit in detail:</p>
-                  <div className="flex flex-col gap-3">
-                    <div className="flex gap-3">
-                      <input
-                        type="text"
-                        placeholder="e.g., Victorian gothic dress with lace trim and corset..."
-                        className="flex-1 px-4 py-3 bg-dark-800/50 text-white rounded-xl border border-pink-500/50 focus:border-green-500/50 focus:outline-none focus:ring-2 focus:ring-green-500/20 placeholder-pink-400"
-                        id="customOutfitInput"
-                        defaultValue={currentCharacter.appearance?.customClothing || ''}
-                      />
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => {
-                          const input = document.getElementById('customOutfitInput') as HTMLInputElement;
-                          const customOutfit = input.value.trim();
-                          if (customOutfit) {
-                            handleCustomClothing(customOutfit);
-                          }
-                        }}
-                        className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-xl hover:from-green-500 hover:to-green-600 transition-all duration-200 shadow-lg shadow-green-500/20 font-medium"
-                      >
-                        Apply
-                      </motion.button>
-                    </div>
-
-                    {currentCharacter.appearance?.customClothing && (
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className="text-dark-400 text-sm">Last used:</span>
-                        <button
-                          onClick={() => handleCustomClothing(currentCharacter.appearance.customClothing!)}
-                          className="text-left text-sm text-green-400 hover:text-green-300 hover:underline truncate max-w-xl"
-                        >
-                          "{currentCharacter.appearance.customClothing}"
-                        </button>
-                      </div>
+                    ) : (
+                      <span>Select an outfit to continue</span>
                     )}
+                  </div>
+
+                  <div className="flex-1" />
+
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowWardrobe(false)}
+                      className="h-11 px-4 rounded-2xl bg-dark-800/40 text-dark-200 border border-dark-600 hover:border-dark-500 hover:text-white transition-all"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleWardrobeImageGeneration()}
+                      className="h-11 px-4 rounded-2xl bg-dark-800/40 text-pink-200 border border-pink-500/20 hover:border-pink-500/40 hover:bg-pink-500/10 transition-all"
+                    >
+                      Generate image
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!pendingWardrobeClothing || (pendingWardrobeClothing === ClothingStyle.CUSTOM && !pendingWardrobeCustomClothing.trim())}
+                      onClick={() => {
+                        if (!pendingWardrobeClothing) return;
+                        if (pendingWardrobeClothing === ClothingStyle.CUSTOM) {
+                          const t = pendingWardrobeCustomClothing.trim();
+                          if (!t) return;
+                          handleCustomClothing(t);
+                          return;
+                        }
+                        const color =
+                          pendingWardrobeClothing === ClothingStyle.NAKED
+                            ? ''
+                            : wardrobeOutfitColors[pendingWardrobeClothing] || '';
+                        handleOutfitChange(pendingWardrobeClothing, color || undefined);
+                      }}
+                      className="h-11 px-5 rounded-2xl bg-gradient-to-r from-pink-600 to-pink-500 text-white font-semibold hover:from-pink-500 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    >
+                      Apply
+                    </button>
                   </div>
                 </div>
               </div>

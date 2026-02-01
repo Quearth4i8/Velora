@@ -36,14 +36,14 @@ export const HeatMeter: React.FC<HeatMeterProps> = ({ value, variant = 'default'
 
   const gradient =
     tier === 'hot'
-      ? 'from-pink-500 via-fuchsia-500 to-rose-500'
+      ? 'from-red-600 via-orange-500 to-yellow-400'
       : tier === 'warm'
         ? 'from-pink-500/80 via-pink-400/70 to-pink-300/60'
         : 'from-dark-700 via-dark-600 to-dark-500';
 
   const glow =
     tier === 'hot'
-      ? 'shadow-pink-500/30'
+      ? 'shadow-orange-500/50 shadow-red-500/30'
       : tier === 'warm'
         ? 'shadow-pink-500/15'
         : 'shadow-black/20';
@@ -86,8 +86,14 @@ export const HeatMeter: React.FC<HeatMeterProps> = ({ value, variant = 'default'
             <motion.div
               className={`absolute bottom-0 left-0 right-0 rounded-full bg-gradient-to-t ${gradient} shadow-2xl ${glow}`}
               initial={false}
-              animate={{ height: `${v}%` }}
-              transition={{ type: 'spring', stiffness: 140, damping: 22 }}
+              animate={{ 
+                height: `${v}%`,
+                filter: tier === 'hot' && v >= 90 ? ['hue-rotate(0deg)', 'hue-rotate(20deg)', 'hue-rotate(0deg)'] : 'hue-rotate(0deg)'
+              }}
+              transition={{ 
+                height: { type: 'spring', stiffness: 140, damping: 22 },
+                filter: { duration: 2, repeat: Infinity, ease: 'easeInOut' }
+              }}
             />
 
             {tier === 'hot' && (
@@ -95,22 +101,38 @@ export const HeatMeter: React.FC<HeatMeterProps> = ({ value, variant = 'default'
                 <motion.div
                   className="absolute inset-0 pointer-events-none"
                   initial={false}
-                  animate={{ opacity: [0.20, 0.55, 0.28] }}
-                  transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+                  animate={{ opacity: [0.3, 0.8, 0.4] }}
+                  transition={{ duration: 0.8, repeat: Infinity, ease: 'easeInOut' }}
                   style={{
                     background:
-                      'radial-gradient(closest-side, rgba(251,113,133,0.18), rgba(236,72,153,0.20), rgba(0,0,0,0) 70%)',
+                      'radial-gradient(closest-side, rgba(251,146,60,0.4), rgba(239,68,68,0.3), rgba(0,0,0,0) 70%)',
                   }}
                 />
                 <motion.div
-                  className="absolute -inset-6 pointer-events-none blur-2xl"
+                  className="absolute -inset-8 pointer-events-none blur-3xl"
                   initial={false}
-                  animate={{ opacity: [0.18, 0.42, 0.22], scale: [0.98, 1.05, 1.0] }}
-                  transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+                  animate={{ 
+                    opacity: [0.4, 0.9, 0.5], 
+                    scale: [0.95, 1.1, 1.0],
+                    rotate: [0, 5, -5, 0]
+                  }}
+                  transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
                   style={{
                     background:
-                      'conic-gradient(from 0deg, rgba(251,113,133,0.00), rgba(236,72,153,0.32), rgba(168,85,247,0.22), rgba(251,113,133,0.00))',
+                      'conic-gradient(from 0deg, rgba(251,146,60,0.2), rgba(239,68,68,0.6), rgba(245,158,11,0.4), rgba(251,146,60,0.2))',
                   }}
+                />
+                <motion.div
+                  className="absolute inset-0 pointer-events-none"
+                  initial={false}
+                  animate={{ 
+                    boxShadow: [
+                      'inset 0 0 20px rgba(251,146,60,0.8)',
+                      'inset 0 0 40px rgba(239,68,68,0.6)',
+                      'inset 0 0 20px rgba(245,158,11,0.8)'
+                    ]
+                  }}
+                  transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
                 />
               </>
             )}
@@ -172,9 +194,44 @@ export const HeatMeter: React.FC<HeatMeterProps> = ({ value, variant = 'default'
             <motion.div
               className={`absolute bottom-0 left-0 right-0 rounded-3xl bg-gradient-to-t ${gradient} shadow-2xl ${glow}`}
               initial={false}
-              animate={{ height: `${v}%` }}
-              transition={{ type: 'spring', stiffness: 140, damping: 22 }}
+              animate={{ 
+                height: `${v}%`,
+                filter: tier === 'hot' && v >= 90 ? ['hue-rotate(0deg)', 'hue-rotate(20deg)', 'hue-rotate(0deg)'] : 'hue-rotate(0deg)'
+              }}
+              transition={{ 
+                height: { type: 'spring', stiffness: 140, damping: 22 },
+                filter: { duration: 2, repeat: Infinity, ease: 'easeInOut' }
+              }}
             />
+
+            {tier === 'hot' && (
+              <>
+                <motion.div
+                  className="absolute inset-0 pointer-events-none"
+                  initial={false}
+                  animate={{ opacity: [0.3, 0.8, 0.4] }}
+                  transition={{ duration: 0.8, repeat: Infinity, ease: 'easeInOut' }}
+                  style={{
+                    background:
+                      'radial-gradient(closest-side, rgba(251,146,60,0.4), rgba(239,68,68,0.3), rgba(0,0,0,0) 70%)',
+                  }}
+                />
+                <motion.div
+                  className="absolute -inset-8 pointer-events-none blur-3xl"
+                  initial={false}
+                  animate={{ 
+                    opacity: [0.4, 0.9, 0.5], 
+                    scale: [0.95, 1.1, 1.0],
+                    rotate: [0, 5, -5, 0]
+                  }}
+                  transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                  style={{
+                    background:
+                      'conic-gradient(from 0deg, rgba(251,146,60,0.2), rgba(239,68,68,0.6), rgba(245,158,11,0.4), rgba(251,146,60,0.2))',
+                  }}
+                />
+              </>
+            )}
 
             <motion.div
               className="absolute bottom-0 left-0 right-0 h-[18%] opacity-70 blur-xl pointer-events-none"
@@ -182,7 +239,7 @@ export const HeatMeter: React.FC<HeatMeterProps> = ({ value, variant = 'default'
               animate={{
                 background:
                   tier === 'hot'
-                    ? 'radial-gradient(closest-side, rgba(236,72,153,0.55), rgba(0,0,0,0))'
+                    ? 'radial-gradient(closest-side, rgba(239,68,68,0.8), rgba(251,146,60,0.6), rgba(0,0,0,0))'
                     : tier === 'warm'
                       ? 'radial-gradient(closest-side, rgba(236,72,153,0.30), rgba(0,0,0,0))'
                       : 'radial-gradient(closest-side, rgba(17,24,39,0.25), rgba(0,0,0,0))',

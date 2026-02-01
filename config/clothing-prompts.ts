@@ -1,73 +1,73 @@
 export const REGULAR_HUMANOID_CLOTHING_MAP: Record<string, string> = {
-    casual: 'jeans and t-shirt',
-    formal: 'elegant dress and high heels',
-    sporty: 'athletic shorts and sports bra',
-    elegant: 'evening gown and jewelry',
-    cute: 'colorful sundress and sandals',
-    edgy: 'leather jacket and ripped jeans',
-    traditional: 'cultural dress with traditional accessories',
-    fantasy: 'magical robes and mystical accessories',
-    revealing: 'detailed revealing outfit, showing skin, form-fitting clothing',
+    casual: 'stylish casual streetwear, fitted top, high-waisted pants, clean sneakers, subtle accessories',
+    formal: 'tailored formal outfit, elegant cocktail dress, tasteful jewelry, refined heels, polished look',
+    sporty: 'modern athleisure set, fitted sports bra, high-waisted leggings, sleek sneakers, sporty accents',
+    elegant: 'luxury evening look, flowing satin gown, delicate jewelry, designer heels, glamorous silhouette',
+    cute: 'cute coordinated outfit, short dress or skirt, soft cardigan, ribbons, pastel accents, charming style',
+    edgy: 'fashion-forward edgy outfit, leather jacket, fitted pants, boots, bold accessories, confident vibe',
+    traditional: 'beautiful traditional attire, rich fabric patterns, tasteful accessories, culturally-inspired elegance',
+    fantasy: 'fantasy-inspired outfit, ornate dress or robes, embroidery, jewelry, mystical accessories, magical aesthetic',
+    revealing: 'sexy stylish outfit, form-fitting top and skirt, tasteful cutouts, modern clubwear, flattering silhouette',
 };
 
 export const REGULAR_CENTAUR_CLOTHING_MAP: Record<string, string> = {
-    casual: 'comfortable tunic top with belt, light cloak, and decorative tack accents',
-    formal: 'elegant fitted bodice with flowing drapes and ornate jewelry, refined ceremonial tack',
-    sporty: 'supportive athletic top with wrap straps, lightweight harness, and practical accessories',
-    elegant: 'flowing gown-like drapes over the upper body with luxurious jewelry and embroidered fabric',
-    cute: 'colorful dress-like top with ribbons, soft shawl, and playful accessories',
-    edgy: 'leather jacket and rugged accessories, arm wraps, and bold metal details',
-    traditional: 'traditional upper garments with cultural accessories and patterned fabrics',
-    fantasy: 'enchanted robes and mystical accessories, ornamental barding and charms',
+    casual: 'stylish layered tunic top, fitted waist belt, light cloak, decorative tack accents, tasteful accessories',
+    formal: 'elegant fitted bodice, flowing draped fabric, ornate jewelry, ceremonial tack, regal presence',
+    sporty: 'athletic wrap top, supportive straps, lightweight harness, practical accessories, dynamic look',
+    elegant: 'luxurious draped upper gown, embroidered fabric, refined jewelry, elegant ornamental tack, graceful silhouette',
+    cute: 'cute colorful top with ribbons, soft shawl, playful accessories, charming coordinated style',
+    edgy: 'edgy leather jacket, rugged accessories, arm wraps, bold metal details, confident attitude',
+    traditional: 'beautiful traditional garments, patterned fabrics, cultural accessories, dignified elegance',
+    fantasy: 'fantasy robes, enchanted accessories, ornamental barding, charms, mystical aesthetic',
 };
 
 export const REGULAR_LEGLESS_CLOTHING_MAP: Record<string, string> = {
-    casual: 'relaxed top with layered wraps and simple accessories',
-    formal: 'elegant upper outfit with flowing fabric wraps and refined jewelry',
-    sporty: 'supportive athletic top with streamlined wraps and practical accessories',
-    elegant: 'luxurious draped outfit with ornate jewelry and flowing fabrics',
-    cute: 'colorful outfit with ribbons and decorative accessories',
-    edgy: 'leather jacket with bold accessories and layered wraps',
-    traditional: 'cultural garments with traditional accessories and patterned fabrics',
-    fantasy: 'magical robes and mystical accessories with flowing fabric and charms',
+    casual: 'stylish relaxed top, layered wraps, tasteful accessories, clean modern look',
+    formal: 'refined formal upper outfit, flowing fabric wraps, elegant jewelry, polished styling',
+    sporty: 'sleek athletic top, streamlined wraps, practical accessories, sporty aesthetic',
+    elegant: 'luxurious draped upper outfit, ornate jewelry, flowing fabrics, elegant silhouette',
+    cute: 'cute colorful top, ribbons, decorative accessories, soft playful styling',
+    edgy: 'edgy jacket styling, bold accessories, layered wraps, confident fashion vibe',
+    traditional: 'beautiful cultural garments, patterned fabrics, traditional accessories, tasteful elegance',
+    fantasy: 'fantasy robes, mystical accessories, flowing fabric, charms, magical aesthetic',
 };
 
 export const NSFW_HUMANOID_CLOTHING_MAP: Record<string, string> = {
     lingerie:
-        'ultra-sheer lace lingerie, completely transparent babydoll, open-cup bra, crotchless garter belt with stockings, tiny g-string thong barely covering anything, nipples and pussy visible through fabric, extreme see-through material',
-    naked: 'completely nude, fully naked body, no clothing whatsoever, totally exposed breasts and genitals, bare skin only, explicit nudity',
+        'luxury lingerie set, sheer lace, delicate straps, garter belt with stockings, tasteful erotic styling, high-end boudoir look',
+    naked: 'completely nude, no clothing, natural skin, tasteful full nudity',
     bikini:
-        'extreme micro bikini, strings-only bikini, pasties and g-string, massive sideboob and underboob, thong bottom disappearing between labia, sheer wet fabric clinging to nipples and pussy outline, practically nude',
+        'sexy micro bikini, string bikini, thong bottom, beach-ready, flattering fit, glossy fabric',
     underwear:
-        'open-cup sheer bra with exposed nipples, crotchless lace panties, transparent cupless teddy, fishnet crotchless set, labia and nipples fully visible, barely-there straps, erotic intimate apparel leaving nothing to imagination',
+        'stylish lingerie underwear set, sheer bra, lace panties, seductive details, high-end intimate wear',
     revealing:
-        'completely see-through outfit, transparent mesh dress with no underwear, extreme deep plunging neckline to navel, massive cleavage spill, sideboob and underboob fully exposed, backless and crotchless design, clothing optionally dissolved or torn for extra exposure',
+        'revealing clubwear, sheer mesh dress, deep neckline, backless design, bold cutouts, sexy modern styling',
     bodysuit:
-        'ultra-transparent sheer bodysuit, full fishnet bodysuit with large holes exposing nipples and pussy, crotchless and open-chest design, strategic cutouts over breasts and genitals, glossy wet-look latex bodysuit clinging to every curve, nipples and labia clearly outlined',
+        'sexy bodysuit, glossy latex or sheer mesh, strategic cutouts, form-fitting, high-fashion erotic look',
     crotchless:
-        'crotchless lace panties with sheer straps, revealing lingerie details, explicit open-crotch design, sensual intimate wear',
+        'crotchless lingerie, lace panties with straps, erotic details, provocative intimate wear',
     'nipple-pasties':
-        'nipple pasties covering nipples only, otherwise topless, minimal straps and accessories, provocative minimalist lingerie',
+        'nipple pasties, topless otherwise, minimal straps, provocative minimalist styling',
 };
 
 export const NSFW_CENTAUR_CLOTHING_MAP: Record<string, string> = {
-    lingerie: 'sheer lace lingerie for the upper body, decorative harness straps, jewelry, and elegant draped fabric accents',
-    naked: 'completely nude body, no clothing whatsoever, bare skin only',
-    bikini: 'minimal string bikini top, decorative straps, and stylish body jewelry with draped fabric accents',
-    underwear: 'revealing lingerie top with delicate straps, decorative harness, and jewelry accents',
-    revealing: 'extremely revealing sheer outfit with translucent fabric and bold cutouts, decorative straps and jewelry',
-    bodysuit: 'sheer bodysuit-like upper garment with cutouts, glossy fabric, and decorative harness straps',
-    crotchless: 'decorative harness straps and revealing lingerie accents for the upper body, bold jewelry and draped fabric',
-    'nipple-pasties': 'nipple pasties covering nipples only, otherwise topless upper body, minimal straps, body jewelry',
+    lingerie: 'luxury sheer lace lingerie for the upper body, decorative harness straps, jewelry, elegant draped accents',
+    naked: 'completely nude body, no clothing, natural skin',
+    bikini: 'minimal string bikini top, decorative straps, stylish body jewelry, draped fabric accents',
+    underwear: 'revealing lingerie top with delicate straps, decorative harness, jewelry accents, boudoir styling',
+    revealing: 'revealing sheer outfit, translucent fabric, bold cutouts, decorative straps, jewelry, sexy styling',
+    bodysuit: 'sexy bodysuit-like upper garment with cutouts, glossy fabric, decorative harness straps, form-fitting',
+    crotchless: 'provocative lingerie accents with harness straps, bold jewelry, draped fabric, erotic styling',
+    'nipple-pasties': 'nipple pasties, topless otherwise, minimal straps, body jewelry, provocative styling',
 };
 
 export const NSFW_LEGLESS_CLOTHING_MAP: Record<string, string> = {
-    lingerie: 'sheer lace lingerie for the upper body with delicate straps, jewelry, and elegant wrap accents',
-    naked: 'completely nude body, no clothing whatsoever, bare skin only',
-    bikini: 'minimal string bikini top with decorative straps and stylish jewelry accents',
-    underwear: 'revealing lingerie top with delicate straps and jewelry accents',
-    revealing: 'extremely revealing sheer outfit with translucent fabric and bold cutouts, accent jewelry and wraps',
-    bodysuit: 'sheer bodysuit-like upper garment with cutouts and glossy fabric, paired with wrap accents',
-    crotchless: 'revealing lingerie top with delicate straps and jewelry, paired with decorative wrap accents',
-    'nipple-pasties': 'nipple pasties covering nipples only, otherwise topless upper body, minimal straps and jewelry accents',
+    lingerie: 'luxury sheer lace lingerie for the upper body, delicate straps, jewelry, elegant wrap accents',
+    naked: 'completely nude body, no clothing, natural skin',
+    bikini: 'minimal string bikini top, decorative straps, stylish jewelry accents, sexy beach vibe',
+    underwear: 'revealing lingerie top, delicate straps, jewelry accents, boudoir styling',
+    revealing: 'revealing sheer outfit, translucent fabric, bold cutouts, accent jewelry and wraps, sexy styling',
+    bodysuit: 'sexy bodysuit-like upper garment, cutouts, glossy fabric, wrap accents, form-fitting',
+    crotchless: 'revealing lingerie top with straps and jewelry, decorative wrap accents, erotic styling',
+    'nipple-pasties': 'nipple pasties, topless otherwise, minimal straps and jewelry accents, provocative styling',
 };

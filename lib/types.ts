@@ -135,6 +135,8 @@ export enum ClothingStyle {
   UNDERWEAR = 'underwear',
   REVEALING = 'revealing',
   BODYSUIT = 'bodysuit',
+  CROTCHLESS = 'crotchless',
+  NIPPLE_PASTIES = 'nipple-pasties',
   CUSTOM = 'custom',
 }
 
