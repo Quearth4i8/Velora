@@ -187,8 +187,8 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
   // Show skeleton while loading in background
   if (isLoading && characters.length > 0) {
     return (
-      <div className="py-8 px-4">
-        <div className="max-w-7xl mx-auto">
+      <div className="py-8 w-full">
+        <div className="w-full">
           <div className="mb-8">
             <div className="h-12 bg-dark-800/50 rounded-lg animate-pulse mb-4"></div>
             <div className="h-6 bg-dark-800/30 rounded-lg w-2/3 mx-auto animate-pulse"></div>
@@ -205,8 +205,8 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
 
   if (error) {
     return (
-      <div className="py-12 px-4">
-        <div className="max-w-6xl mx-auto">
+      <div className="py-12 w-full">
+        <div className="w-full">
           <div className="text-center">
             <p className="text-red-400 mb-4">{error instanceof Error ? error.message : String(error)}</p>
             <PrimaryCTAButton label="Retry" onClick={loadCharacters} />
@@ -217,8 +217,8 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
   }
 
   return (
-    <div className="py-8 px-4">
-      <div className="max-w-7xl mx-auto">
+    <div className="py-8 w-full">
+      <div className="w-full">
         <TraitFilter onFilterChange={handleFilterChange} />
 
         {filteredCharacters.length === 0 ? (

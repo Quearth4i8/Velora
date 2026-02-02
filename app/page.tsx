@@ -46,7 +46,7 @@ export default function Home() {
         <Navbar />
       
       {/* Hero Section */}
-      <div className="container mx-auto px-4 pt-16 pb-12 relative">
+      <div className="w-full px-4 sm:px-8 lg:px-12 pt-16 pb-12 relative">
         {/* Left Image - Positioned Absolutely */}
         <motion.div 
           className="hidden lg:block absolute left-8 top-8"
@@ -160,7 +160,7 @@ export default function Home() {
       </div>
 
       {/* Character Gallery Section */}
-      <div className="container mx-auto px-4 pb-16">
+      <div className="w-full px-4 sm:px-8 lg:px-12 pb-16">
         <SpecialCharacterSection
           onSelectCharacter={(character) => {
             if (character.id) {

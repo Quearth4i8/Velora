@@ -157,12 +157,12 @@ export default function SettingsPage() {
       <Navbar />
 
       <motion.div
-        className="container mx-auto px-4 py-24"
+        className="w-full px-4 sm:px-8 lg:px-12 py-24"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <div className="max-w-6xl mx-auto">
+        <div className="w-full">
           {/* Header */}
           <div className="mb-12 text-center">
             <h1 className="text-5xl font-extrabold bg-gradient-to-r from-pink-400 to-pink-600 bg-clip-text text-transparent mb-4 tracking-tight">

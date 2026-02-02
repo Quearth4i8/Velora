@@ -206,8 +206,8 @@ export function SpecialCharacterSection({ onSelectCharacter }: SpecialCharacterS
   }
 
   return (
-    <div className="py-16 px-4 overflow-hidden relative">
-      <div className="max-w-7xl mx-auto mb-16 text-center relative z-10">
+    <div className="py-16 w-full relative">
+      <div className="w-full px-4 sm:px-8 lg:px-12 mb-16 text-center relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -223,7 +223,7 @@ export function SpecialCharacterSection({ onSelectCharacter }: SpecialCharacterS
         </motion.div>
       </div>
 
-      <div className="relative group/carousel max-w-[1400px] mx-auto px-4 md:px-12">
+      <div className="relative group/carousel w-full px-4 sm:px-8 lg:px-12">
         {/* Navigation Buttons - Hidden on small touch screens, visible on hover */}
         <button
           onClick={() => scroll('left')}

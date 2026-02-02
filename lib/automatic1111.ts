@@ -884,7 +884,7 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle, settings?: an
   const age = ageNumber !== null ? `${ageNumber} years old` : '';
 
   const isMinor = ageNumber !== null && ageNumber < 18;
-  const subjectDescriptor = isMinor ? 'loli, small, mini size, shortstack, tiny size, petite size, petite childlike female,' : 'woman';
+  const subjectDescriptor = isMinor ? 'loli, small, mini size, (shortstack:1.6), (child:1.6), tiny size, petite size, petite childlike female, big head' : 'woman';
   const malePartnerPrompt = (!isSelfAction && shouldIncludeMalePartnerFromCurrentText(messageContent)) ? 'male, man' : '';
   const soloDescriptor = hasSexualContent ? '' : 'solo';
   const ageDescriptor =
@@ -1633,13 +1633,7 @@ const buildHandPoseVariation = (draft: CharacterDraft, settings?: any): string =
 };
 
 const buildPromptWithHandPose = (draft: CharacterDraft, style: CharacterStyle, settings?: any): string => {
-  const prompt = buildPrompt(draft, style, settings);
-  // Don't add hand pose variations for special characters (monster girls and exotic species)
-  if (style === CharacterStyle.SPECIAL) {
-    return prompt;
-  }
-  const handPoseVariation = buildHandPoseVariation(draft, settings);
-  return joinAndDedupeTags(prompt, handPoseVariation);
+  return buildPrompt(draft, style, settings);
 };
 
 export const automatic1111API = {
@@ -1720,10 +1714,9 @@ export const automatic1111API = {
 
     if (hasCustomPoses(effectiveRaceType)) {
       const randomPose = getRandomRacePose(effectiveRaceType, aspectRatioId);
-      const handPoseVariation = (style === CharacterStyle.SPECIAL || poseMentionsHandsOrArms(randomPose)) ? '' : buildHandPoseVariation(draft, settings);
       const modifiedDraft = {
         ...draft,
-        specialPrompt: joinAndDedupeTags(draft.specialPrompt, randomPose, handPoseVariation)
+        specialPrompt: joinAndDedupeTags(draft.specialPrompt, poseMentionsHandsOrArms(randomPose) ? '' : randomPose)
       };
 
       let prompt = buildPrompt(modifiedDraft, style);
@@ -1757,13 +1750,11 @@ export const automatic1111API = {
 
     if (hasNonHumanLegs && isLandscapeOrCinematic) {
       const randomPose = NON_HUMAN_LEGS_LANDSCAPE_CINEMATIC_VARIED_POSES[Math.floor(Math.random() * NON_HUMAN_LEGS_LANDSCAPE_CINEMATIC_VARIED_POSES.length)];
-      const handPoseVariation = (style === CharacterStyle.SPECIAL || poseMentionsHandsOrArms(randomPose)) ? '' : buildHandPoseVariation(draft, settings);
       const modifiedDraft = {
         ...draft,
         specialPrompt: joinAndDedupeTags(
           draft.specialPrompt,
-          randomPose,
-          handPoseVariation,
+          poseMentionsHandsOrArms(randomPose) ? '' : randomPose,
           NON_HUMAN_LEGS_LANDSCAPE_CINEMATIC_PROMPT_SUFFIX
         )
       };

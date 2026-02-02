@@ -69,8 +69,8 @@ export default function EncountersPage() {
       <div className="relative z-10">
         <Navbar />
 
-        <div className="container mx-auto px-4 pt-10 pb-16">
-          <div className="max-w-6xl mx-auto">
+        <div className="w-full px-4 sm:px-8 lg:px-12 pt-10 pb-16">
+          <div className="w-full">
             <div className="mb-8">
               <div className="flex items-start justify-between gap-4">
                 <div>
