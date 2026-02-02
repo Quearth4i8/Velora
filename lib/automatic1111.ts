@@ -17,7 +17,7 @@ import {
   HAND_POSE_VARIATIONS_GENERIC,
 } from '@/config/race-poses';
 import { ETHNICITY_PROMPT_MAP } from '@/config/ethnicity-prompts';
-import { hexToColorName } from '@/config/color-mappings';
+import { hexToColorName, normalizeA1111ColorName } from '@/config/color-mappings';
 import { EYE_TYPE_DESCRIPTIONS } from '@/config/eye-type-descriptions';
 import { STYLE_PROMPTS } from '@/config/style-prompts';
 import {
@@ -1038,12 +1038,49 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle, settings?: an
   const fangsActivationTags = hasFangs
     ? 'sharp fangs, visible fangs, clean sharp teeth, symmetrical teeth, slightly parted lips'
     : '';
+  const clothingColorValueRaw = appearance.clothingColor;
+  const clothingColorValue = typeof clothingColorValueRaw === 'string' ? clothingColorValueRaw.trim() : '';
+  const clothingColorTag = clothingColorValue
+    ? normalizeA1111ColorName(clothingColorValue.startsWith('#') ? hexToColorName(clothingColorValue) : clothingColorValue)
+    : '';
+  const clothingDetails = clothing ? getClothingDetails(clothing, false, draft) : '';
+  const clothingDetailsLower = clothingDetails.toLowerCase();
+  const clothingColorEnforcementTags = (() => {
+    if (!clothingColorTag || !clothingDetailsLower) return '';
+
+    const pieces: string[] = [];
+    const addIf = (needle: string, tag: string) => {
+      if (clothingDetailsLower.includes(needle)) pieces.push(tag);
+    };
+
+    // Bind the (canonicalized) color to likely garment nouns. These weighted tags help SD lock onto the intended clothing color.
+    addIf('gown', `(${clothingColorTag} gown:1.6)`);
+    addIf('dress', `(${clothingColorTag} dress:1.6)`);
+    addIf('bikini', `(${clothingColorTag} bikini:1.5)`);
+    addIf('lingerie', `(${clothingColorTag} lingerie:1.5)`);
+    addIf('bodysuit', `(${clothingColorTag} bodysuit:1.5)`);
+    addIf('latex', `(${clothingColorTag} latex:1.3)`);
+    addIf('satin', `(${clothingColorTag} satin:1.3)`);
+
+    if (pieces.length === 0) {
+      pieces.push(`(${clothingColorTag} outfit:1.45)`);
+    }
+
+    // Extra plain-language anchor.
+    pieces.push(`clothing is ${clothingColorTag}`);
+
+    return joinAndDedupeTags(...pieces);
+  })();
+
+  const clothingDetailsWithColor = clothingDetails
+    ? (clothingColorTag ? `${clothingColorTag} colored ${clothingDetails}` : clothingDetails)
+    : '';
   const clothingTag = clothing === ClothingStyle.CUSTOM && appearance.customClothing
     ? `wearing ${appearance.customClothing}`
     : clothing === ClothingStyle.NAKED
       ? getClothingDetails(clothing, false, draft)
       : clothing
-        ? `wearing detailed ${getClothingDetails(clothing, false, draft)}`
+        ? `wearing detailed ${clothingDetailsWithColor}`
         : '';
   const hairColorTag = hairColor ? `${hexToColorName(hairColor)} hair` : '';
   const eyeColorTag = eyeColor ? `${eyeColor} eyes` : '';
@@ -1076,6 +1113,7 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle, settings?: an
     physique ? `${physique} body` : '',
     chestSize ? `${chestSize} breasts` : '',
     clothingTag,
+    clothingColorEnforcementTags,
     resolvedHairStyleTag,
     hairColorTag,
     eyeColorTag,
@@ -1097,22 +1135,33 @@ const buildNegativePrompt = (draft?: CharacterDraft, messageContent?: string): s
   const mainTagSexual = (draft?.mainTag || '').toLowerCase();
   const specialPromptSexual = (draft?.specialPrompt || '').toLowerCase();
   const originalMessageContent = (messageContent || '').toLowerCase();
-  
+
   // Check if it's a self-action to avoid adding male partner for solo activities
-  const isSelfActionInNegative = 
+  const isSelfActionInNegative =
     mainTagSexual.includes('takes her own') ||
     mainTagSexual.includes('takes his own') ||
     mainTagSexual.includes('her own') ||
     mainTagSexual.includes('his own') ||
     mainTagSexual.includes('herself') ||
     mainTagSexual.includes('himself') ||
-    (mainTagSexual.includes('takes') && mainTagSexual.includes('penis') && (mainTagSexual.includes('her') || mainTagSexual.includes('his')) && mainTagSexual.includes('into her mouth')) ||
-    // Detect futanari self-oral actions - check both mainTag and specialPrompt
-    ((mainTagSexual.includes('futanari') || specialPromptSexual.includes('futanari')) && (mainTagSexual.includes('blowjob') || mainTagSexual.includes('deepthroat') || mainTagSexual.includes('oral') || specialPromptSexual.includes('blowjob') || specialPromptSexual.includes('deepthroat') || specialPromptSexual.includes('oral'))) ||
-    // Detect solo sexual actions that imply self-pleasure
-    (mainTagSexual.includes('solo') && (mainTagSexual.includes('blowjob') || mainTagSexual.includes('deepthroat') || mainTagSexual.includes('oral') || mainTagSexual.includes('sucking')));
+    (mainTagSexual.includes('takes') &&
+      mainTagSexual.includes('penis') &&
+      (mainTagSexual.includes('her') || mainTagSexual.includes('his')) &&
+      mainTagSexual.includes('into her mouth')) ||
+    ((mainTagSexual.includes('futanari') || specialPromptSexual.includes('futanari')) &&
+      (mainTagSexual.includes('blowjob') ||
+        mainTagSexual.includes('deepthroat') ||
+        mainTagSexual.includes('oral') ||
+        specialPromptSexual.includes('blowjob') ||
+        specialPromptSexual.includes('deepthroat') ||
+        specialPromptSexual.includes('oral'))) ||
+    (mainTagSexual.includes('solo') &&
+      (mainTagSexual.includes('blowjob') ||
+        mainTagSexual.includes('deepthroat') ||
+        mainTagSexual.includes('oral') ||
+        mainTagSexual.includes('sucking')));
 
-  const hasSexualContent = 
+  const hasSexualContent =
     mainTagSexual.includes('oral sex') ||
     mainTagSexual.includes('sex') ||
     mainTagSexual.includes('intercourse') ||
@@ -1220,7 +1269,6 @@ const buildNegativePrompt = (draft?: CharacterDraft, messageContent?: string): s
     specialPromptSexual.includes('slave') ||
     specialPromptSexual.includes('kinky') ||
     specialPromptSexual.includes('fetish') ||
-    // Also check the original message content for sexual terms
     originalMessageContent.includes('anus') ||
     originalMessageContent.includes('anal') ||
     originalMessageContent.includes('anal sex') ||
@@ -1252,7 +1300,6 @@ const buildNegativePrompt = (draft?: CharacterDraft, messageContent?: string): s
   // Simple negative prompts - let LM Studio handle the specifics
   let contextualNegativePrompts = '';
   if (hasSexualContent && !isSelfActionInNegative) {
-    // LM Studio will provide the specific negative prompts in the extraction
     contextualNegativePrompts = '';
   }
 
@@ -1307,6 +1354,20 @@ const buildNegativePrompt = (draft?: CharacterDraft, messageContent?: string): s
       );
 
   const extraNegativePrompts: string[] = [];
+
+  // Outfit color drift guard: discourage "gold dress" when a non-gold outfit color is selected.
+  const clothingColorRaw = draft?.appearance?.clothingColor;
+  const clothingColorValue = typeof clothingColorRaw === 'string' ? clothingColorRaw.trim() : '';
+  const clothingColorTag = clothingColorValue
+    ? normalizeA1111ColorName(clothingColorValue.startsWith('#') ? hexToColorName(clothingColorValue) : clothingColorValue)
+    : '';
+  if (clothingColorTag) {
+    const lower = clothingColorTag.toLowerCase();
+    const allowsGold = lower.includes('gold') || lower.includes('golden') || lower.includes('amber') || lower.includes('yellow');
+    if (!allowsGold) {
+      extraNegativePrompts.push('gold dress, golden dress, gold gown, golden gown');
+    }
+  }
 
   const ageNumber =
     typeof draft?.identity?.age === 'number' && Number.isFinite(draft.identity.age) ? draft.identity.age : null;

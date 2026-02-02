@@ -263,8 +263,14 @@ const sanitizeNegativesFromTranscript = (plan: ImageGenerationPlan, transcriptTe
 };
 
 export const lmStudioService = {
-    async sendMessage(messages: ChatMessage[], character: CharacterDraft, context?: { heat?: number }) {
-        const systemPrompt = this.constructSystemPrompt(character, context?.heat);
+    async sendMessage(
+        messages: ChatMessage[],
+        character: CharacterDraft,
+        context?: { heat?: number; systemPromptAddon?: string }
+    ) {
+        const baseSystemPrompt = this.constructSystemPrompt(character, context?.heat);
+        const systemPromptAddon = String(context?.systemPromptAddon || '').trim();
+        const systemPrompt = systemPromptAddon ? `${baseSystemPrompt}\n\n${systemPromptAddon}` : baseSystemPrompt;
 
         // Truncate chat history to a sliding window to avoid sending entire conversation
         const MAX_HISTORY_MESSAGES = 10; // keep last 10 messages (5 turns)

@@ -67,12 +67,13 @@ export function Navbar() {
     { href: '/', label: 'Home' },
     { href: '/create', label: 'Create' },
     { href: '/gallery', label: 'Gallery' },
+    { href: '/encounters', label: 'Encounters' },
     { href: '/tentacles', label: 'Tentacles' },
   ];
 
   return (
     <nav className="sticky top-0 z-50 bg-dark-900/95 backdrop-blur-md border-b border-dark-800 will-change-transform transform-gpu">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 will-change-auto">
+      <div className="mx-auto px-10 sm:px-16 lg:px-20 will-change-auto">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center">
             <Link href="/" className="flex items-center space-x-3 group">

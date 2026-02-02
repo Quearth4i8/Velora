@@ -190,6 +190,7 @@ export interface CharacterAppearance {
   eyeColor: EyeColor | null;
   eyeType: EyeType | null;
   clothing: ClothingStyle | null;
+  clothingColor?: string;
   customClothing?: string;
   environment: Environment | null;
 }

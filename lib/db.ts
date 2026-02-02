@@ -1,4 +1,5 @@
 import { CharacterDraft, Height, Physique, Ethnicity } from './types';
+import { normalizeA1111ColorName } from '@/config/color-mappings';
 
 const PERSISTENT_PROMPT_DELIMITER = '||PERSISTENT_PROMPT||';
 
@@ -57,6 +58,7 @@ export const serializeCharacter = (draft: CharacterDraft): Record<string, any> =
     eye_color: draft.appearance?.eyeColor || null,
     eye_type: draft.appearance?.eyeType || null,
     clothing: draft.appearance?.clothing || null,
+    clothing_color: draft.appearance?.clothingColor ? normalizeA1111ColorName(draft.appearance.clothingColor) : null,
     custom_clothing: draft.appearance?.customClothing || undefined,
     environment: draft.appearance?.environment || null,
     personality_archetype: draft.personality?.archetype || null,
@@ -188,6 +190,7 @@ export const deserializeCharacter = (data: Record<string, any>): CharacterDraft 
       eyeColor: data.eye_color,
       eyeType: data.eye_type,
       clothing: data.clothing,
+      clothingColor: data.clothing_color ? normalizeA1111ColorName(data.clothing_color) : undefined,
       customClothing: data.custom_clothing || undefined,
       environment: data.environment,
     },

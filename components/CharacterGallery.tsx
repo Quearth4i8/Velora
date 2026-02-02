@@ -439,10 +439,11 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
       <div className="h-[calc(100vh-120px)] overflow-hidden">
         {/* Filter Section - Enhanced */}
         <div className="px-6 py-6 border-b border-dark-700/20 backdrop-blur-md bg-dark-900/30">
-          <div className="flex items-center justify-between max-w-[2000px] mx-auto">
-            <div className="flex items-center gap-6">
+          <div className="max-w-[2000px] mx-auto">
+            {/* Filter Pills and Controls - Responsive Layout */}
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               {/* Filter Pills - Enhanced with Icons */}
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <button
                   onClick={() => setFilter('all')}
                   className={`group relative px-5 py-2.5 rounded-2xl text-sm font-semibold transition-all duration-300 ${filter === 'all'
@@ -499,41 +500,41 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
                     </span>
                   </span>
                 </button>
+
+                {/* NSFW Blur Toggle - Mobile Responsive */}
+                <div className="flex items-center gap-3 pl-3 border-l border-dark-700/50">
+                  <span className="text-sm text-dark-400 whitespace-nowrap">Blur NSFW</span>
+                  <button
+                    onClick={toggleBlurNSFW}
+                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 ${blurNSFW
+                      ? 'bg-gradient-to-r from-pink-600 to-pink-500 shadow-lg shadow-pink-500/30'
+                      : 'bg-dark-700'
+                      }`}
+                  >
+                    <span
+                      className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-lg transition-transform duration-300 ${blurNSFW ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                    />
+                  </button>
+                </div>
               </div>
 
-              {/* NSFW Blur Toggle */}
-              <div className="flex items-center gap-3 pl-3 border-l border-dark-700/50">
-                <span className="text-sm text-dark-400">Blur NSFW</span>
+              {/* Generate Button - Full Width on Mobile */}
+              <div className="relative group lg:ml-auto">
+                <div className="absolute -inset-1 bg-gradient-to-r from-pink-600 via-pink-400 to-pink-600 rounded-2xl blur-lg opacity-60 group-hover:opacity-100 transition duration-300 animate-pulse"></div>
                 <button
-                  onClick={toggleBlurNSFW}
-                  className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 ${blurNSFW
-                    ? 'bg-gradient-to-r from-pink-600 to-pink-500 shadow-lg shadow-pink-500/30'
-                    : 'bg-dark-700'
-                    }`}
+                  onClick={() => setShowGenerationSettingsModal(true)}
+                  disabled={isGenerating || !editedCharacter.generation?.style}
+                  className="relative w-full lg:w-auto px-6 py-3 bg-gradient-to-r from-pink-600 via-pink-500 to-pink-700 text-white rounded-2xl text-sm font-bold hover:from-pink-500 hover:via-pink-400 hover:to-pink-600 disabled:from-dark-700 disabled:via-dark-800 disabled:to-dark-700 disabled:cursor-not-allowed transition-all duration-300 shadow-xl hover:scale-105 disabled:scale-100"
                 >
-                  <span
-                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-lg transition-transform duration-300 ${blurNSFW ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                  />
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Create New
+                  </span>
                 </button>
               </div>
-            </div>
-
-            {/* Generate Button - Floating Effect */}
-            <div className="relative group">
-              <div className="absolute -inset-1 bg-gradient-to-r from-pink-600 via-pink-400 to-pink-600 rounded-2xl blur-lg opacity-60 group-hover:opacity-100 transition duration-300 animate-pulse"></div>
-              <button
-                onClick={() => setShowGenerationSettingsModal(true)}
-                disabled={isGenerating || !editedCharacter.generation?.style}
-                className="relative px-6 py-3 bg-gradient-to-r from-pink-600 via-pink-500 to-pink-700 text-white rounded-2xl text-sm font-bold hover:from-pink-500 hover:via-pink-400 hover:to-pink-600 disabled:from-dark-700 disabled:via-dark-800 disabled:to-dark-700 disabled:cursor-not-allowed transition-all duration-300 shadow-xl hover:scale-105 disabled:scale-100"
-              >
-                <span className="flex items-center gap-2">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Create New
-                </span>
-              </button>
             </div>
           </div>
         </div>

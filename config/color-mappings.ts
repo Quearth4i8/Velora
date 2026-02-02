@@ -70,14 +70,29 @@ export const HEX_TO_COLOR_MAP: Record<string, string> = {
     '#2f4f4f': 'dark slate gray',
 };
 
+export const normalizeA1111ColorName = (value: string): string => {
+    const input = typeof value === 'string' ? value.trim() : '';
+    if (!input) return '';
+
+    const lower = input.toLowerCase();
+
+    if (lower === 'violet') return 'purple';
+    if (lower === 'blue violet') return 'purple';
+    if (lower === 'dark violet') return 'purple';
+    if (lower === 'medium purple') return 'purple';
+    if (lower === 'indigo') return 'purple';
+
+    return lower;
+};
+
 export const hexToColorName = (hex: string): string => {
     const normalized = typeof hex === 'string' ? hex.trim().toLowerCase() : '';
     if (!normalized) return '';
-    if (HEX_TO_COLOR_MAP[normalized]) return HEX_TO_COLOR_MAP[normalized];
+    if (HEX_TO_COLOR_MAP[normalized]) return normalizeA1111ColorName(HEX_TO_COLOR_MAP[normalized]);
 
     // Avoid leaking raw hex strings into prompts (A1111 won't understand them).
     // Fallback to a generic descriptor.
     if (/^#[0-9a-f]{6}$/.test(normalized)) return 'colored';
 
-    return normalized;
+    return normalizeA1111ColorName(normalized);
 };

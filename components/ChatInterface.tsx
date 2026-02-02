@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CharacterDraft, ChatMessage, ClothingStyle, Environment, Conversation, CharacterStyle } from '@/lib/types';
 import { CharacterGalleryComponent } from './CharacterGallery';
@@ -13,11 +13,19 @@ import { automatic1111API, STYLE_TO_MODEL_MAP } from '@/lib/automatic1111';
 import { lmStudioService } from '@/lib/lmstudio';
 import { AspectRatioId } from '@/config/aspect-ratios';
 import { useDialog } from '@/components/ui/DialogProvider';
+import type { EncounterSessionConfig } from '@/lib/encounters';
+import { getEncounterScenarioById } from '@/data/encounters';
+import { buildEncounterSystemPromptAddon } from '@/lib/encounterPrompt';
+import { bondService } from '@/lib/bondService';
+import { buildBondSystemPromptAddon, getBondState } from '@/lib/bond';
+import { normalizeA1111ColorName } from '@/config/color-mappings';
 
 interface ChatInterfaceProps {
   character: CharacterDraft;
   onBack: () => void;
   onCharacterUpdate?: (character: CharacterDraft) => void;
+  mode?: 'normal' | 'encounter';
+  encounterConfig?: (Omit<EncounterSessionConfig, 'characterId'> & { conversationId?: string });
 }
 
 export interface ChatResponse {
@@ -25,7 +33,7 @@ export interface ChatResponse {
   keywords: string[];
 }
 
-export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInterfaceProps) {
+export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'normal', encounterConfig }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -34,6 +42,8 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
   const [showWardrobe, setShowWardrobe] = useState(false);
   const [showEnvironment, setShowEnvironment] = useState(false);
   const [currentCharacter, setCurrentCharacter] = useState<CharacterDraft>(character);
+  const chatMode: 'normal' | 'encounter' = mode;
+  const isEncounter = chatMode === 'encounter';
   const [wardrobeTab, setWardrobeTab] = useState<'regular' | 'adult' | 'custom'>('regular');
   const [wardrobeSearch, setWardrobeSearch] = useState('');
   const [pendingWardrobeClothing, setPendingWardrobeClothing] = useState<ClothingStyle | null>(
@@ -59,6 +69,22 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
   const router = useRouter();
   const dialog = useDialog();
 
+  const encounterScenario = useMemo(() => {
+    if (chatMode !== 'encounter') return null;
+    const scenarioId = String(encounterConfig?.scenarioId || '').trim();
+    if (!scenarioId) return null;
+    return getEncounterScenarioById(scenarioId) || null;
+  }, [chatMode, encounterConfig?.scenarioId]);
+
+  const encounterSystemPromptAddon = useMemo(() => {
+    if (chatMode !== 'encounter') return '';
+    if (!encounterScenario) return '';
+    return buildEncounterSystemPromptAddon(encounterScenario, encounterConfig?.options);
+  }, [chatMode, encounterConfig?.options, encounterScenario]);
+
+  const [bondPromptAddon, setBondPromptAddon] = useState<string>('');
+  const [bondLevelName, setBondLevelName] = useState<string>('');
+
   const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
   const heatStorageKey = currentCharacter.id ? `heat_${currentCharacter.id}` : null;
   const wardrobeColorsStorageKey = currentCharacter.id ? `wardrobe_colors_${currentCharacter.id}` : null;
@@ -81,6 +107,33 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
       // ignore
     }
   }, [heatStorageKey]);
+
+  useEffect(() => {
+    const loadBond = async () => {
+      if (!currentCharacter?.id) {
+        setBondPromptAddon('');
+        return;
+      }
+
+      try {
+        const rel = await bondService.applyInactivityDecay(currentCharacter.id);
+        if (!rel) {
+          setBondPromptAddon('');
+          setBondLevelName('');
+          return;
+        }
+
+        const bondState = getBondState(rel.bond_points);
+        setBondPromptAddon(buildBondSystemPromptAddon(bondState));
+        setBondLevelName(bondState.level.name);
+      } catch {
+        setBondPromptAddon('');
+        setBondLevelName('');
+      }
+    };
+
+    loadBond();
+  }, [currentCharacter?.id]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -199,6 +252,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
     return delta;
   };
 
+
   const applyHeatUpdateFromUserText = (text: string): number => {
     const next = clamp(heat + computeHeatDelta(text, heat), 0, 100);
     setHeat(next);
@@ -212,6 +266,26 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
       });
     }
     return next;
+  };
+
+  const updateBondFromUserText = async (text: string): Promise<string> => {
+    if (!currentCharacter?.id) return bondPromptAddon;
+    try {
+      const rel = await bondService.registerInteraction(currentCharacter.id, text);
+      if (!rel) {
+        setBondPromptAddon('');
+        setBondLevelName('');
+        return '';
+      }
+
+      const bondState = getBondState(rel.bond_points);
+      const addon = buildBondSystemPromptAddon(bondState);
+      setBondPromptAddon(addon);
+      setBondLevelName(bondState.level.name);
+      return addon;
+    } catch {
+      return bondPromptAddon;
+    }
   };
 
   const getMessageImageUrls = (m: ChatMessage): string[] => {
@@ -613,6 +687,87 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
   const initChat = async () => {
     if (currentCharacter.id) {
       try {
+        if (chatMode === 'encounter' && encounterConfig?.scenarioId) {
+          const storageKey = `encounter_conversation_${currentCharacter.id}_${encounterConfig.scenarioId}`;
+          let encounterConversationId: string | null = null;
+
+          const encounterTitle = (() => {
+            const scenarioId = String(encounterConfig.scenarioId);
+            const mood = String(encounterConfig?.options?.mood || '').trim();
+            const location = String(encounterConfig?.options?.location || '').trim();
+            const intensity = String(encounterConfig?.options?.intensity || '').trim();
+
+            const parts: string[] = [`encounter:${scenarioId}`];
+            if (mood) parts.push(`mood=${encodeURIComponent(mood)}`);
+            if (location) parts.push(`location=${encodeURIComponent(location)}`);
+            if (intensity) parts.push(`intensity=${encodeURIComponent(intensity)}`);
+            return parts.join('|');
+          })();
+
+          try {
+            encounterConversationId = window.localStorage.getItem(storageKey);
+          } catch {
+            // ignore
+          }
+
+          const forcedConversationId = String(encounterConfig?.conversationId || '').trim();
+          if (forcedConversationId) {
+            encounterConversationId = forcedConversationId;
+            try {
+              window.localStorage.setItem(storageKey, forcedConversationId);
+            } catch {
+              // ignore
+            }
+          }
+
+          if (!encounterConversationId) {
+            const created = await characterAPI.createConversation(
+              currentCharacter.id,
+              encounterTitle
+            );
+            if (created.success && created.data?.id) {
+              encounterConversationId = String(created.data.id);
+              try {
+                window.localStorage.setItem(storageKey, encounterConversationId);
+              } catch {
+                // ignore
+              }
+            }
+          }
+
+          if (encounterConversationId) {
+            await characterAPI.updateConversationTitle(encounterConversationId, encounterTitle);
+
+            setConversation({
+              id: encounterConversationId,
+              characterId: currentCharacter.id,
+              userId: '',
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+
+            const messagesResult = await characterAPI.getMessages(encounterConversationId);
+            if (messagesResult.success && messagesResult.data) {
+              setMessages(messagesResult.data.map((m: any) => {
+                const urls = Array.isArray(m.image_urls)
+                  ? m.image_urls
+                  : (m.image_url ? [m.image_url] : []);
+
+                return {
+                  ...m,
+                  imageUrl: m.image_url || urls[0],
+                  imageUrls: urls,
+                  timestamp: new Date(m.timestamp)
+                };
+              }));
+            } else {
+              setMessages([]);
+            }
+
+            return;
+          }
+        }
+
         const convResult = await characterAPI.getConversation(currentCharacter.id);
         if (convResult.success && convResult.data) {
           setConversation(convResult.data);
@@ -643,7 +798,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
 
   useEffect(() => {
     initChat();
-  }, [currentCharacter.id]);
+  }, [currentCharacter.id, chatMode, encounterConfig?.scenarioId]);
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || !conversation) return;
@@ -652,6 +807,12 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
     setInputMessage('');
 
     const nextHeat = applyHeatUpdateFromUserText(userMessageContent);
+    const nextBondAddon = await updateBondFromUserText(userMessageContent);
+
+    const systemPromptAddon = [nextBondAddon, chatMode === 'encounter' ? encounterSystemPromptAddon : '']
+      .map((s) => String(s || '').trim())
+      .filter(Boolean)
+      .join('\n\n');
 
     const userMsg: Partial<ChatMessage> = {
       conversationId: conversation.id,
@@ -678,7 +839,10 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
       // Get LLM response using either saved message or fallback to optimistic
       const messageForContext = savedUserMsg.success ? savedUserMsg.data : optimisticMsg;
       const chatContext = [...messages, messageForContext];
-      const llmResponse = await lmStudioService.sendMessage(chatContext, currentCharacter, { heat: nextHeat });
+      const llmResponse = await lmStudioService.sendMessage(chatContext, currentCharacter, {
+        heat: nextHeat,
+        systemPromptAddon: systemPromptAddon || undefined,
+      });
 
       const characterMsg: Partial<ChatMessage> = {
         conversationId: conversation.id,
@@ -774,7 +938,6 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
     { id: 'amber', label: 'Amber', value: 'amber' },
     { id: 'rose', label: 'Rose', value: 'rose' },
     { id: 'cyan', label: 'Cyan', value: 'cyan' },
-    { id: 'violet', label: 'Violet', value: 'violet' },
   ];
 
   const wardrobeRegularOutfits: Array<{ id: ClothingStyle; label: string; image: string; description: string }> = [
@@ -916,9 +1079,18 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
   const handleResetChat = async () => {
     if (!conversation) return;
 
+    if (chatMode === 'encounter' && currentCharacter.id && encounterConfig?.scenarioId) {
+      const storageKey = `encounter_conversation_${currentCharacter.id}_${encounterConfig.scenarioId}`;
+      try {
+        window.localStorage.removeItem(storageKey);
+      } catch {
+        // ignore
+      }
+    }
+
     const ok = await dialog.confirm({
-      title: 'Reset chat?',
-      message: 'Are you sure you want to reset the chat history? This cannot be undone.',
+      title: 'Reset chat history?',
+      message: 'This will delete the entire conversation history. This cannot be undone.',
       confirmText: 'Reset',
       cancelText: 'Cancel',
       destructive: true,
@@ -1173,12 +1345,16 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
   };
 
   const handleOutfitChange = async (clothing: ClothingStyle, color?: string) => {
+    const resolvedColorRaw = typeof color === 'string' && color.trim().length > 0 ? color.trim() : undefined;
+    const resolvedColor = resolvedColorRaw ? normalizeA1111ColorName(resolvedColorRaw) : undefined;
+
     // Update character's clothing
     const updatedCharacter = {
       ...currentCharacter,
       appearance: {
         ...currentCharacter.appearance,
-        clothing: clothing
+        clothing: clothing,
+        clothingColor: resolvedColor
       }
     };
 
@@ -1189,7 +1365,8 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
     if (currentCharacter.id) {
       try {
         const result = await characterAPI.updateCharacterDirect(currentCharacter.id, {
-          clothing: clothing
+          clothing: clothing,
+          clothing_color: resolvedColor || null
         });
 
         if (!result.success) {
@@ -1209,7 +1386,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
     }
 
     // Add a message about the outfit change
-    const colorLabel = color ? ` (${color})` : '';
+    const colorLabel = resolvedColor ? ` (${resolvedColor})` : '';
     const outfitMessage: Partial<ChatMessage> = {
       conversationId: conversation?.id || 'temp',
       characterId: currentCharacter.id || 'temp',
@@ -1233,7 +1410,8 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
       appearance: {
         ...currentCharacter.appearance,
         clothing: ClothingStyle.CUSTOM,
-        customClothing: customOutfit
+        customClothing: customOutfit,
+        clothingColor: undefined
       }
     };
 
@@ -1245,7 +1423,8 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
       try {
         const result = await characterAPI.updateCharacterDirect(currentCharacter.id, {
           clothing: ClothingStyle.CUSTOM,
-          custom_clothing: customOutfit
+          custom_clothing: customOutfit,
+          clothing_color: null
         });
 
         if (!result.success) {
@@ -1392,6 +1571,121 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
     return responses[Math.floor(Math.random() * responses.length)];
   };
 
+  const handleLeaveEncounter = async () => {
+    if (!isEncounter) {
+      onBack();
+      return;
+    }
+
+    const ok = await dialog.confirm({
+      title: 'Leave Encounter?',
+      message: 'The scene will pause. You can come back to Encounters to start a new scene any time.',
+      confirmText: 'Leave',
+      cancelText: 'Stay',
+      destructive: true,
+    });
+
+    if (!ok) return;
+    onBack();
+  };
+
+  const handleChangeEncounterOptions = async () => {
+    if (!isEncounter) return;
+
+    const ok = await dialog.confirm({
+      title: 'Change encounter setup?',
+      message: 'You will return to Encounters setup. This scene will remain paused unless you restart it.',
+      confirmText: 'Go to Setup',
+      cancelText: 'Stay',
+      destructive: false,
+    });
+
+    if (!ok) return;
+    router.push('/encounters');
+  };
+
+  const handleRestartEncounterScene = async () => {
+    if (!isEncounter || !conversation) return;
+
+    const ok = await dialog.confirm({
+      title: 'Restart scene?',
+      message: 'This will clear the current scene conversation and start fresh.',
+      confirmText: 'Restart',
+      cancelText: 'Cancel',
+      destructive: true,
+    });
+
+    if (!ok) return;
+
+    if (currentCharacter.id && encounterConfig?.scenarioId) {
+      const storageKey = `encounter_conversation_${currentCharacter.id}_${encounterConfig.scenarioId}`;
+      try {
+        window.localStorage.removeItem(storageKey);
+      } catch {
+        // ignore
+      }
+    }
+
+    const result = await characterAPI.resetConversation(conversation.id);
+    if (result.success) {
+      setMessages([]);
+      setConversation(null);
+      await initChat();
+    }
+  };
+
+  const handleRewindEncounter = async () => {
+    if (!isEncounter || !conversation) return;
+    if (isTyping) return;
+
+    const lastCharacterIndex = (() => {
+      for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i]?.sender === 'character') return i;
+      }
+      return -1;
+    })();
+
+    if (lastCharacterIndex === -1) return;
+
+    const lastUserIndex = (() => {
+      for (let i = lastCharacterIndex - 1; i >= 0; i--) {
+        if (messages[i]?.sender === 'user') return i;
+      }
+      return -1;
+    })();
+
+    const ok = await dialog.confirm({
+      title: 'Rewind the last exchange?',
+      message: 'This will delete the most recent assistant response (and the user message before it when available).',
+      confirmText: 'Rewind',
+      cancelText: 'Cancel',
+      destructive: true,
+    });
+
+    if (!ok) return;
+
+    const idsToDelete = new Set<string>();
+    const charMsg = messages[lastCharacterIndex];
+    if (charMsg?.id) idsToDelete.add(charMsg.id);
+    if (lastUserIndex !== -1) {
+      const userMsg = messages[lastUserIndex];
+      if (userMsg?.id) idsToDelete.add(userMsg.id);
+    }
+
+    for (const id of idsToDelete) {
+      const res = await characterAPI.deleteMessage(id);
+      if (!res?.success) {
+        await dialog.alert({
+          title: 'Error',
+          message: 'Failed to rewind the scene. Please try again.',
+        });
+        return;
+      }
+    }
+
+    setMessages((prev) => prev.filter((m) => !idsToDelete.has(m.id)));
+  };
+
   return (
     <>
       {showGallery ? (
@@ -1418,9 +1712,9 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                     <img
                       src={currentCharacter.generation.generatedImage}
                       alt="Generated Character"
-                      className="w-full h-full object-cover"
+                      className={`w-full h-full object-cover ${isEncounter ? 'opacity-70 saturate-75 contrast-90' : ''}`}
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
+                    <div className={`absolute inset-0 pointer-events-none ${isEncounter ? 'bg-gradient-to-t from-black/55 via-black/10 to-transparent' : 'bg-gradient-to-t from-black/40 via-transparent to-transparent'}`} />
                     <div className="absolute top-4 right-4">
                       <div className="px-4 py-2 bg-black/40 backdrop-blur-md rounded-lg border border-white/20">
                         <p className="text-white text-lg font-medium">
@@ -1441,76 +1735,152 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
             }`}
           >
             {/* Chat Header */}
-            <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 border-b border-dark-700/50 backdrop-blur-sm">
-              <div className="flex items-center">
-                <button
-                  onClick={onBack}
-                  className="flex items-center text-pink-300 hover:text-pink-200 transition-colors group"
-                >
-                  <svg className="w-4 h-4 mr-2 group-hover:-translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                  </svg>
-                  <span className="text-sm font-medium">Back to Selection</span>
-                </button>
-
-                {/* Character Name - Center */}
-                <div className="flex-1 flex justify-center">
-                  <div className="flex items-center space-x-3">
-                    {/* Character Info */}
-                    <div className="flex flex-col items-center">
-                      <h1 className="text-xl font-semibold text-white">{currentCharacter.name || 'Character'}</h1>
-                      <div className="text-sm text-pink-400 capitalize">
-                        {currentCharacter.stylePreset || 'Human'}
+            {isEncounter ? (
+              <div className="relative overflow-hidden border-b border-dark-700/50">
+                <div className="absolute inset-0 bg-gradient-to-br from-dark-950 via-dark-900/80 to-dark-950" />
+                <div className="absolute inset-0 bg-[radial-gradient(900px_circle_at_30%_30%,rgba(236,72,153,0.18),transparent_55%)]" />
+                <div className="relative px-5 sm:px-8 lg:px-12 py-8 sm:py-10 backdrop-blur-sm">
+                  <div className="max-w-5xl mx-auto flex items-start justify-between gap-6">
+                    <div className="min-w-0">
+                      <div className="text-xs tracking-[0.22em] uppercase text-pink-200/70">
+                        Scene
                       </div>
+                      <h1 className="mt-2 text-3xl sm:text-4xl font-semibold text-white tracking-tight">
+                        {encounterScenario?.title || 'Encounter'}
+                      </h1>
+                      <div className="mt-3 text-sm sm:text-[15px] leading-relaxed text-dark-200/90 max-w-3xl">
+                        {encounterScenario?.shortDescription || ''}
+                      </div>
+                      <div className="mt-5 text-[12px] text-dark-300/90">
+                        {[
+                          encounterConfig?.options?.mood?.trim() ? `Mood: ${encounterConfig.options.mood.trim()}` : null,
+                          encounterConfig?.options?.location?.trim() ? `Location: ${encounterConfig.options.location.trim()}` : null,
+                          encounterConfig?.options?.intensity ? `Intensity: ${encounterConfig.options.intensity}` : null,
+                          bondLevelName ? `Bond: ${bondLevelName}` : null,
+                        ]
+                          .filter(Boolean)
+                          .join('  •  ')}
+                      </div>
+                    </div>
+
+                    <div className="shrink-0 flex items-center gap-2">
+                      <button
+                        onClick={() => setBlurImages((v) => !v)}
+                        className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 ${
+                          blurImages
+                            ? 'text-pink-200 bg-pink-500/10 border-pink-500/30'
+                            : 'text-dark-200 bg-dark-900/30 border-dark-700/60 hover:border-pink-500/25 hover:bg-dark-900/40'
+                        }`}
+                        title={blurImages ? 'Unblur images' : 'Blur images'}
+                      >
+                        Blur
+                      </button>
+                      <button
+                        onClick={handleRewindEncounter}
+                        className="px-3 py-2 rounded-xl text-xs font-semibold border border-dark-700/60 bg-dark-900/30 text-dark-200 hover:bg-dark-900/40 hover:border-pink-500/20 transition-all duration-200"
+                        title="Rewind the last exchange"
+                      >
+                        Rewind
+                      </button>
+                      <button
+                        onClick={handleRestartEncounterScene}
+                        className="px-3 py-2 rounded-xl text-xs font-semibold border border-dark-700/60 bg-dark-900/30 text-dark-200 hover:bg-dark-900/40 hover:border-pink-500/20 transition-all duration-200"
+                        title="Restart this scene"
+                      >
+                        Restart
+                      </button>
+                      <button
+                        onClick={handleChangeEncounterOptions}
+                        className="px-3 py-2 rounded-xl text-xs font-semibold border border-dark-700/60 bg-dark-900/30 text-dark-200 hover:bg-dark-900/40 hover:border-pink-500/20 transition-all duration-200"
+                        title="Change encounter options"
+                      >
+                        Options
+                      </button>
+                      <button
+                        onClick={handleLeaveEncounter}
+                        className="px-4 py-2 rounded-xl text-xs font-semibold border border-red-500/25 bg-red-500/10 text-red-200 hover:bg-red-500/15 transition-all duration-200"
+                        title="Leave Encounter"
+                      >
+                        Leave Encounter
+                      </button>
                     </div>
                   </div>
                 </div>
-
-                {/* Actions - Right */}
-                <div className="flex items-center gap-2">
+              </div>
+            ) : (
+              <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 border-b border-dark-700/50 backdrop-blur-sm">
+                <div className="flex items-center">
                   <button
-                    onClick={() => setBlurImages((v) => !v)}
-                    className={`p-2 rounded-xl transition-all duration-200 ${
-                      blurImages
-                        ? 'text-pink-300 bg-pink-400/10'
-                        : 'text-dark-400 hover:text-pink-300 hover:bg-pink-400/10'
-                    }`}
-                    title={blurImages ? 'Unblur images' : 'Blur images'}
+                    onClick={onBack}
+                    className="flex items-center text-pink-300 hover:text-pink-200 transition-colors group"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M2 12s3.636-7 10-7 10 7 10 7-3.636 7-10 7S2 12 2 12z"
-                      />
-                      <circle cx="12" cy="12" r="3" strokeWidth={2} />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4l16 16" />
+                    <svg className="w-4 h-4 mr-2 group-hover:-translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
+                    <span className="text-sm font-medium">Back to Selection</span>
                   </button>
 
-                  <button
-                    onClick={handleResetChat}
-                    className="p-2 text-dark-400 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all duration-200"
-                    title="Reset History"
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
+                  {/* Character Name - Center */}
+                  <div className="flex-1 flex justify-center">
+                    <div className="flex items-center space-x-3">
+                      {/* Character Info */}
+                      <div className="flex flex-col items-center">
+                        <h1 className="text-xl font-semibold text-white">{currentCharacter.name || 'Character'}</h1>
+                        <div className="text-sm text-pink-400 capitalize">
+                          {currentCharacter.stylePreset || 'Human'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions - Right */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setBlurImages((v) => !v)}
+                      className={`p-2 rounded-xl transition-all duration-200 ${
+                        blurImages
+                          ? 'text-pink-300 bg-pink-400/10'
+                          : 'text-dark-400 hover:text-pink-300 hover:bg-pink-400/10'
+                      }`}
+                      title={blurImages ? 'Unblur images' : 'Blur images'}
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M2 12s3.636-7 10-7 10 7 10 7-3.636 7-10 7S2 12 2 12z"
+                        />
+                        <circle cx="12" cy="12" r="3" strokeWidth={2} />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4l16 16" />
+                      </svg>
+                    </button>
+
+                    <button
+                      onClick={handleResetChat}
+                      className="p-2 text-dark-400 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all duration-200"
+                      title="Reset History"
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Messages Area */}
             <div className="flex-1 min-h-0 relative">
-              <div className="absolute left-4 sm:left-6 lg:left-8 top-4 bottom-4 hidden lg:block pointer-events-none">
-                <HeatMeter value={heat} variant="embedded" className="h-full" />
-              </div>
+              {!isEncounter && (
+                <div className="absolute left-4 sm:left-6 lg:left-8 top-4 bottom-4 hidden lg:block pointer-events-none">
+                  <HeatMeter value={heat} variant="embedded" className="h-full" />
+                </div>
+              )}
 
               {/* Scrollable Only */}
-              <div className="h-full min-h-0 overflow-y-auto p-4 sm:p-6 lg:p-8">
-                <div className="max-w-4xl mx-auto space-y-5 lg:pl-20">
+              <div className={`h-full min-h-0 overflow-y-auto ${isEncounter ? 'px-5 sm:px-8 lg:px-12 py-8 sm:py-10' : 'p-4 sm:p-6 lg:p-8'}`}>
+                <div className={`${isEncounter ? 'max-w-5xl mx-auto space-y-10' : 'max-w-4xl mx-auto space-y-5 lg:pl-20'}`}>
                   <AnimatePresence>
                     {messages.map((message) => (
                       <motion.div
@@ -1521,30 +1891,36 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                         className="w-full"
                       >
                       <div
-                        className={`flex w-full items-end gap-3 ${message.sender === 'user'
-                          ? 'justify-end'
-                          : message.sender === 'system'
-                            ? 'justify-center'
-                            : 'justify-start'
+                        className={`flex w-full ${isEncounter ? 'items-start' : 'items-end gap-3'} ${message.sender === 'system'
+                          ? 'justify-center'
+                          : isEncounter
+                            ? 'justify-start'
+                            : message.sender === 'user'
+                              ? 'justify-end'
+                              : 'justify-start'
                           }`}
                       >
-                        {message.sender !== 'user' && message.sender !== 'system' && (
+                        {!isEncounter && message.sender !== 'user' && message.sender !== 'system' && (
                           <div className="w-9 h-9 rounded-2xl bg-dark-800/60 border border-dark-700/60 backdrop-blur-md flex items-center justify-center text-xs font-semibold text-pink-200 shadow-sm shadow-black/20 select-none">
                             {(currentCharacter.name || 'C').charAt(0).toUpperCase()}
                           </div>
                           )}
 
-                        <div className={`${message.sender === 'system' ? 'max-w-2xl w-full' : 'max-w-[85%] sm:max-w-[75%] lg:max-w-[60%]'}`}>
+                        <div className={`${message.sender === 'system' ? 'max-w-2xl w-full' : isEncounter ? 'w-full' : 'max-w-[85%] sm:max-w-[75%] lg:max-w-[60%]'}`}>
                           <div
-                            className={`px-5 py-4 rounded-3xl relative group/msg ring-1 ${message.sender === 'user'
-                              ? 'bg-gradient-to-r from-pink-600 to-pink-500 text-white shadow-lg shadow-pink-500/25 ring-pink-500/20'
-                              : message.sender === 'system'
-                                ? 'bg-dark-900/40 text-dark-200 border border-dark-700/60 ring-white/5'
-                                : 'bg-dark-800/40 text-dark-200 border border-dark-700/60 backdrop-blur-md shadow-md shadow-black/20 ring-white/5'
-                              }`}
+                            className={isEncounter
+                              ? `relative ${message.sender === 'system'
+                                ? 'px-4 py-3 rounded-2xl bg-dark-900/30 text-dark-200 border border-dark-700/50'
+                                : 'px-0 py-0 bg-transparent border-0 shadow-none ring-0'}`
+                              : `px-5 py-4 rounded-3xl relative group/msg ring-1 ${message.sender === 'user'
+                                ? 'bg-gradient-to-r from-pink-600 to-pink-500 text-white shadow-lg shadow-pink-500/25 ring-pink-500/20'
+                                : message.sender === 'system'
+                                  ? 'bg-dark-900/40 text-dark-200 border border-dark-700/60 ring-white/5'
+                                  : 'bg-dark-800/40 text-dark-200 border border-dark-700/60 backdrop-blur-md shadow-md shadow-black/20 ring-white/5'
+                                }`}
                           >
                             <div className="relative">
-                              <div className="text-[15px] leading-relaxed whitespace-pre-wrap">
+                              <div className={`whitespace-pre-wrap ${isEncounter ? 'text-[17px] leading-8 text-dark-100' : 'text-[15px] leading-relaxed'}`}>
                                 {/* Message Content */}
                                 {message.content.split(/(\*[^*]+\*)/).map((part, index) => {
                                   // Check if this part is enclosed in asterisks (internal thought)
@@ -1558,7 +1934,8 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                               </div>
                             </div>
 
-                            <div className={`mt-3 pt-3 border-t border-white/10 flex items-center justify-end gap-1 ${message.sender === 'system' ? 'hidden' : ''}`}>
+                            {!isEncounter && (
+                              <div className={`mt-3 pt-3 border-t border-white/10 flex items-center justify-end gap-1 ${message.sender === 'system' ? 'hidden' : ''}`}>
                               {extractDialogueText(message.content) && (
                                 <TTSButton
                                   text={extractDialogueText(message.content)}
@@ -1598,7 +1975,8 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                 </svg>
                               </button>
-                            </div>
+                              </div>
+                            )}
 
                           {/* Generated Images Below Message */}
                           {(getMessageImageUrls(message).length > 0 || message.isGeneratingImage) && (
@@ -1682,12 +2060,23 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                           )}
                         </div>
 
-                        <div className={`mt-1 text-[11px] ${message.sender === 'user' ? 'text-right text-pink-200/70' : message.sender === 'system' ? 'text-center text-dark-400' : 'text-left text-dark-400'}`}>
+                        <div className={`mt-3 text-[11px] ${message.sender === 'system'
+                          ? 'text-center text-dark-400'
+                          : isEncounter
+                            ? 'text-left text-dark-400'
+                            : message.sender === 'user'
+                              ? 'text-right text-pink-200/70'
+                              : 'text-left text-dark-400'
+                          }`}
+                        >
+                          {isEncounter && message.sender !== 'system'
+                            ? `${message.sender === 'user' ? 'You' : currentCharacter.name || 'Her'}${message.timestamp instanceof Date ? '  ·  ' : ''}`
+                            : ''}
                           {message.timestamp instanceof Date ? message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                         </div>
                       </div>
 
-                        {message.sender === 'user' && (
+                        {!isEncounter && message.sender === 'user' && (
                           <div className="w-9 h-9 rounded-2xl bg-pink-600/20 border border-pink-500/20 backdrop-blur-md flex items-center justify-center text-xs font-semibold text-pink-200 shadow-sm shadow-black/20 select-none" title="You">
                             Y
                           </div>
@@ -1702,7 +2091,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                     animate={{ opacity: 1, y: 0 }}
                     className="flex justify-start"
                   >
-                    <div className="bg-dark-800/40 text-dark-200 px-5 py-3 rounded-3xl border border-dark-700/60 ring-1 ring-white/5 backdrop-blur-md shadow-md shadow-black/20">
+                    <div className={`${isEncounter ? 'bg-transparent border-0 shadow-none ring-0 px-0 py-0' : 'bg-dark-800/40 text-dark-200 px-5 py-3 rounded-3xl border border-dark-700/60 ring-1 ring-white/5 backdrop-blur-md shadow-md shadow-black/20'}`}>
                       <div className="flex space-x-1">
                         <div className="w-2 h-2 bg-pink-500 rounded-full animate-bounce" />
                         <div className="w-2 h-2 bg-pink-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
@@ -1729,7 +2118,8 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                   </div>
                 )}
                 {/* Buttons Above Input */}
-                <div className="flex items-center justify-center space-x-3 mb-3">
+                {!isEncounter && (
+                  <div className="flex items-center justify-center space-x-3 mb-3">
                   {/* Gallery Button */}
                   <button
                     onClick={() => setShowGallery(true)}
@@ -1764,17 +2154,34 @@ export function ChatInterface({ character, onBack, onCharacterUpdate }: ChatInte
                     </svg>
                   </button>
                 </div>
+                )}
 
                 {/* Input with Send Button */}
                 <div className="relative">
-                  <input
-                    type="text"
-                    value={inputMessage}
-                    onChange={(e) => setInputMessage(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                    placeholder="Type your message..."
-                    className="w-full px-5 py-3 pr-16 bg-dark-800/50 text-dark-200 rounded-2xl border border-pink-500/50 focus:border-pink-500/50 focus:outline-none focus:ring-2 focus:ring-pink-500/20 backdrop-blur-sm placeholder-pink-400"
-                  />
+                  {isEncounter ? (
+                    <textarea
+                      value={inputMessage}
+                      onChange={(e) => setInputMessage(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSendMessage();
+                        }
+                      }}
+                      placeholder="What do you do or say?"
+                      rows={3}
+                      className="w-full px-5 py-4 pr-16 bg-dark-900/25 text-dark-100 rounded-2xl border border-dark-700/60 focus:border-pink-500/35 focus:outline-none focus:ring-2 focus:ring-pink-500/15 backdrop-blur-sm placeholder:text-dark-300 resize-none"
+                    />
+                  ) : (
+                    <input
+                      type="text"
+                      value={inputMessage}
+                      onChange={(e) => setInputMessage(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                      placeholder="Type your message..."
+                      className="w-full px-5 py-3 pr-16 bg-dark-800/50 text-dark-200 rounded-2xl border border-pink-500/50 focus:border-pink-500/50 focus:outline-none focus:ring-2 focus:ring-pink-500/20 backdrop-blur-sm placeholder-pink-400"
+                    />
+                  )}
 
                   {/* Send Button */}
                   <button

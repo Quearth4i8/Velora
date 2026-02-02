@@ -572,7 +572,7 @@ export const characterAPI = {
         .eq('character_id', characterId)
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: false })
-        .limit(1);
+        .limit(10);
 
       if (error) throw error;
 
@@ -591,10 +591,108 @@ export const characterAPI = {
         return { success: true, data: newConv };
       }
 
-      // Return the most recent conversation
-      return { success: true, data: data[0] };
+      let encounterIds = new Set<string>();
+      if (typeof window !== 'undefined') {
+        try {
+          const prefix = `encounter_conversation_${characterId}_`;
+          for (let i = 0; i < window.localStorage.length; i++) {
+            const k = window.localStorage.key(i);
+            if (!k || !k.startsWith(prefix)) continue;
+            const v = window.localStorage.getItem(k);
+            if (v) encounterIds.add(v);
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      const preferred = data.find((c: any) => !encounterIds.has(String(c?.id || '')));
+      return { success: true, data: preferred || data[0] };
     } catch (error) {
       console.error('Failed to get conversation:', error);
+      return { success: false, error };
+    }
+  },
+
+  async createConversation(characterId: string, title?: string) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) throw new Error('Not authenticated');
+
+      const payload: Record<string, any> = {
+        character_id: characterId,
+        user_id: session.user.id,
+      };
+
+      const trimmedTitle = String(title || '').trim();
+      if (trimmedTitle) payload.title = trimmedTitle;
+
+      const { data, error } = await supabase
+        .from('conversations')
+        .insert(payload)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error) {
+      console.error('Failed to create conversation:', error);
+      return { success: false, error };
+    }
+  },
+
+  async updateConversationTitle(conversationId: string, title: string) {
+    try {
+      const trimmedTitle = String(title || '').trim();
+      if (!trimmedTitle) return { success: true, data: null };
+
+      const { data, error } = await supabase
+        .from('conversations')
+        .update({ title: trimmedTitle, updated_at: new Date().toISOString() })
+        .eq('id', conversationId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error) {
+      console.error('Failed to update conversation title:', error);
+      return { success: false, error };
+    }
+  },
+
+  async listEncounterConversations() {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .ilike('title', 'encounter:%')
+        .order('updated_at', { ascending: false })
+        .limit(200);
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error) {
+      console.error('Failed to list encounter conversations:', error);
+      return { success: false, error };
+    }
+  },
+
+  async deleteConversation(conversationId: string) {
+    try {
+      const { error } = await supabase
+        .from('conversations')
+        .delete()
+        .eq('id', conversationId);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to delete conversation:', error);
       return { success: false, error };
     }
   },
