@@ -13,6 +13,13 @@ export default function EncountersPage() {
   const router = useRouter();
   const [step, setStep] = useState<'scenario' | 'character' | 'options'>('scenario');
 
+  const scenarioImageById: Record<string, string> = {
+    'midnight-hotel-lobby': '/encounters/hotel-lobby.jpg',
+    'after-hours-bookshop': '/encounters/bookshop.jpg',
+    'stormy-cabin': '/encounters/stormy-cabin.jpg',
+    'club-vip-booth': '/encounters/club-vip.jpg',
+  };
+
   const [selectedScenario, setSelectedScenario] = useState<EncounterScenario | null>(null);
   const [characters, setCharacters] = useState<CharacterDraft[]>([]);
   const [isLoadingCharacters, setIsLoadingCharacters] = useState(false);
@@ -134,9 +141,10 @@ export default function EncountersPage() {
             </div>
 
             {step === 'scenario' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              <div className="flex flex-col gap-6">
                 {ENCOUNTER_SCENARIOS.map((scenario) => {
                   const selected = selectedScenario?.id === scenario.id;
+                  const imageSrc = scenarioImageById[scenario.id];
                   return (
                     <button
                       key={scenario.id}
@@ -148,36 +156,61 @@ export default function EncountersPage() {
                         setIntensity('medium');
                         setStep('character');
                       }}
-                      className={`text-left p-6 rounded-2xl border transition-all duration-200 ${selected
+                      className={`group relative w-full rounded-3xl border text-left transition-all duration-300 ${selected
                         ? 'border-pink-500/70 bg-pink-500/10 ring-2 ring-pink-500/15'
-                        : 'border-dark-700/60 bg-dark-900/30 hover:border-pink-500/35 hover:bg-dark-900/45'
+                        : 'border-dark-700/60 bg-dark-900/25 hover:border-pink-500/35 hover:bg-dark-900/40'
                         }`}
                     >
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <h3 className="text-xl font-bold text-white">{scenario.title}</h3>
-                          <p className="text-dark-300 mt-1">{scenario.shortDescription}</p>
-                        </div>
-                        <span className="text-[10px] px-2 py-1 rounded-lg bg-dark-800/60 border border-dark-700 text-dark-200">
-                          {scenario.id}
-                        </span>
-                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-[1fr_520px] overflow-hidden rounded-3xl">
+                        <div className="relative z-10 p-6 md:p-8">
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <h3 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
+                                {scenario.title}
+                              </h3>
+                              <p className="text-dark-300 mt-2 max-w-3xl">{scenario.shortDescription}</p>
+                            </div>
+                            <span className="shrink-0 text-[10px] px-2 py-1 rounded-lg bg-dark-800/60 border border-dark-700 text-dark-200">
+                              {scenario.id}
+                            </span>
+                          </div>
 
-                      <div className="mt-4">
-                        <div className="text-xs text-dark-400">Narrative intent</div>
-                        <div className="text-sm text-dark-200 mt-1">{scenario.narrativeIntent}</div>
-                      </div>
+                          <div className="mt-5">
+                            <div className="text-xs text-dark-400">Narrative intent</div>
+                            <div className="text-sm text-dark-200 mt-1 max-w-4xl">{scenario.narrativeIntent}</div>
+                          </div>
 
-                      <div className="mt-4">
-                        <div className="text-xs text-dark-400">AI rules</div>
-                        <div className="mt-2 space-y-1">
-                          {scenario.behavioralRules.slice(0, 3).map((r) => (
-                            <div key={r} className="text-sm text-dark-200">- {r}</div>
-                          ))}
-                          {scenario.behavioralRules.length > 3 && (
-                            <div className="text-xs text-dark-500">+ {scenario.behavioralRules.length - 3} more</div>
-                          )}
+                          <div className="mt-5">
+                            <div className="text-xs text-dark-400">AI rules</div>
+                            <div className="mt-2 space-y-1 max-w-4xl">
+                              {scenario.behavioralRules.slice(0, 3).map((r) => (
+                                <div key={r} className="text-sm text-dark-200">- {r}</div>
+                              ))}
+                              {scenario.behavioralRules.length > 3 && (
+                                <div className="text-xs text-dark-500">+ {scenario.behavioralRules.length - 3} more</div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="mt-6 inline-flex items-center gap-2 text-xs font-semibold text-pink-200/90 opacity-0 translate-y-1 transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0">
+                            <span className="h-1.5 w-1.5 rounded-full bg-pink-400 shadow-[0_0_14px_rgba(236,72,153,0.45)]" />
+                            Select scenario
+                          </div>
                         </div>
+
+                        {imageSrc ? (
+                          <div className="relative hidden md:block overflow-hidden">
+                            <div
+                              className="absolute inset-0 bg-center bg-cover opacity-75 transition-transform duration-700 ease-out will-change-transform group-hover:scale-[1.03]"
+                              style={{ backgroundImage: `url(${imageSrc})` }}
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-dark-950/40 via-transparent to-transparent" />
+                            <div className="absolute inset-y-0 left-0 w-96 bg-gradient-to-r from-dark-950 via-dark-950/70 to-transparent" />
+                            <div className="absolute inset-0 bg-gradient-to-l from-black/0 via-black/0 to-black/0" />
+                          </div>
+                        ) : (
+                          <div className="hidden md:block" />
+                        )}
                       </div>
                     </button>
                   );
