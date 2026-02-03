@@ -89,6 +89,9 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
     return buildEncounterSystemPromptAddon(encounterScenario, encounterConfig?.options);
   }, [chatMode, encounterConfig?.options, encounterScenario]);
 
+  const [encounterStrikeCount, setEncounterStrikeCount] = useState<number>(0);
+  const [encounterBlocked, setEncounterBlocked] = useState<boolean>(false);
+
   const [bondPromptAddon, setBondPromptAddon] = useState<string>('');
   const [bondLevelName, setBondLevelName] = useState<string>('');
 
@@ -854,6 +857,23 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
     encounterConfig?.options?.intensity,
   ]);
 
+  useEffect(() => {
+    const loadEnforcement = async () => {
+      if (!isEncounter) return;
+      if (!conversation?.id) return;
+
+      const enforcement = await characterAPI.getEncounterEnforcement(conversation.id);
+      if (enforcement.success) {
+        const strike = enforcement.data ? Number((enforcement.data as any).strike_count || 0) : 0;
+        const blocked = enforcement.data ? Boolean((enforcement.data as any).blocked) : false;
+        setEncounterStrikeCount(Number.isFinite(strike) ? Math.max(0, Math.min(3, Math.floor(strike))) : 0);
+        setEncounterBlocked(blocked);
+      }
+    };
+
+    loadEnforcement();
+  }, [conversation?.id, isEncounter]);
+
   const handleSendMessage = async () => {
     if (!inputMessage.trim()) return;
 
@@ -867,6 +887,65 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
     }
 
     const userMessageContent = inputMessage;
+
+    if (isEncounter) {
+      if (encounterBlocked) {
+        await dialog.alert({
+          title: 'Encounter blocked',
+          message: 'You can’t continue this encounter because you did not stick to the rules. Please restart or start a new encounter.',
+        });
+        return;
+      }
+
+      if (encounterScenario) {
+        const evaluation = await lmStudioService.evaluateEncounterRuleViolation({
+          scenario: encounterScenario,
+          userMessage: userMessageContent,
+          recentMessages: messages,
+        });
+
+        if (evaluation.violated) {
+          const strikeRes = await characterAPI.incrementEncounterStrike({
+            conversationId: activeConversation.id,
+            scenarioId: encounterScenario.id,
+          });
+
+          const strike = strikeRes.success && strikeRes.data
+            ? Number((strikeRes.data as any).strike_count || 0)
+            : Math.min(encounterStrikeCount + 1, 3);
+          const blockedNow = strikeRes.success && strikeRes.data
+            ? Boolean((strikeRes.data as any).blocked)
+            : strike >= 3;
+
+          setEncounterStrikeCount(Number.isFinite(strike) ? Math.max(0, Math.min(3, Math.floor(strike))) : 0);
+          setEncounterBlocked(blockedNow);
+
+          if (strike < 3) {
+            await dialog.alert({
+              title: `Encounter rules warning (${strike}/3)`,
+              message: evaluation.reason
+                ? `${evaluation.reason} Please rewrite your message to match the rules.`
+                : 'That message doesn’t follow the encounter rules. Please rewrite it to match the rules.',
+            });
+            setInputMessage(userMessageContent);
+            return;
+          }
+
+          await characterAPI.resetConversation(activeConversation.id);
+          setMessages([]);
+
+          await dialog.alert({
+            title: 'Encounter ended',
+            message: evaluation.reason
+              ? `${evaluation.reason} This encounter has been reset and blocked because you didn’t stick to the rules.`
+              : 'This encounter has been reset and blocked because you didn’t stick to the rules.',
+          });
+
+          return;
+        }
+      }
+    }
+
     setInputMessage('');
 
     const nextHeat = applyHeatUpdateFromUserText(userMessageContent);
@@ -1163,6 +1242,11 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
 
     const result = await characterAPI.resetConversation(conversation.id);
     if (result.success) {
+      if (isEncounter) {
+        await characterAPI.resetEncounterEnforcement(conversation.id);
+        setEncounterStrikeCount(0);
+        setEncounterBlocked(false);
+      }
       setMessages([]);
       setConversation(null);
       await initChat();
@@ -1691,6 +1775,9 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
 
     const result = await characterAPI.resetConversation(conversation.id);
     if (result.success) {
+      await characterAPI.resetEncounterEnforcement(conversation.id);
+      setEncounterStrikeCount(0);
+      setEncounterBlocked(false);
       setMessages([]);
       setConversation(null);
       await initChat();
@@ -2257,6 +2344,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
                     <textarea
                       value={inputMessage}
                       onChange={(e) => setInputMessage(e.target.value)}
+                      disabled={encounterBlocked}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
@@ -2270,7 +2358,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
 
                     <button
                       onClick={handleSendMessage}
-                      disabled={!inputMessage.trim()}
+                      disabled={encounterBlocked || !inputMessage.trim()}
                       className="h-[52px] px-5 bg-gradient-to-r from-pink-600 to-pink-500 text-white rounded-2xl hover:from-pink-500 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg shadow-pink-500/20 hover:shadow-pink-500/30 font-semibold text-sm shrink-0"
                     >
                       Send

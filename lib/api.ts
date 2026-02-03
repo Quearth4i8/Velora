@@ -866,4 +866,94 @@ export const characterAPI = {
       return { success: false, error };
     }
   },
+
+  async getEncounterEnforcement(conversationId: string) {
+    try {
+      const id = String(conversationId || '').trim();
+      if (!id) return { success: false, error: new Error('Missing conversationId') };
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase
+        .from('encounter_enforcement')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .eq('conversation_id', id)
+        .maybeSingle();
+
+      if (error) throw error;
+      return { success: true, data: data || null };
+    } catch (error) {
+      console.error('Failed to get encounter enforcement:', error);
+      return { success: false, error };
+    }
+  },
+
+  async setEncounterEnforcement(args: { conversationId: string; scenarioId?: string | null; strikeCount?: number; blocked?: boolean }) {
+    try {
+      const conversationId = String(args.conversationId || '').trim();
+      if (!conversationId) return { success: false, error: new Error('Missing conversationId') };
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) throw new Error('Not authenticated');
+
+      const strike = typeof args.strikeCount === 'number' && Number.isFinite(args.strikeCount)
+        ? Math.max(0, Math.min(3, Math.floor(args.strikeCount)))
+        : undefined;
+
+      const payload: Record<string, any> = {
+        user_id: session.user.id,
+        conversation_id: conversationId,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (Object.prototype.hasOwnProperty.call(args, 'blocked')) payload.blocked = Boolean(args.blocked);
+      if (Object.prototype.hasOwnProperty.call(args, 'scenarioId')) payload.scenario_id = args.scenarioId ? String(args.scenarioId) : null;
+      if (typeof strike === 'number') payload.strike_count = strike;
+
+      const { data, error } = await supabase
+        .from('encounter_enforcement')
+        .upsert(payload, { onConflict: 'user_id,conversation_id' })
+        .select('*')
+        .single();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error) {
+      console.error('Failed to set encounter enforcement:', error);
+      return { success: false, error };
+    }
+  },
+
+  async incrementEncounterStrike(args: { conversationId: string; scenarioId?: string | null }) {
+    try {
+      const conversationId = String(args.conversationId || '').trim();
+      if (!conversationId) return { success: false, error: new Error('Missing conversationId') };
+
+      const existing = await this.getEncounterEnforcement(conversationId);
+      const currentStrike = existing.success && existing.data ? Number(existing.data.strike_count || 0) : 0;
+      const currentBlocked = existing.success && existing.data ? Boolean(existing.data.blocked) : false;
+
+      const nextStrike = Math.max(0, Math.min(3, Math.floor(currentStrike) + 1));
+      const nextBlocked = currentBlocked || nextStrike >= 3;
+
+      const updated = await this.setEncounterEnforcement({
+        conversationId,
+        scenarioId: Object.prototype.hasOwnProperty.call(args, 'scenarioId') ? args.scenarioId : undefined,
+        strikeCount: nextStrike,
+        blocked: nextBlocked,
+      });
+
+      if (!updated.success) return updated;
+      return { success: true, data: { ...updated.data, strike_count: nextStrike, blocked: nextBlocked } };
+    } catch (error) {
+      console.error('Failed to increment encounter strike:', error);
+      return { success: false, error };
+    }
+  },
+
+  async resetEncounterEnforcement(conversationId: string) {
+    return this.setEncounterEnforcement({ conversationId, strikeCount: 0, blocked: false });
+  },
 };

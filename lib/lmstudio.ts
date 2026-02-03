@@ -1,4 +1,5 @@
 import { CharacterDraft, ChatMessage, ImageGenerationPlan } from './types';
+import type { EncounterScenario } from './encounters';
 
 const PROXY_URL = '/api/chat';
 
@@ -320,6 +321,94 @@ export const lmStudioService = {
         } catch (error) {
             console.error('Failed to communicate with LM Studio:', error);
             throw error;
+        }
+    },
+
+    async evaluateEncounterRuleViolation(args: {
+        scenario: EncounterScenario;
+        userMessage: string;
+        recentMessages?: ChatMessage[];
+    }): Promise<{ violated: boolean; reason: string }> {
+        const scenario = args.scenario;
+        const userMessage = String(args.userMessage || '').trim();
+        const recent = Array.isArray(args.recentMessages) ? args.recentMessages : [];
+
+        if (!userMessage) return { violated: false, reason: '' };
+
+        const rules = Array.isArray(scenario?.behavioralRules) ? scenario.behavioralRules : [];
+        const rulesText = rules.map((r) => `- ${r}`).join('\n');
+
+        const contextLines = recent
+            .slice(-6)
+            .map((m) => `${m.sender === 'user' ? 'USER' : m.sender === 'character' ? 'CHARACTER' : 'SYSTEM'}: ${String(m.content || '')}`)
+            .join('\n');
+
+        const systemPrompt = [
+            'You are a strict rule checker for an interactive roleplay encounter.',
+            'Your job: decide if the USER\'s next message violates the Encounter rules.',
+            'Violation examples: non-consensual/forced actions, sudden time skips, teleporting/scene jumps, unrealistic escalation that breaks slow pacing, ignoring public-setting realism, coercion/manipulation, or anything that contradicts the listed rules.',
+            'If the message asks for consent, moves slowly, stays grounded, or negotiates realism, it is NOT a violation.',
+            'Output ONLY valid JSON (no markdown, no extra text) with exactly these keys: violated (boolean), reason (string).',
+            'Keep reason short and user-facing (1 sentence).',
+            '',
+            `Scenario: ${String(scenario?.title || '')}`,
+            'Rules:',
+            rulesText || '- (none)',
+        ].join('\n');
+
+        const userContentParts: string[] = [];
+        if (contextLines.trim()) {
+            userContentParts.push('Recent context:');
+            userContentParts.push(contextLines);
+            userContentParts.push('');
+        }
+        userContentParts.push('User message to check:');
+        userContentParts.push(userMessage);
+
+        const formattedMessages = [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userContentParts.join('\n') },
+        ];
+
+        try {
+            const response = await fetch(PROXY_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    model: 'local-model',
+                    messages: formattedMessages,
+                    temperature: 0,
+                    max_tokens: 120,
+                    stream: false,
+                }),
+            });
+
+            if (!response.ok) {
+                return { violated: false, reason: '' };
+            }
+
+            const data = await response.json();
+            const content = String(data?.choices?.[0]?.message?.content || '').trim();
+
+            let parsed: any;
+            try {
+                parsed = tryParseJson(content);
+            } catch {
+                parsed = null;
+            }
+
+            const violated = Boolean(parsed && typeof parsed === 'object' ? (parsed as any).violated : false);
+            const reason = String(parsed && typeof parsed === 'object' ? (parsed as any).reason : '').trim();
+
+            if (typeof (parsed as any)?.violated !== 'boolean') {
+                return { violated: false, reason: '' };
+            }
+
+            return { violated, reason: reason.length > 240 ? reason.slice(0, 240) : reason };
+        } catch {
+            return { violated: false, reason: '' };
         }
     },
 
