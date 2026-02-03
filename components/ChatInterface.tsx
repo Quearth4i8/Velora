@@ -3,11 +3,10 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CharacterDraft, ChatMessage, ClothingStyle, Environment, Conversation, CharacterStyle } from '@/lib/types';
-import { CharacterGalleryComponent } from './CharacterGallery';
 import { FormatSelector } from './ui/FormatSelector';
 import { HeatMeter } from './ui/HeatMeter';
 import { TTSButton } from './ui/TTSButton';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { characterAPI } from '@/lib/api';
 import { automatic1111API, STYLE_TO_MODEL_MAP } from '@/lib/automatic1111';
 import { lmStudioService } from '@/lib/lmstudio';
@@ -37,7 +36,6 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [showGallery, setShowGallery] = useState(false);
   const [isLargeScreen, setIsLargeScreen] = useState(false);
   const [showWardrobe, setShowWardrobe] = useState(false);
   const [showEnvironment, setShowEnvironment] = useState(false);
@@ -67,7 +65,16 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isMountedRef = useRef(true);
   const router = useRouter();
+  const pathname = usePathname();
   const dialog = useDialog();
+
+  const latestCharacterMessage = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (m?.sender === 'character') return m;
+    }
+    return null;
+  }, [messages]);
 
   const encounterScenario = useMemo(() => {
     if (chatMode !== 'encounter') return null;
@@ -683,6 +690,10 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
   }, [showFormatSelector]);
 
   const [conversation, setConversation] = useState<Conversation | null>(null);
+  const initChatInFlightRef = useRef<{ key: string; promise: Promise<void> | null }>({
+    key: '',
+    promise: null,
+  });
 
   const initChat = async () => {
     if (currentCharacter.id) {
@@ -797,8 +808,34 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
   };
 
   useEffect(() => {
-    initChat();
-  }, [currentCharacter.id, chatMode, encounterConfig?.scenarioId]);
+    const key = [
+      currentCharacter.id,
+      chatMode,
+      encounterConfig?.scenarioId || '',
+      encounterConfig?.conversationId || '',
+    ].join('|');
+
+    const inFlight = initChatInFlightRef.current;
+    if (inFlight.promise && inFlight.key === key) return;
+
+    const p = (async () => {
+      await initChat();
+    })().finally(() => {
+      if (initChatInFlightRef.current.key === key) {
+        initChatInFlightRef.current.promise = null;
+      }
+    });
+
+    initChatInFlightRef.current = { key, promise: p };
+  }, [
+    currentCharacter.id,
+    chatMode,
+    encounterConfig?.scenarioId,
+    encounterConfig?.conversationId,
+    encounterConfig?.options?.mood,
+    encounterConfig?.options?.location,
+    encounterConfig?.options?.intensity,
+  ]);
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || !conversation) return;
@@ -1688,14 +1725,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
 
   return (
     <>
-      {showGallery ? (
-        <CharacterGalleryComponent
-          character={currentCharacter}
-          onBack={() => setShowGallery(false)}
-          onCharacterUpdate={handleCharacterUpdate}
-        />
-      ) : (
-        <div className="flex h-screen bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950 relative">
+      <div className="flex h-screen bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950 relative">
           {/* Static Character Image - Full Right Side */}
           <AnimatePresence>
             {isLargeScreen && currentCharacter.generation?.generatedImage && (
@@ -1764,6 +1794,22 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
                     </div>
 
                     <div className="shrink-0 flex items-center gap-2">
+                      <button
+                        onClick={async () => {
+                          if (!latestCharacterMessage) {
+                            await dialog.alert({
+                              title: 'No message to snapshot',
+                              message: 'Send a message first, then generate a photo from the latest character reply.',
+                            });
+                            return;
+                          }
+                          handleGenerateMessageImage(latestCharacterMessage.id, latestCharacterMessage.content);
+                        }}
+                        className="px-3 py-2 rounded-xl text-xs font-semibold border border-dark-700/60 bg-dark-900/30 text-dark-200 hover:bg-dark-900/40 hover:border-pink-500/20 transition-all duration-200"
+                        title="Generate a photo from the latest scene"
+                      >
+                        Photo
+                      </button>
                       <button
                         onClick={() => setBlurImages((v) => !v)}
                         className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 ${
@@ -2122,7 +2168,19 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
                   <div className="flex items-center justify-center space-x-3 mb-3">
                   {/* Gallery Button */}
                   <button
-                    onClick={() => setShowGallery(true)}
+                    onClick={() => {
+                      const id = currentCharacter?.id;
+                      if (!id) return;
+                      if (pathname?.startsWith('/special/')) {
+                        router.push(`/special/${id}/gallery`);
+                        return;
+                      }
+                      if (pathname?.startsWith('/chat/')) {
+                        router.push(`/chat/${id}/gallery`);
+                        return;
+                      }
+                      router.push(`/${id}/gallery`);
+                    }}
                     className="w-10 h-10 bg-dark-700/50 text-pink-300 rounded-xl border border-pink-500/30 hover:bg-pink-600/20 transition-all duration-200 flex items-center justify-center"
                     title="View Gallery"
                   >
@@ -2196,7 +2254,6 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
             </div>
           </div>
         </div>
-      )}
 
       {/* Wardrobe Modal */}
       <AnimatePresence>

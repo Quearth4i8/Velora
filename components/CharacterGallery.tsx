@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getDimensionsFromAspectRatio, MODEL_DEFAULT_SETTINGS } from '@/config/aspect-ratios';
 import { CharacterDraft, ChatMessage, CharacterImage } from '@/lib/types';
@@ -31,6 +31,9 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
   const [showEditModal, setShowEditModal] = useState(false);
   const [showGenerationSettingsModal, setShowGenerationSettingsModal] = useState(false);
   const [filter, setFilter] = useState<'all' | 'sfw' | 'nsfw'>('all');
+  const [masonryColumns, setMasonryColumns] = useState(1);
+  const [visibleCount, setVisibleCount] = useState(36);
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
 
   // Sync editedCharacter when character prop changes
   useEffect(() => {
@@ -103,6 +106,72 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
       return true;
     });
   }, [characterImages, filter, isNSFWImage]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const compute = () => {
+      const w = window.innerWidth;
+      if (w >= 1920) return 5;
+      if (w >= 1536) return 5;
+      if (w >= 1280) return 4;
+      if (w >= 1024) return 4;
+      if (w >= 768) return 3;
+      if (w >= 640) return 2;
+      return 1;
+    };
+
+    const update = () => setMasonryColumns(compute());
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
+  useEffect(() => {
+    // When the filter changes, start with a reasonable initial set again.
+    setVisibleCount(36);
+  }, [filter]);
+
+  const visibleImages = useMemo(() => filteredImages.slice(0, Math.max(0, visibleCount)), [filteredImages, visibleCount]);
+
+  const filteredIndexById = useMemo(() => {
+    const m = new Map<string, number>();
+    filteredImages.forEach((img, idx) => {
+      if (img?.id) m.set(img.id, idx);
+    });
+    return m;
+  }, [filteredImages]);
+
+  const masonryColumnedImages = useMemo(() => {
+    const cols = Math.max(1, masonryColumns);
+    const buckets: CharacterImage[][] = Array.from({ length: cols }, () => []);
+    visibleImages.forEach((img, idx) => {
+      buckets[idx % cols].push(img);
+    });
+    return buckets;
+  }, [visibleImages, masonryColumns]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const node = loadMoreSentinelRef.current;
+    if (!node) return;
+    if (visibleCount >= filteredImages.length) return;
+
+    const obs = new IntersectionObserver(
+      (entries) => {
+        const first = entries[0];
+        if (!first?.isIntersecting) return;
+        setVisibleCount((v) => Math.min(filteredImages.length, v + 24));
+      },
+      {
+        root: null,
+        rootMargin: '1200px 0px 1200px 0px',
+        threshold: 0,
+      }
+    );
+
+    obs.observe(node);
+    return () => obs.disconnect();
+  }, [filteredImages.length, visibleCount, masonryColumns]);
 
   // Load character images from gallery
   useEffect(() => {
@@ -556,155 +625,112 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
           </div>
         ) : (
           <div className="h-full overflow-y-auto p-6 pb-24">
-            <div className="masonry-grid max-w-[2000px] mx-auto">
-              <AnimatePresence>
-                {filteredImages
-                  .map((image, index) => (
-                    <motion.div
-                      key={image.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.9 }}
-                      transition={{ delay: index * 0.05, duration: 0.4 }}
-                      className="masonry-item group relative mb-6"
-                    >
-                      <div className="relative overflow-hidden rounded-2xl border border-dark-700/30 bg-gradient-to-br from-dark-800/40 to-dark-900/40 cursor-pointer backdrop-blur-sm hover:border-pink-500/30 transition-all duration-300 hover:shadow-2xl hover:shadow-pink-500/10"
-                        onClick={() => handleImageClick(index)}>
-                        {/* Gradient Border Effect */}
-                        <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-pink-500/0 via-pink-500/0 to-pink-500/0 group-hover:from-pink-500/20 group-hover:via-pink-400/10 group-hover:to-pink-500/20 transition-all duration-500 pointer-events-none"></div>
+            <div className="max-w-[2000px] mx-auto">
+              <div className="flex gap-4">
+                {masonryColumnedImages.map((col, colIdx) => (
+                  <div key={`col-${colIdx}`} className="flex-1 min-w-0 flex flex-col gap-4">
+                    <AnimatePresence>
+                      {col.map((image) => {
+                        const index = filteredIndexById.get(image.id) ?? 0;
+                        return (
+                          <motion.div
+                            key={image.id}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9 }}
+                            transition={{ delay: index * 0.02, duration: 0.35 }}
+                            className="group relative"
+                          >
+                            <div
+                              className="relative overflow-hidden rounded-2xl border border-dark-700/30 bg-gradient-to-br from-dark-800/40 to-dark-900/40 cursor-pointer backdrop-blur-sm hover:border-pink-500/30 transition-all duration-300 hover:shadow-2xl hover:shadow-pink-500/10"
+                              onClick={() => handleImageClick(index)}
+                            >
+                              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-pink-500/0 via-pink-500/0 to-pink-500/0 group-hover:from-pink-500/20 group-hover:via-pink-400/10 group-hover:to-pink-500/20 transition-all duration-500 pointer-events-none"></div>
 
-                        <img
-                          src={image.imageUrl}
-                          alt={`Character image ${index + 1}`}
-                          className={`w-full h-auto object-cover group-hover:scale-[1.02] transition-all duration-500 pointer-events-none ${isNSFWImage(image) && blurNSFW ? 'blur-lg' : ''
-                            }`}
-                          loading="lazy"
-                        />
+                              <img
+                                src={image.imageUrl}
+                                alt={`Character image ${index + 1}`}
+                                className={`w-full h-auto object-cover group-hover:scale-[1.02] transition-all duration-500 pointer-events-none ${isNSFWImage(image) && blurNSFW ? 'blur-lg' : ''}`}
+                                loading={index < 12 ? 'eager' : 'lazy'}
+                              />
 
-                        {/* NSFW Badge - Compact (Left) */}
-                        {isNSFWImage(image) && (
-                          <div className="absolute top-2 left-2 w-7 h-7 bg-red-600/90 backdrop-blur-sm rounded-lg flex items-center justify-center shadow-lg border border-red-500/30 group-hover:scale-110 transition-transform duration-200">
-                            <span className="text-sm" title="NSFW Content">🔥</span>
-                          </div>
-                        )}
-                        {/* 3-dot menu button (Right) */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowImageDropdown(showImageDropdown === image.id ? null : image.id);
-                          }}
-                          className="absolute top-2 right-2 w-8 h-8 bg-dark-900/80 backdrop-blur-md rounded-lg flex items-center justify-center text-white/70 hover:text-white hover:bg-dark-800 transition-all duration-200 opacity-0 group-hover:opacity-100 shadow-lg border border-dark-700/50"
-                        >
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                            <circle cx="12" cy="5" r="2" />
-                            <circle cx="12" cy="12" r="2" />
-                            <circle cx="12" cy="19" r="2" />
-                          </svg>
-                        </button>
-
-                        {/* Dropdown menu */}
-                        {showImageDropdown === image.id && (
-                          <div className="absolute top-10 right-2 bg-dark-800 border border-dark-600 rounded-lg shadow-lg z-10 min-w-[120px] image-dropdown">
-                            <div className="py-1">
-                              {!image.isPrimary && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleSetAsPrimary(image.id);
-                                    setShowImageDropdown(null);
-                                  }}
-                                  className="w-full px-3 py-2 text-left text-sm text-dark-200 hover:bg-dark-700 transition-colors"
-                                >
-                                  Set as Primary
-                                </button>
+                              {isNSFWImage(image) && (
+                                <div className="absolute top-2 left-2 w-7 h-7 bg-red-600/90 backdrop-blur-sm rounded-lg flex items-center justify-center shadow-lg border border-red-500/30 group-hover:scale-110 transition-transform duration-200">
+                                  <span className="text-sm" title="NSFW Content">🔥</span>
+                                </div>
                               )}
+
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleDeleteImage(image.id);
-                                  setShowImageDropdown(null);
+                                  setShowImageDropdown(showImageDropdown === image.id ? null : image.id);
                                 }}
-                                className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-dark-700 transition-colors"
+                                className="absolute top-2 right-2 w-8 h-8 bg-dark-900/80 backdrop-blur-md rounded-lg flex items-center justify-center text-white/70 hover:text-white hover:bg-dark-800 transition-all duration-200 opacity-0 group-hover:opacity-100 shadow-lg border border-dark-700/50"
                               >
-                                Delete
+                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                  <circle cx="12" cy="5" r="2" />
+                                  <circle cx="12" cy="12" r="2" />
+                                  <circle cx="12" cy="19" r="2" />
+                                </svg>
                               </button>
-                            </div>
-                          </div>
-                        )}
-                        {/* Hover Overlay */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none">
-                          <div className="absolute bottom-4 left-4 right-4">
-                            <div className="flex justify-between items-center">
-                              <span className="text-white text-sm font-semibold backdrop-blur-sm bg-dark-900/40 px-3 py-1.5 rounded-lg">
-                                #{index + 1}
-                              </span>
-                              {image.isPrimary && (
-                                <span className="px-3 py-1.5 bg-gradient-to-r from-pink-600/90 to-pink-500/90 text-white rounded-lg text-xs font-bold shadow-lg backdrop-blur-sm flex items-center gap-1.5">
-                                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                                  </svg>
-                                  Primary
-                                </span>
+
+                              {showImageDropdown === image.id && (
+                                <div className="absolute top-10 right-2 bg-dark-800 border border-dark-600 rounded-lg shadow-lg z-10 min-w-[120px] image-dropdown">
+                                  <div className="py-1">
+                                    {!image.isPrimary && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleSetAsPrimary(image.id);
+                                          setShowImageDropdown(null);
+                                        }}
+                                        className="w-full px-3 py-2 text-left text-sm text-dark-200 hover:bg-dark-700 transition-colors"
+                                      >
+                                        Set as Primary
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteImage(image.id);
+                                        setShowImageDropdown(null);
+                                      }}
+                                      className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-dark-700 transition-colors"
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                </div>
                               )}
+
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none">
+                                <div className="absolute bottom-4 left-4 right-4">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-white text-sm font-semibold backdrop-blur-sm bg-dark-900/40 px-3 py-1.5 rounded-lg">
+                                      #{index + 1}
+                                    </span>
+                                    {image.isPrimary && (
+                                      <span className="px-3 py-1.5 bg-gradient-to-r from-pink-600/90 to-pink-500/90 text-white rounded-lg text-xs font-bold shadow-lg backdrop-blur-sm flex items-center gap-1.5">
+                                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                        </svg>
+                                        Primary
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))}
-              </AnimatePresence>
+                          </motion.div>
+                        );
+                      })}
+                    </AnimatePresence>
+                  </div>
+                ))}
+              </div>
+
+              <div ref={loadMoreSentinelRef} className="h-1" />
             </div>
-
-            <style jsx>{`
-              .masonry-grid {
-                column-count: 1;
-                column-gap: 1.5rem;
-                width: 100%;
-                column-fill: balance;
-              }
-
-              .masonry-item {
-                break-inside: avoid;
-                width: 100%;
-                display: inline-block;
-                vertical-align: top;
-              }
-
-              @media (min-width: 640px) {
-                .masonry-grid {
-                  column-count: 2;
-                  column-gap: 1.5rem;
-                }
-              }
-
-              @media (min-width: 768px) {
-                .masonry-grid {
-                  column-count: 3;
-                  column-gap: 1.75rem;
-                }
-              }
-
-              @media (min-width: 1024px) {
-                .masonry-grid {
-                  column-count: 4;
-                  column-gap: 2rem;
-                }
-              }
-
-              @media (min-width: 1280px) {
-                .masonry-grid {
-                  column-count: 4;
-                  column-gap: 2rem;
-                }
-              }
-
-              @media (min-width: 1536px) {
-                .masonry-grid {
-                  column-count: 5;
-                  column-gap: 2.25rem;
-                }
-              }
-            `}</style>
           </div>
         )}
       </div>

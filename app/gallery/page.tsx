@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Navbar } from '@/components/Navbar';
 import { AnimatedBackground } from '@/components/AnimatedBackground';
@@ -23,6 +23,9 @@ export default function GalleryPage() {
   const [isSpecialGenerating, setIsSpecialGenerating] = useState(false);
   const [communityImages, setCommunityImages] = useState<any[]>([]);
   const [isLoadingImages, setIsLoadingImages] = useState(true);
+  const [isLoadingMoreImages, setIsLoadingMoreImages] = useState(false);
+  const [imagesOffset, setImagesOffset] = useState(0);
+  const [hasMoreImages, setHasMoreImages] = useState(true);
   const [isZoomed, setIsZoomed] = useState(false);
   const [zoomedImageIndex, setZoomedImageIndex] = useState(0);
   const { blurNSFW, toggleBlurNSFW } = useBlurNSFW();
@@ -30,6 +33,8 @@ export default function GalleryPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
+  const [masonryColumns, setMasonryColumns] = useState(1);
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
 
   const isNSFWImage = (image: any): boolean => {
     if (!image?.generationPrompt) return false;
@@ -247,7 +252,7 @@ export default function GalleryPage() {
         throw new Error('Failed to add generated image to gallery');
       }
 
-      await fetchAllCharacterImages();
+      await fetchAllCharacterImages(true);
       setSpecialPrompt('');
     } catch (error) {
       console.error('Failed to generate image:', error);
@@ -298,7 +303,7 @@ export default function GalleryPage() {
 
   // Fetch all character images on component mount
   useEffect(() => {
-    fetchAllCharacterImages();
+    fetchAllCharacterImages(true);
   }, []);
 
   useEffect(() => {
@@ -346,24 +351,101 @@ export default function GalleryPage() {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
-  const fetchAllCharacterImages = async () => {
+  const fetchAllCharacterImages = async (reset = false) => {
     try {
-      setIsLoadingImages(true);
-      const result = await characterAPI.getAllCharacterImages();
+      const pageSize = 60;
+      const nextOffset = reset ? 0 : imagesOffset;
 
-      if (result.success && result.data) {
-        setCommunityImages(result.data);
+      if (reset) {
+        setIsLoadingImages(true);
+        setImagesOffset(0);
+        setHasMoreImages(true);
+      } else {
+        setIsLoadingMoreImages(true);
+      }
+
+      const result = await characterAPI.getAllCharacterImagesPaged({
+        limit: pageSize,
+        offset: nextOffset,
+      });
+
+      const page = result.success && Array.isArray(result.data) ? result.data : [];
+      if (result.success) {
+        setCommunityImages((prev) => (reset ? page : [...prev, ...page]));
+        setImagesOffset(nextOffset + page.length);
+        setHasMoreImages(page.length === pageSize);
       } else {
         console.error('Failed to fetch images:', result.error);
-        setCommunityImages([]);
+        if (reset) {
+          setCommunityImages([]);
+        }
       }
     } catch (error) {
       console.error('Failed to fetch community images:', error);
-      setCommunityImages([]);
+      if (reset) {
+        setCommunityImages([]);
+      }
     } finally {
       setIsLoadingImages(false);
+      setIsLoadingMoreImages(false);
     }
   };
+
+  const handleLoadMoreImages = async () => {
+    if (isLoadingImages || isLoadingMoreImages || !hasMoreImages) return;
+    await fetchAllCharacterImages(false);
+  };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const compute = () => {
+      const w = window.innerWidth;
+      if (w >= 1920) return 5;
+      if (w >= 1280) return 4;
+      if (w >= 768) return 3;
+      if (w >= 640) return 2;
+      return 1;
+    };
+
+    const update = () => setMasonryColumns(compute());
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
+  const masonryColumnedImages = useMemo(() => {
+    const cols = Math.max(1, masonryColumns);
+    const buckets: any[][] = Array.from({ length: cols }, () => []);
+    filteredImages.forEach((img, idx) => {
+      buckets[idx % cols].push(img);
+    });
+    return buckets;
+  }, [filteredImages, masonryColumns]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const node = loadMoreSentinelRef.current;
+    if (!node) return;
+    if (!hasMoreImages) return;
+
+    const obs = new IntersectionObserver(
+      (entries) => {
+        const first = entries[0];
+        if (!first?.isIntersecting) return;
+        handleLoadMoreImages();
+      },
+      {
+        root: null,
+        rootMargin: '1200px 0px 1200px 0px',
+        threshold: 0,
+      }
+    );
+
+    obs.observe(node);
+    return () => {
+      obs.disconnect();
+    };
+  }, [hasMoreImages, isLoadingImages, isLoadingMoreImages, imagesOffset, masonryColumns]);
 
   const handleImageClick = (index: number) => {
     if (index >= 0 && index < filteredImages.length) {
@@ -412,7 +494,7 @@ export default function GalleryPage() {
         }
         
         // Refresh the gallery to remove the deleted image
-        await fetchAllCharacterImages();
+        await fetchAllCharacterImages(true);
         await dialog.alert({ title: 'Deleted', message: 'Image deleted successfully' });
       } else {
         console.error('Failed to delete image:', result.error);
@@ -626,7 +708,7 @@ export default function GalleryPage() {
         throw new Error('Failed to add generated image to gallery');
       }
 
-      await fetchAllCharacterImages();
+      await fetchAllCharacterImages(true);
       setPrompt('');
 
       console.log('Image generated and added to gallery successfully');
@@ -1083,117 +1165,64 @@ export default function GalleryPage() {
                     </button>
                   </div>
                 ) : (
-                  <div className="masonry-grid">
-                    {filteredImages.map((image, index) => (
-                      <div
-                        key={image.id || index}
-                        className="masonry-item group relative overflow-hidden rounded-xl bg-dark-900/50 border border-dark-600/50 hover:border-pink-500/50 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-pink-500/10 cursor-pointer"
-                        onClick={() => handleImageClick(index)}
-                      >
-                        <div className="relative overflow-hidden">
-                          <img
-                            src={image.imageUrl}
-                            alt={`Generated image ${index + 1}`}
-                            className={`w-full h-auto object-cover transition-transform duration-500 group-hover:scale-105 ${blurNSFW && isNSFWImage(image) ? 'blur-md' : ''}`}
-                            loading="lazy"
-                          />
-                        </div>
+                  <div className="flex gap-3 sm:gap-4">
+                    {masonryColumnedImages.map((col, colIdx) => (
+                      <div key={`col-${colIdx}`} className="flex-1 min-w-0 flex flex-col gap-3 sm:gap-4">
+                        {col.map((image, indexInCol) => {
+                          const index = colIdx + indexInCol * masonryColumnedImages.length;
+                          return (
+                            <div
+                              key={image.id || `${colIdx}-${indexInCol}`}
+                              className="group relative overflow-hidden rounded-xl bg-dark-900/50 border border-dark-600/50 hover:border-pink-500/50 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-pink-500/10 cursor-pointer"
+                              onClick={() => handleImageClick(index)}
+                            >
+                              <div className="relative overflow-hidden">
+                                <img
+                                  src={image.imageUrl}
+                                  alt={`Generated image ${index + 1}`}
+                                  className={`w-full h-auto object-cover transition-transform duration-500 group-hover:scale-105 ${blurNSFW && isNSFWImage(image) ? 'blur-md' : ''}`}
+                                  loading={index < 12 ? 'eager' : 'lazy'}
+                                />
+                              </div>
 
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300">
-                          <div className="absolute bottom-0 left-0 right-0 p-3 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-                            <p className="text-white text-sm font-medium truncate mb-2">{image.characterName || 'Unknown'}</p>
-                            <div className="flex gap-2">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteImage(image.id);
-                                }}
-                                className="flex-1 bg-red-500/80 hover:bg-red-600/90 text-white text-xs py-1 px-2 rounded transition-colors duration-200"
-                              >
-                                Delete
-                              </button>
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300">
+                                <div className="absolute bottom-0 left-0 right-0 p-3 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
+                                  <p className="text-white text-sm font-medium truncate mb-2">{image.characterName || 'Unknown'}</p>
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteImage(image.id);
+                                      }}
+                                      className="flex-1 bg-red-500/80 hover:bg-red-600/90 text-white text-xs py-1 px-2 rounded transition-colors duration-200"
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        </div>
+                          );
+                        })}
                       </div>
                     ))}
                   </div>
                 )}
+
+                {!isLoadingImages && filteredImages.length > 0 && (
+                  <div className="mt-8 flex items-center justify-center">
+                    <button
+                      onClick={handleLoadMoreImages}
+                      disabled={!hasMoreImages || isLoadingMoreImages}
+                      className="px-6 py-3 rounded-2xl border border-dark-700 bg-dark-900/40 text-dark-200 hover:bg-dark-800/60 hover:border-pink-500/25 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isLoadingMoreImages ? 'Loading…' : hasMoreImages ? 'Load more' : 'All loaded'}
+                    </button>
+                  </div>
+                )}
               </div>
 
-              <style jsx>{`
-              .masonry-grid {
-                column-count: 1;
-                column-gap: 1rem;
-                width: 100%;
-              }
-              
-              .masonry-item {
-                break-inside: avoid;
-                margin-bottom: 1rem;
-                width: 100%;
-              }
-              
-              @media (min-width: 640px) {
-                .masonry-grid {
-                  column-count: 2;
-                  column-gap: 1rem;
-                }
-                .masonry-item {
-                  margin-bottom: 1rem;
-                }
-              }
-              
-              @media (min-width: 768px) {
-                .masonry-grid {
-                  column-count: 3;
-                  column-gap: 1.25rem;
-                }
-                .masonry-item {
-                  margin-bottom: 1.25rem;
-                }
-              }
-              
-              @media (min-width: 1024px) {
-                .masonry-grid {
-                  column-count: 3;
-                  column-gap: 1.5rem;
-                }
-                .masonry-item {
-                  margin-bottom: 1.5rem;
-                }
-              }
-              
-              @media (min-width: 1280px) {
-                .masonry-grid {
-                  column-count: 4;
-                  column-gap: 1.5rem;
-                }
-                .masonry-item {
-                  margin-bottom: 1.5rem;
-                }
-              }
-              
-              @media (min-width: 1536px) {
-                .masonry-grid {
-                  column-count: 4;
-                  column-gap: 1.75rem;
-                }
-                .masonry-item {
-                  margin-bottom: 1.75rem;
-                }
-              }
-              
-              @media (min-width: 1920px) {
-                .masonry-grid {
-                  column-count: 5;
-                  column-gap: 2rem;
-                }
-                .masonry-item {
-                  margin-bottom: 2rem;
-                }
-              }
-            `}</style>
+              <div ref={loadMoreSentinelRef} className="h-1" />
             </div>
           </motion.div>
         </div>
