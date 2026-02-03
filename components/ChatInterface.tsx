@@ -690,10 +690,15 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
   }, [showFormatSelector]);
 
   const [conversation, setConversation] = useState<Conversation | null>(null);
+  const conversationRef = useRef<Conversation | null>(null);
   const initChatInFlightRef = useRef<{ key: string; promise: Promise<void> | null }>({
     key: '',
     promise: null,
   });
+
+  useEffect(() => {
+    conversationRef.current = conversation;
+  }, [conversation]);
 
   const initChat = async () => {
     if (currentCharacter.id) {
@@ -728,6 +733,18 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
               window.localStorage.setItem(storageKey, forcedConversationId);
             } catch {
               // ignore
+            }
+          }
+
+          if (encounterConversationId) {
+            const existing = await characterAPI.getConversationById(encounterConversationId);
+            if (!existing.success) {
+              encounterConversationId = null;
+              try {
+                window.localStorage.removeItem(storageKey);
+              } catch {
+                // ignore
+              }
             }
           }
 
@@ -838,7 +855,16 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
   ]);
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim() || !conversation) return;
+    if (!inputMessage.trim()) return;
+
+    if (!conversationRef.current) {
+      await initChat();
+    }
+
+    const activeConversation = conversationRef.current;
+    if (!activeConversation) {
+      return;
+    }
 
     const userMessageContent = inputMessage;
     setInputMessage('');
@@ -852,7 +878,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
       .join('\n\n');
 
     const userMsg: Partial<ChatMessage> = {
-      conversationId: conversation.id,
+      conversationId: activeConversation.id,
       characterId: currentCharacter.id,
       content: userMessageContent,
       sender: 'user',
@@ -882,7 +908,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
       });
 
       const characterMsg: Partial<ChatMessage> = {
-        conversationId: conversation.id,
+        conversationId: activeConversation.id,
         characterId: currentCharacter.id,
         content: llmResponse.content,
         sender: 'character',
@@ -951,7 +977,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
       console.error('Chat error:', error);
       const errorMsg: ChatMessage = {
         id: Date.now().toString(),
-        conversationId: conversation.id,
+        conversationId: activeConversation.id,
         characterId: currentCharacter.id || 'temp',
         content: "*Connection lost. Please make sure LM Studio is running.*",
         sender: 'system',
@@ -1770,7 +1796,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
                 <div className="absolute inset-0 bg-gradient-to-br from-dark-950 via-dark-900/80 to-dark-950" />
                 <div className="absolute inset-0 bg-[radial-gradient(900px_circle_at_30%_30%,rgba(236,72,153,0.18),transparent_55%)]" />
                 <div className="relative px-5 sm:px-8 lg:px-12 py-8 sm:py-10 backdrop-blur-sm">
-                  <div className="max-w-5xl mx-auto flex items-start justify-between gap-6">
+                  <div className="w-full flex items-start justify-between gap-6">
                     <div className="min-w-0">
                       <div className="text-xs tracking-[0.22em] uppercase text-pink-200/70">
                         Scene
@@ -1925,8 +1951,19 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
               )}
 
               {/* Scrollable Only */}
-              <div className={`h-full min-h-0 overflow-y-auto ${isEncounter ? 'px-5 sm:px-8 lg:px-12 py-8 sm:py-10' : 'p-4 sm:p-6 lg:p-8'}`}>
-                <div className={`${isEncounter ? 'max-w-5xl mx-auto space-y-10' : 'max-w-4xl mx-auto space-y-5 lg:pl-20'}`}>
+              <div className={`h-full min-h-0 overflow-y-auto ${isEncounter ? 'px-4 sm:px-6 lg:px-8 py-6 sm:py-8' : 'p-4 sm:p-6 lg:p-8'}`}>
+                <div className={`${isEncounter ? 'max-w-none w-full space-y-8' : 'max-w-4xl mx-auto space-y-5 lg:pl-20'}`}>
+                  {isEncounter && messages.length === 0 && !isTyping && (
+                    <div className="min-h-[40vh] flex items-center justify-center">
+                      <div className="w-full max-w-3xl rounded-[28px] border border-white/10 bg-dark-950/10 backdrop-blur-xl p-6 sm:p-8">
+                        <div className="text-xs tracking-[0.22em] uppercase text-pink-200/70">Begin the scene</div>
+                        <div className="mt-2 text-xl sm:text-2xl font-extrabold text-white">Say your first line.</div>
+                        <div className="mt-2 text-sm text-dark-300 leading-relaxed">
+                          Write what you do or say to start the encounter. Keep it natural—glances, small movements, short dialogue.
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <AnimatePresence>
                     {messages.map((message) => (
                       <motion.div
@@ -2153,7 +2190,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
 
             {/* Message Input */}
             <div className="p-3 sm:p-4 lg:p-6 border-t border-dark-700/50 backdrop-blur-sm">
-              <div className="max-w-4xl mx-auto">
+              <div className={isEncounter ? 'w-full' : 'max-w-4xl mx-auto'}>
                 {showFormatSelector && pendingGeneration && (
                   <div className="flex justify-center mb-3" onClick={(e) => e.stopPropagation()}>
                     <FormatSelector
@@ -2215,8 +2252,8 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
                 )}
 
                 {/* Input with Send Button */}
-                <div className="relative">
-                  {isEncounter ? (
+                {isEncounter ? (
+                  <div className="flex items-end gap-3">
                     <textarea
                       value={inputMessage}
                       onChange={(e) => setInputMessage(e.target.value)}
@@ -2228,9 +2265,19 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
                       }}
                       placeholder="What do you do or say?"
                       rows={3}
-                      className="w-full px-5 py-4 pr-16 bg-dark-900/25 text-dark-100 rounded-2xl border border-dark-700/60 focus:border-pink-500/35 focus:outline-none focus:ring-2 focus:ring-pink-500/15 backdrop-blur-sm placeholder:text-dark-300 resize-none"
+                      className="flex-1 min-w-0 px-5 py-4 bg-dark-900/25 text-dark-100 rounded-2xl border border-dark-700/60 focus:border-pink-500/35 focus:outline-none focus:ring-2 focus:ring-pink-500/15 backdrop-blur-sm placeholder:text-dark-300 resize-none"
                     />
-                  ) : (
+
+                    <button
+                      onClick={handleSendMessage}
+                      disabled={!inputMessage.trim()}
+                      className="h-[52px] px-5 bg-gradient-to-r from-pink-600 to-pink-500 text-white rounded-2xl hover:from-pink-500 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg shadow-pink-500/20 hover:shadow-pink-500/30 font-semibold text-sm shrink-0"
+                    >
+                      Send
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative">
                     <input
                       type="text"
                       value={inputMessage}
@@ -2239,17 +2286,17 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
                       placeholder="Type your message..."
                       className="w-full px-5 py-3 pr-16 bg-dark-800/50 text-dark-200 rounded-2xl border border-pink-500/50 focus:border-pink-500/50 focus:outline-none focus:ring-2 focus:ring-pink-500/20 backdrop-blur-sm placeholder-pink-400"
                     />
-                  )}
 
-                  {/* Send Button */}
-                  <button
-                    onClick={handleSendMessage}
-                    disabled={!inputMessage.trim()}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 bg-gradient-to-r from-pink-600 to-pink-500 text-white rounded-lg hover:from-pink-500 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg shadow-pink-500/20 hover:shadow-pink-500/30 px-3 py-1.5 flex items-center justify-center font-medium text-sm"
-                  >
-                    Send
-                  </button>
-                </div>
+                    {/* Send Button */}
+                    <button
+                      onClick={handleSendMessage}
+                      disabled={!inputMessage.trim()}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-gradient-to-r from-pink-600 to-pink-500 text-white rounded-lg hover:from-pink-500 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg shadow-pink-500/20 hover:shadow-pink-500/30 px-3 py-1.5 flex items-center justify-center font-medium text-sm"
+                    >
+                      Send
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>

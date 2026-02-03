@@ -614,6 +614,29 @@ export const characterAPI = {
     }
   },
 
+  async getConversationById(conversationId: string) {
+    try {
+      const id = String(conversationId || '').trim();
+      if (!id) return { success: false, error: new Error('Missing conversationId') };
+
+      const { data, error } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data) {
+        return { success: false, error: new Error('Conversation not found') };
+      }
+
+      return { success: true, data };
+    } catch (error) {
+      console.error('Failed to get conversation by id:', error);
+      return { success: false, error };
+    }
+  },
+
   async createConversation(characterId: string, title?: string) {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -651,9 +674,12 @@ export const characterAPI = {
         .update({ title: trimmedTitle, updated_at: new Date().toISOString() })
         .eq('id', conversationId)
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
+      if (!data) {
+        return { success: false, error: new Error('Conversation not found') };
+      }
       return { success: true, data };
     } catch (error) {
       console.error('Failed to update conversation title:', error);
@@ -819,13 +845,21 @@ export const characterAPI = {
         console.warn('Failed to reset character seed:', seedError);
       }
 
-      // Deleting the conversation will automatically delete messages due to ON DELETE CASCADE
-      const { error: deleteError } = await supabase
-        .from('conversations')
+      const { error: messagesDeleteError } = await supabase
+        .from('messages')
         .delete()
+        .eq('conversation_id', conversationId);
+
+      if (messagesDeleteError) throw messagesDeleteError;
+
+      const { error: touchError } = await supabase
+        .from('conversations')
+        .update({ updated_at: new Date().toISOString() })
         .eq('id', conversationId);
 
-      if (deleteError) throw deleteError;
+      if (touchError) {
+        console.warn('Failed to update conversation timestamp:', touchError);
+      }
       return { success: true };
     } catch (error) {
       console.error('Failed to reset conversation:', error);

@@ -25,6 +25,8 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
   const [characterImages, setCharacterImages] = useState<CharacterImage[]>([]);
   const [isZoomed, setIsZoomed] = useState(false);
   const [showImageDropdown, setShowImageDropdown] = useState<string | null>(null);
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [selectedImageIds, setSelectedImageIds] = useState<Set<string>>(new Set());
   const [showNavbarDropdown, setShowNavbarDropdown] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
   const [zoomedImageIndex, setZoomedImageIndex] = useState(0);
@@ -199,6 +201,19 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
     }
   }, [filteredImages.length, isZoomed, zoomedImageIndex]);
 
+  useEffect(() => {
+    if (!isSelectMode) {
+      setSelectedImageIds(new Set());
+      return;
+    }
+
+    if (isZoomed) {
+      setIsZoomed(false);
+    }
+
+    setShowImageDropdown(null);
+  }, [isSelectMode, isZoomed]);
+
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -230,6 +245,44 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
       }
     } catch (error) {
       console.error('Failed to load character images:', error);
+    }
+  };
+
+  const toggleSelectImage = (imageId: string) => {
+    setSelectedImageIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(imageId)) next.delete(imageId);
+      else next.add(imageId);
+      return next;
+    });
+  };
+
+  const handleDeleteSelectedImages = async () => {
+    const ids = Array.from(selectedImageIds);
+    if (ids.length === 0) return;
+
+    const ok = await dialog.confirm({
+      title: `Delete ${ids.length} image${ids.length === 1 ? '' : 's'}?`,
+      message: 'This will permanently delete the selected images from the gallery.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      destructive: true,
+    });
+
+    if (!ok) return;
+
+    try {
+      const results = await Promise.all(ids.map((id) => characterAPI.deleteCharacterImageFromGallery(id)));
+      const allOk = results.every((r) => r.success);
+      if (!allOk) {
+        throw new Error('Failed to delete one or more images');
+      }
+      await loadCharacterImages();
+      setSelectedImageIds(new Set());
+      setIsSelectMode(false);
+    } catch (error) {
+      console.error('Error deleting selected images:', error);
+      await dialog.alert({ title: 'Error', message: 'Failed to delete selected images. Please try again.' });
     }
   };
 
@@ -470,6 +523,33 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
 
           {/* Right: Actions */}
           <div className="flex items-center gap-2">
+            {isSelectMode ? (
+              <>
+                <button
+                  onClick={handleDeleteSelectedImages}
+                  disabled={selectedImageIds.size === 0}
+                  className="px-3 py-2 rounded-xl text-sm font-semibold text-white bg-red-600/80 hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  title="Delete selected images"
+                >
+                  Delete ({selectedImageIds.size})
+                </button>
+                <button
+                  onClick={() => setIsSelectMode(false)}
+                  className="px-3 py-2 rounded-xl text-sm font-semibold text-dark-200 border border-dark-700 bg-dark-900/30 hover:bg-dark-800/60 transition-colors"
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => setIsSelectMode(true)}
+                className="px-3 py-2 rounded-xl text-sm font-semibold text-dark-200 border border-dark-700 bg-dark-900/30 hover:bg-dark-800/60 transition-colors"
+                title="Select multiple images"
+              >
+                Select
+              </button>
+            )}
+
             <button
               onClick={() => window.location.href = '/'}
               className="p-2 rounded-xl text-dark-300 hover:text-white hover:bg-dark-800/50 transition-all duration-200"
@@ -632,6 +712,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
                     <AnimatePresence>
                       {col.map((image) => {
                         const index = filteredIndexById.get(image.id) ?? 0;
+                        const isSelected = selectedImageIds.has(image.id);
                         return (
                           <motion.div
                             key={image.id}
@@ -643,9 +724,38 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
                           >
                             <div
                               className="relative overflow-hidden rounded-2xl border border-dark-700/30 bg-gradient-to-br from-dark-800/40 to-dark-900/40 cursor-pointer backdrop-blur-sm hover:border-pink-500/30 transition-all duration-300 hover:shadow-2xl hover:shadow-pink-500/10"
-                              onClick={() => handleImageClick(index)}
+                              onClick={() => {
+                                if (isSelectMode) {
+                                  toggleSelectImage(image.id);
+                                  return;
+                                }
+                                handleImageClick(index);
+                              }}
                             >
                               <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-pink-500/0 via-pink-500/0 to-pink-500/0 group-hover:from-pink-500/20 group-hover:via-pink-400/10 group-hover:to-pink-500/20 transition-all duration-500 pointer-events-none"></div>
+
+                              {isSelectMode && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleSelectImage(image.id);
+                                  }}
+                                  className={`absolute top-2 right-2 z-20 w-8 h-8 rounded-lg border flex items-center justify-center backdrop-blur-md transition-colors ${isSelected
+                                    ? 'bg-pink-600/90 border-pink-500/40 text-white'
+                                    : 'bg-dark-900/70 border-dark-700/60 text-white/70 hover:bg-dark-800'
+                                    }`}
+                                  aria-label={isSelected ? 'Deselect image' : 'Select image'}
+                                >
+                                  {isSelected ? (
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  ) : (
+                                    <div className="w-3.5 h-3.5 rounded border border-white/40" />
+                                  )}
+                                </button>
+                              )}
 
                               <img
                                 src={image.imageUrl}
@@ -660,19 +770,21 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
                                 </div>
                               )}
 
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setShowImageDropdown(showImageDropdown === image.id ? null : image.id);
-                                }}
-                                className="absolute top-2 right-2 w-8 h-8 bg-dark-900/80 backdrop-blur-md rounded-lg flex items-center justify-center text-white/70 hover:text-white hover:bg-dark-800 transition-all duration-200 opacity-0 group-hover:opacity-100 shadow-lg border border-dark-700/50"
-                              >
-                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                                  <circle cx="12" cy="5" r="2" />
-                                  <circle cx="12" cy="12" r="2" />
-                                  <circle cx="12" cy="19" r="2" />
-                                </svg>
-                              </button>
+                              {!isSelectMode && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowImageDropdown(showImageDropdown === image.id ? null : image.id);
+                                  }}
+                                  className="absolute top-2 right-2 w-8 h-8 bg-dark-900/80 backdrop-blur-md rounded-lg flex items-center justify-center text-white/70 hover:text-white hover:bg-dark-800 transition-all duration-200 opacity-0 group-hover:opacity-100 shadow-lg border border-dark-700/50"
+                                >
+                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                    <circle cx="12" cy="5" r="2" />
+                                    <circle cx="12" cy="12" r="2" />
+                                    <circle cx="12" cy="19" r="2" />
+                                  </svg>
+                                </button>
+                              )}
 
                               {showImageDropdown === image.id && (
                                 <div className="absolute top-10 right-2 bg-dark-800 border border-dark-600 rounded-lg shadow-lg z-10 min-w-[120px] image-dropdown">

@@ -60,6 +60,36 @@ export const ENCOUNTER_SCENARIOS: EncounterScenario[] = [
     ],
     suggestedMoods: ['cocky', 'playful', 'hungry', 'controlled'],
     suggestedLocations: ['club VIP booth', 'bar', 'dance floor']
+  },
+  {
+    id: 'late-night-train-platform',
+    title: 'Late-Night Train Platform',
+    shortDescription: 'Last train delayed. Cold air, fluorescent light, and a stranger who keeps glancing your way.',
+    narrativeIntent: 'Subtle tension in a public place: proximity, shared inconvenience, and careful choices.',
+    behavioralRules: [
+      'Keep it realistic and public-aware; voices low, movements measured.',
+      'Build attraction through conversation, glances, and small gestures—no instant intimacy.',
+      'Respect boundaries; ask before closing distance or touching.',
+      'Maintain continuity: no abrupt scene jumps; time passes naturally.',
+      'Use grounded sensory details (announcements, air, footsteps, metal, light) without being overly poetic.'
+    ],
+    suggestedMoods: ['wary', 'curious', 'tender', 'electric'],
+    suggestedLocations: ['train platform', 'station corridor', 'inside the last carriage']
+  },
+  {
+    id: 'quiet-museum-gallery',
+    title: 'Quiet Museum Gallery',
+    shortDescription: 'Soft footsteps and hushed voices. You linger at the same painting, drawn to the same details.',
+    narrativeIntent: 'Slow intimacy through shared focus, careful conversation, and restrained closeness.',
+    behavioralRules: [
+      'Keep the tone soft and intimate without rushing; let silence and subtext breathe.',
+      'Stay consent-forward; never narrate the user’s actions or emotions as a given.',
+      'Use the environment as tension (guards, quiet rooms, echoes) to keep it believable.',
+      'Escalate only if the user clearly invites it; keep it subtle by default.',
+      'Maintain realism: small, plausible actions; avoid melodrama and sudden leaps.'
+    ],
+    suggestedMoods: ['soft', 'restrained', 'bold', 'warm'],
+    suggestedLocations: ['museum gallery', 'hallway bench', 'gift shop exit']
   }
 ];
 

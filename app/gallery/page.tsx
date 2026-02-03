@@ -28,6 +28,8 @@ export default function GalleryPage() {
   const [hasMoreImages, setHasMoreImages] = useState(true);
   const [isZoomed, setIsZoomed] = useState(false);
   const [zoomedImageIndex, setZoomedImageIndex] = useState(0);
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [selectedImageIds, setSelectedImageIds] = useState<Set<string>>(new Set());
   const { blurNSFW, toggleBlurNSFW } = useBlurNSFW();
   const dialog = useDialog();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -265,6 +267,70 @@ export default function GalleryPage() {
     }
   };
 
+  const toggleSelectImage = (imageId: string) => {
+    setSelectedImageIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(imageId)) next.delete(imageId);
+      else next.add(imageId);
+      return next;
+    });
+  };
+
+  const handleDeleteSelectedImages = async () => {
+    const ids = Array.from(selectedImageIds);
+    if (ids.length === 0) return;
+
+    const ok = await dialog.confirm({
+      title: `Delete ${ids.length} image${ids.length === 1 ? '' : 's'}?`,
+      message: 'This will permanently delete the selected images from the gallery. This action cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      destructive: true,
+    });
+
+    if (!ok) return;
+
+    try {
+      const selected = new Set(ids);
+      const galleryOnlyByCharacter = new Map<string, string[]>();
+
+      for (const img of communityImages) {
+        if (!img?.id || !selected.has(img.id)) continue;
+        if (img.isGalleryOnly && img.characterId) {
+          const existing = galleryOnlyByCharacter.get(img.characterId) || [];
+          existing.push(img.id);
+          galleryOnlyByCharacter.set(img.characterId, existing);
+        }
+      }
+
+      const results = await Promise.all(ids.map((id) => characterAPI.deleteCharacterImageFromGallery(id)));
+      const allOk = results.every((r) => r.success);
+      if (!allOk) throw new Error('Failed to delete one or more images');
+
+      await Promise.all(
+        Array.from(galleryOnlyByCharacter.keys()).map(async (characterId) => {
+          const remaining = communityImages.filter(
+            (img) => img.characterId === characterId && !selected.has(img.id)
+          );
+          if (remaining.length === 0) {
+            await characterAPI.deleteCharacter(characterId);
+          }
+        })
+      );
+
+      await fetchAllCharacterImages(true);
+      setSelectedImageIds(new Set());
+      setIsSelectMode(false);
+      await dialog.alert({ title: 'Deleted', message: `${ids.length} image${ids.length === 1 ? '' : 's'} deleted successfully` });
+    } catch (error) {
+      console.error('Error deleting selected images:', error);
+      await dialog.alert({
+        title: 'Error',
+        message: 'Failed to delete selected images. Please try again.',
+      });
+    }
+  };
+
   const filteredImages = communityImages.filter((img) => {
     if (filter === 'all') return true;
     if (filter === 'sfw') return !isNSFWImage(img);
@@ -312,6 +378,18 @@ export default function GalleryPage() {
       setZoomedImageIndex(0);
     }
   }, [filter]);
+
+  useEffect(() => {
+    if (!isSelectMode) {
+      setSelectedImageIds(new Set());
+      return;
+    }
+
+    if (isZoomed) {
+      setIsZoomed(false);
+      setZoomedImageIndex(0);
+    }
+  }, [isSelectMode, isZoomed]);
 
   useEffect(() => {
     if (zoomedImageIndex >= filteredImages.length && filteredImages.length > 0) {
@@ -1071,12 +1149,35 @@ export default function GalleryPage() {
           >
             <div className={`w-full ${isDesktopSidebarCollapsed ? 'max-w-none' : 'max-w-none'} mx-auto`}>
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
-                <div className="text-center sm:text-left">
-                  <h1 className="text-3xl md:text-4xl font-bold text-white">Gallery</h1>
-                </div>
+                <div className="flex items-center justify-between gap-4 w-full">
+                  <h1 className="text-3xl font-bold text-white">Gallery</h1>
 
-                <div className="flex justify-center sm:justify-end">
-                  <div className="inline-flex items-center gap-3">
+                  <div className="flex items-center gap-3 justify-end">
+                    {isSelectMode ? (
+                      <>
+                        <button
+                          onClick={handleDeleteSelectedImages}
+                          disabled={selectedImageIds.size === 0}
+                          className="h-10 px-4 rounded-lg border transition-colors bg-red-600/80 hover:bg-red-600 text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          Delete ({selectedImageIds.size})
+                        </button>
+                        <button
+                          onClick={() => setIsSelectMode(false)}
+                          className="h-10 px-4 rounded-lg border transition-colors bg-dark-800/50 border-dark-700 text-dark-200 hover:text-white hover:bg-dark-700"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => setIsSelectMode(true)}
+                        className="h-10 px-4 rounded-lg border transition-colors bg-dark-800/50 border-dark-700 text-dark-200 hover:text-white hover:bg-dark-700"
+                      >
+                        Select
+                      </button>
+                    )}
+
                     <button
                       onClick={toggleBlurNSFW}
                       className={`h-10 px-4 rounded-lg border transition-colors ${blurNSFW
@@ -1170,12 +1271,42 @@ export default function GalleryPage() {
                       <div key={`col-${colIdx}`} className="flex-1 min-w-0 flex flex-col gap-3 sm:gap-4">
                         {col.map((image, indexInCol) => {
                           const index = colIdx + indexInCol * masonryColumnedImages.length;
+                          const isSelected = !!image?.id && selectedImageIds.has(image.id);
                           return (
                             <div
                               key={image.id || `${colIdx}-${indexInCol}`}
                               className="group relative overflow-hidden rounded-xl bg-dark-900/50 border border-dark-600/50 hover:border-pink-500/50 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-pink-500/10 cursor-pointer"
-                              onClick={() => handleImageClick(index)}
+                              onClick={() => {
+                                if (isSelectMode) {
+                                  if (image?.id) toggleSelectImage(image.id);
+                                  return;
+                                }
+                                handleImageClick(index);
+                              }}
                             >
+                              {isSelectMode && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (image?.id) toggleSelectImage(image.id);
+                                  }}
+                                  className={`absolute top-2 right-2 z-20 w-8 h-8 rounded-lg border flex items-center justify-center backdrop-blur-md transition-colors ${isSelected
+                                    ? 'bg-pink-600/90 border-pink-500/40 text-white'
+                                    : 'bg-dark-900/70 border-dark-700/60 text-white/70 hover:bg-dark-800'
+                                    }`}
+                                  aria-label={isSelected ? 'Deselect image' : 'Select image'}
+                                >
+                                  {isSelected ? (
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  ) : (
+                                    <div className="w-3.5 h-3.5 rounded border border-white/40" />
+                                  )}
+                                </button>
+                              )}
+
                               <div className="relative overflow-hidden">
                                 <img
                                   src={image.imageUrl}
@@ -1189,15 +1320,17 @@ export default function GalleryPage() {
                                 <div className="absolute bottom-0 left-0 right-0 p-3 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
                                   <p className="text-white text-sm font-medium truncate mb-2">{image.characterName || 'Unknown'}</p>
                                   <div className="flex gap-2">
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeleteImage(image.id);
-                                      }}
-                                      className="flex-1 bg-red-500/80 hover:bg-red-600/90 text-white text-xs py-1 px-2 rounded transition-colors duration-200"
-                                    >
-                                      Delete
-                                    </button>
+                                    {!isSelectMode && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDeleteImage(image.id);
+                                        }}
+                                        className="flex-1 bg-red-500/80 hover:bg-red-600/90 text-white text-xs py-1 px-2 rounded transition-colors duration-200"
+                                      >
+                                        Delete
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
                               </div>

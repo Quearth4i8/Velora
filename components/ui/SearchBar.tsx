@@ -152,7 +152,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
   return (
     <motion.div
-      className={`max-w-2xl mx-auto ${className}`}
+      className={`max-w-2xl mx-auto relative z-[100] ${className}`}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
@@ -190,7 +190,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           </div>
 
           {isOpen && results.length > 0 && (
-            <div className="absolute left-0 right-0 mt-3 z-50">
+            <div className="absolute left-0 right-0 mt-3 z-[200]">
               <div className="rounded-2xl border border-white/10 bg-dark-950/70 backdrop-blur-xl shadow-2xl overflow-hidden">
                 <div className="max-h-80 overflow-auto">
                   {results.map((c, idx) => {
