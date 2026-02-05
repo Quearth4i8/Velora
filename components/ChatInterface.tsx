@@ -107,10 +107,43 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
 
   const [conversationRelation, setConversationRelation] = useState<string>('');
   const [conversationSexToys, setConversationSexToys] = useState<string[]>([]);
+  const [appliedConversationSexToys, setAppliedConversationSexToys] = useState<string[]>([]);
   const [conversationGifts, setConversationGifts] = useState<any[]>([]);
   const [customSexToy, setCustomSexToy] = useState<string>('');
 
   const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
+
+  const normalizeCommaTagKey = (value: string) => String(value || '').trim().toLowerCase();
+  const splitCommaTags = (input: string): string[] =>
+    String(input || '')
+      .split(/[,\n]+/g)
+      .map((part) => part.trim())
+      .filter(Boolean);
+  const joinAndDedupeCommaTags = (...inputs: Array<string | undefined | null | false>): string => {
+    const parts = inputs
+      .filter((p): p is string => typeof p === 'string' && p.trim().length > 0)
+      .flatMap((p) => splitCommaTags(p));
+
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const part of parts) {
+      const key = normalizeCommaTagKey(part);
+      if (!key) continue;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push(part);
+    }
+    return result.join(', ');
+  };
+
+  const removeCommaTagsByKey = (input: string, removeKeys: Set<string>): string => {
+    const parts = splitCommaTags(input);
+    const kept = parts.filter((part) => {
+      const key = normalizeCommaTagKey(part);
+      return key && !removeKeys.has(key);
+    });
+    return kept.join(', ');
+  };
   const heatStorageKey = currentCharacter.id ? `heat_${currentCharacter.id}` : null;
   const wardrobeColorsStorageKey = currentCharacter.id ? `wardrobe_colors_${currentCharacter.id}` : null;
   const [heat, setHeat] = useState<number>(() => clamp((character?.heat ?? 25) as number, 0, 100));
@@ -1310,6 +1343,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
 
       setConversationRelation(rel);
       setConversationSexToys(toys);
+      setAppliedConversationSexToys(toys);
       setConversationGifts(gifts);
     };
 
@@ -3367,7 +3401,33 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
                 <button
                   type="button"
                   onClick={async () => {
-                    await persistConversationContext({ sexToys: conversationSexToys });
+                    const selectedToys = Array.isArray(conversationSexToys)
+                      ? conversationSexToys.map((t) => String(t).trim()).filter(Boolean)
+                      : [];
+
+                    await persistConversationContext({ sexToys: selectedToys });
+
+                    if (currentCharacter?.id) {
+                      const previouslyApplied = Array.isArray(appliedConversationSexToys)
+                        ? appliedConversationSexToys.map((t) => String(t).trim()).filter(Boolean)
+                        : [];
+                      const removeKeys = new Set<string>(previouslyApplied.map((t) => normalizeCommaTagKey(t)).filter(Boolean));
+                      const existingPersistent = String(currentCharacter.persistentPrompt || '');
+                      const persistentWithoutOldToys = removeCommaTagsByKey(existingPersistent, removeKeys);
+                      const nextPersistent = joinAndDedupeCommaTags(persistentWithoutOldToys, selectedToys.join(', '));
+
+                      if (nextPersistent !== String(currentCharacter.persistentPrompt || '')) {
+                        const updated = await characterAPI.updateCharacter(currentCharacter.id, { persistentPrompt: nextPersistent });
+                        if (updated.success && updated.data) {
+                          setCurrentCharacter(updated.data);
+                          onCharacterUpdate?.(updated.data);
+                        } else {
+                          setCurrentCharacter((prev) => ({ ...prev, persistentPrompt: nextPersistent }));
+                        }
+                      }
+                    }
+
+                    setAppliedConversationSexToys(selectedToys);
                     setShowSexToys(false);
                   }}
                   className="h-11 px-5 rounded-2xl bg-gradient-to-r from-purple-600 to-purple-500 text-white font-semibold hover:from-purple-500 hover:to-purple-600 transition-all"
