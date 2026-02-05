@@ -213,8 +213,6 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
 
     const relRaw = String(conversationRelation || '').trim();
     const relNormalized = relRaw === 'stepsister' || relRaw === 'stepbrother' ? 'Step-sibling' : relRaw;
-    const characterGender = String((currentCharacter as any)?.gender || '').trim().toLowerCase();
-    const isCharacterMale = characterGender === 'male' || characterGender === 'man' || characterGender === 'boy';
     const toys = Array.isArray(conversationSexToys) ? conversationSexToys.map((t) => String(t).trim()).filter(Boolean) : [];
     const gifts = Array.isArray(conversationGifts) ? conversationGifts : [];
     const recentGiftNames = gifts
@@ -226,73 +224,70 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
     if (relNormalized) {
       const relLines: string[] = [];
 
+      relLines.push('RELATIONSHIP LOCK (follow exactly, do not contradict chat history):');
+
       if (relNormalized === 'Step-sibling') {
-        const meRole = isCharacterMale ? 'stepbrother' : 'stepsister';
-        const youRole = isCharacterMale ? 'stepsister' : 'stepbrother';
-        relLines.push(`You and I are step-siblings.`);
-        relLines.push(`I am your ${meRole}.`);
-        relLines.push(`You are my ${youRole}.`);
-        relLines.push(`CRITICAL: Never swap these roles. I am your ${meRole}; you are my ${youRole}.`);
-        relLines.push(`In dialogue, refer to me as your ${meRole}, and refer to you as my ${youRole}.`);
-        relLines.push('If you answer questions about our relationship (e.g. “what am I to you?”), use these exact roles and never contradict them.');
+        const meRole = 'stepsister';
+        const youRole = 'stepbrother';
+        relLines.push(`- CHARACTER: ${meRole}.`);
+        relLines.push(`- INTERLOCUTOR: ${youRole}.`);
+        relLines.push('- CRITICAL: Never swap roles.');
+        relLines.push(`- CRITICAL (forbidden): Never call the interlocutor your ${meRole}. Never say "my ${meRole}" to the interlocutor.`);
+        relLines.push(`- CRITICAL (forbidden): Never say "my ${meRole}" at all. The word "${meRole}" is only allowed when you say "I'm your ${meRole}."`);
+        relLines.push(`- If the interlocutor uses the wrong label, correct them immediately: "You're my ${youRole}."`);
+        relLines.push(`- If asked "what am I to you?" reply with exactly: "You're my ${youRole}."`);
+        relLines.push('- If you ever output the wrong label, immediately self-correct in the same message and restate the correct roles.');
       } else if (relNormalized === 'Personal secretary') {
-        relLines.push(`I am your personal secretary.`);
-        relLines.push(`You are my boss.`);
-        relLines.push('CRITICAL: Never swap roles.');
-        relLines.push('In dialogue, refer to me as your personal secretary, and refer to you as my boss.');
-        relLines.push('If you answer questions about our relationship (e.g. “what am I to you?”), say “You are my boss” and keep it consistent.');
+        relLines.push('- CHARACTER: personal secretary.');
+        relLines.push('- INTERLOCUTOR: boss.');
+        relLines.push('- CRITICAL: Never swap roles.');
+        relLines.push('- If the interlocutor uses the wrong label, correct them and restate the roles.');
+        relLines.push(`- If asked "what am I to you?" reply with exactly: "You're my boss."`);
       } else if (relNormalized === 'Crush') {
-        relLines.push(`I have a crush on you.`);
-        relLines.push(`You are my crush.`);
-        relLines.push('In dialogue, make it clear I have a crush on you.');
-        relLines.push('If you answer questions about our relationship (e.g. “what am I to you?”), say “You are my crush” and keep it consistent.');
+        relLines.push('- CHARACTER: has a crush.');
+        relLines.push('- INTERLOCUTOR: crush.');
+        relLines.push('- If the interlocutor uses the wrong label, correct them and restate the relationship.');
+        relLines.push(`- If asked "what am I to you?" reply with exactly: "You're my crush."`);
       } else if (relNormalized === 'Dating') {
-        relLines.push(`You and I are dating.`);
-        relLines.push(`You are my romantic partner (dating).`);
-        relLines.push('In dialogue, treat me as your romantic partner (dating), and treat you as my romantic partner.');
-        relLines.push('If you answer questions about our relationship (e.g. “what am I to you?”), say “You are my romantic partner” and keep it consistent.');
+        relLines.push('- CHARACTER: dating.');
+        relLines.push('- INTERLOCUTOR: romantic partner.');
+        relLines.push('- If the interlocutor uses the wrong label, correct them and restate the relationship.');
+        relLines.push(`- If asked "what am I to you?" reply with exactly: "You're my romantic partner."`);
       } else if (relNormalized === 'Married') {
-        relLines.push(`I am your spouse.`);
-        relLines.push(`You are my spouse.`);
-        relLines.push('In dialogue, treat me as your spouse, and treat you as my spouse.');
-        relLines.push('If you answer questions about our relationship (e.g. “what am I to you?”), say “You are my spouse” and keep it consistent.');
+        relLines.push('- CHARACTER: married.');
+        relLines.push('- INTERLOCUTOR: spouse.');
+        relLines.push('- If the interlocutor uses the wrong label, correct them and restate the relationship.');
+        relLines.push(`- If asked "what am I to you?" reply with exactly: "You're my spouse."`);
       } else {
         const noun = relNormalized.toLowerCase();
         if (noun === 'strangers') {
-          relLines.push('You and I are strangers who have just met.');
-          relLines.push('You are a stranger to me.');
-          relLines.push('In dialogue, treat me like a stranger you just met.');
-          relLines.push('If you answer questions about our relationship (e.g. “what am I to you?”), say “You are a stranger to me” and keep it consistent.');
+          relLines.push('- CHARACTER: stranger.');
+          relLines.push('- INTERLOCUTOR: stranger.');
+          relLines.push(`- If asked "what am I to you?" reply with exactly: "You're a stranger to me."`);
         } else if (noun === 'friends') {
-          relLines.push('You and I are friends.');
-          relLines.push('You are my friend.');
-          relLines.push('In dialogue, treat me like your friend.');
-          relLines.push('If you answer questions about our relationship (e.g. “what am I to you?”), say “You are my friend” and keep it consistent.');
+          relLines.push('- CHARACTER: friend.');
+          relLines.push('- INTERLOCUTOR: friend.');
+          relLines.push(`- If asked "what am I to you?" reply with exactly: "You're my friend."`);
         } else if (noun === 'classmates') {
-          relLines.push('You and I are classmates.');
-          relLines.push('You are my classmate.');
-          relLines.push('In dialogue, treat me like your classmate.');
-          relLines.push('If you answer questions about our relationship (e.g. “what am I to you?”), say “You are my classmate” and keep it consistent.');
+          relLines.push('- CHARACTER: classmate.');
+          relLines.push('- INTERLOCUTOR: classmate.');
+          relLines.push(`- If asked "what am I to you?" reply with exactly: "You're my classmate."`);
         } else if (noun === 'coworkers') {
-          relLines.push('You and I are coworkers.');
-          relLines.push('You are my coworker.');
-          relLines.push('In dialogue, treat me like your coworker.');
-          relLines.push('If you answer questions about our relationship (e.g. “what am I to you?”), say “You are my coworker” and keep it consistent.');
+          relLines.push('- CHARACTER: coworker.');
+          relLines.push('- INTERLOCUTOR: coworker.');
+          relLines.push(`- If asked "what am I to you?" reply with exactly: "You're my coworker."`);
         } else if (noun === 'roommates') {
-          relLines.push('You and I are roommates.');
-          relLines.push('You are my roommate.');
-          relLines.push('In dialogue, treat me like your roommate.');
-          relLines.push('If you answer questions about our relationship (e.g. “what am I to you?”), say “You are my roommate” and keep it consistent.');
+          relLines.push('- CHARACTER: roommate.');
+          relLines.push('- INTERLOCUTOR: roommate.');
+          relLines.push(`- If asked "what am I to you?" reply with exactly: "You're my roommate."`);
         } else if (noun === 'lovers') {
-          relLines.push('You and I are lovers.');
-          relLines.push('You are my lover.');
-          relLines.push('In dialogue, treat me as your lover, and treat you as my lover.');
-          relLines.push('If you answer questions about our relationship (e.g. “what am I to you?”), say “You are my lover” and keep it consistent.');
+          relLines.push('- CHARACTER: lover.');
+          relLines.push('- INTERLOCUTOR: lover.');
+          relLines.push(`- If asked "what am I to you?" reply with exactly: "You're my lover."`);
         } else if (noun === 'partners') {
-          relLines.push('You and I are partners.');
-          relLines.push('You are my partner.');
-          relLines.push('In dialogue, treat me as your partner, and treat you as my partner.');
-          relLines.push('If you answer questions about our relationship (e.g. “what am I to you?”), say “You are my partner” and keep it consistent.');
+          relLines.push('- CHARACTER: partner.');
+          relLines.push('- INTERLOCUTOR: partner.');
+          relLines.push(`- If asked "what am I to you?" reply with exactly: "You're my partner."`);
         } else {
           relLines.push(`Relationship: ${relNormalized}.`);
         }
@@ -304,7 +299,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
     if (recentGiftNames.length > 0) lines.push(`Recent gifts: ${recentGiftNames.join(', ')}.`);
 
     return lines.length > 1 ? lines.join('\n') : '';
-  }, [chatMode, conversationGifts, conversationRelation, conversationSexToys, (currentCharacter as any)?.gender]);
+  }, [chatMode, conversationGifts, conversationRelation, conversationSexToys]);
 
   const StateChip = ({
     title,
