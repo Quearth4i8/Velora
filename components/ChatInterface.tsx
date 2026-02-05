@@ -108,6 +108,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
   const [conversationRelation, setConversationRelation] = useState<string>('');
   const [conversationSexToys, setConversationSexToys] = useState<string[]>([]);
   const [appliedConversationSexToys, setAppliedConversationSexToys] = useState<string[]>([]);
+  const [appliedConversationSexToyNegativeTags, setAppliedConversationSexToyNegativeTags] = useState<string[]>([]);
   const [conversationGifts, setConversationGifts] = useState<any[]>([]);
   const [customSexToy, setCustomSexToy] = useState<string>('');
 
@@ -121,6 +122,137 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
       .replace(/[^a-z0-9]+/g, '_')
       .replace(/^_+|_+$/g, '')
       .replace(/_+/g, '_');
+  };
+
+  const resolveSexToyPromptTags = (toyLabel: string): { positive: string[]; negative: string[] } => {
+    const base = String(toyLabel || '').trim();
+    const key = toBooruTag(base);
+    if (!key) return { positive: [], negative: [] };
+
+    switch (key) {
+      case 'dildo':
+        return {
+          positive: [
+            'sex_toy',
+            'dildo',
+            'vaginal_penetration',
+            'penetration',
+            '(dildo_in_vagina:1.35)',
+            '(dildo_in_pussy:1.35)',
+            '(vaginal_insertion:1.25)',
+            '(insertion:1.15)',
+          ],
+          negative: [],
+        };
+      case 'vibrator':
+        return {
+          positive: [
+            'sex_toy',
+            'vibrator',
+            'using_vibrator',
+            '(vibrator_on_clitoris:1.25)',
+            '(clitoral_stimulation:1.2)',
+            'masturbation',
+          ],
+          negative: [],
+        };
+      case 'butt_plug':
+        return {
+          positive: [
+            'sex_toy',
+            'butt_plug',
+            'buttplug',
+            'anal',
+            '(buttplug_in_ass:1.35)',
+            '(butt_plug_in_anus:1.35)',
+            '(anal_insertion:1.25)',
+            '(insertion:1.15)',
+          ],
+          negative: [],
+        };
+      case 'blindfold':
+        return {
+          positive: [
+            'blindfold',
+            'blindfolded',
+            '(eyes_covered:1.35)',
+            '(covered_eyes:1.35)',
+            '(opaque_blindfold:1.25)',
+            '(no_eyes_visible:1.25)',
+          ],
+          negative: [
+            'domino_mask',
+            'eye_mask',
+            'masquerade_mask',
+            'half_mask',
+            'eye_holes',
+            'eye_hole',
+            'cutout',
+            'cut_out',
+            'eyes_visible',
+            'visible_eyes',
+          ],
+        };
+      case 'handcuffs':
+        return {
+          positive: ['handcuffs', 'restrained', 'bound_wrists'],
+          negative: [],
+        };
+      case 'rope':
+        return {
+          positive: ['rope', 'bondage', 'shibari'],
+          negative: [],
+        };
+      case 'lube':
+        return {
+          positive: ['lube', 'lubricant', 'lubed', 'wet'],
+          negative: [],
+        };
+      case 'collar':
+        return {
+          positive: ['collar'],
+          negative: [],
+        };
+      case 'massage_oil':
+        return {
+          positive: ['massage_oil', 'body_oil', 'oiled_skin'],
+          negative: [],
+        };
+      default:
+        return {
+          positive: [key],
+          negative: [],
+        };
+    }
+  };
+
+  const resolveSexToysPromptTags = (toys: string[]) => {
+    const result = { positive: [] as string[], negative: [] as string[] };
+    const list = Array.isArray(toys) ? toys : [];
+
+    for (const toy of list) {
+      const resolved = resolveSexToyPromptTags(toy);
+      resolved.positive.forEach((t) => result.positive.push(t));
+      resolved.negative.forEach((t) => result.negative.push(t));
+    }
+
+    const dedupe = (arr: string[]) => {
+      const seen = new Set<string>();
+      const out: string[] = [];
+      for (const item of arr) {
+        const k = normalizeCommaTagKey(item);
+        if (!k) continue;
+        if (seen.has(k)) continue;
+        seen.add(k);
+        out.push(item);
+      }
+      return out;
+    };
+
+    return {
+      positive: dedupe(result.positive),
+      negative: dedupe(result.negative),
+    };
   };
   const splitCommaTags = (input: string): string[] =>
     String(input || '')
@@ -1351,7 +1483,9 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
 
       setConversationRelation(rel);
       setConversationSexToys(toys);
-      setAppliedConversationSexToys(toys.map(toBooruTag).filter(Boolean));
+      const resolved = resolveSexToysPromptTags(toys);
+      setAppliedConversationSexToys(resolved.positive);
+      setAppliedConversationSexToyNegativeTags(resolved.negative);
       setConversationGifts(gifts);
     };
 
@@ -3413,7 +3547,9 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
                       ? conversationSexToys.map((t) => String(t).trim()).filter(Boolean)
                       : [];
 
-                    const booruToyTags = selectedToys.map(toBooruTag).filter(Boolean);
+                    const resolved = resolveSexToysPromptTags(selectedToys);
+                    const booruToyTags = resolved.positive;
+                    const negativeToyTags = resolved.negative;
 
                     await persistConversationContext({ sexToys: selectedToys });
 
@@ -3426,18 +3562,38 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
                       const persistentWithoutOldToys = removeCommaTagsByKey(existingPersistent, removeKeys);
                       const nextPersistent = joinAndDedupeCommaTags(persistentWithoutOldToys, booruToyTags.join(', '));
 
-                      if (nextPersistent !== String(currentCharacter.persistentPrompt || '')) {
-                        const updated = await characterAPI.updateCharacter(currentCharacter.id, { persistentPrompt: nextPersistent });
+                      const prevNeg = Array.isArray(appliedConversationSexToyNegativeTags)
+                        ? appliedConversationSexToyNegativeTags.map((t) => String(t).trim()).filter(Boolean)
+                        : [];
+                      const removeNegKeys = new Set<string>(prevNeg.map((t) => normalizeCommaTagKey(t)).filter(Boolean));
+                      const existingSpecialNegative = String(currentCharacter.specialNegativePrompt || '');
+                      const negativeWithoutOld = removeCommaTagsByKey(existingSpecialNegative, removeNegKeys);
+                      const nextSpecialNegative = joinAndDedupeCommaTags(negativeWithoutOld, negativeToyTags.join(', '));
+
+                      const needsUpdate =
+                        nextPersistent !== String(currentCharacter.persistentPrompt || '') ||
+                        nextSpecialNegative !== String(currentCharacter.specialNegativePrompt || '');
+
+                      if (needsUpdate) {
+                        const updated = await characterAPI.updateCharacter(currentCharacter.id, {
+                          persistentPrompt: nextPersistent,
+                          specialNegativePrompt: nextSpecialNegative,
+                        });
                         if (updated.success && updated.data) {
                           setCurrentCharacter(updated.data);
                           onCharacterUpdate?.(updated.data);
                         } else {
-                          setCurrentCharacter((prev) => ({ ...prev, persistentPrompt: nextPersistent }));
+                          setCurrentCharacter((prev) => ({
+                            ...prev,
+                            persistentPrompt: nextPersistent,
+                            specialNegativePrompt: nextSpecialNegative,
+                          }));
                         }
                       }
                     }
 
                     setAppliedConversationSexToys(booruToyTags);
+                    setAppliedConversationSexToyNegativeTags(negativeToyTags);
                     setShowSexToys(false);
                   }}
                   className="h-11 px-5 rounded-2xl bg-gradient-to-r from-purple-600 to-purple-500 text-white font-semibold hover:from-purple-500 hover:to-purple-600 transition-all"
