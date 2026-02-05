@@ -39,6 +39,9 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
   const [isLargeScreen, setIsLargeScreen] = useState(false);
   const [showWardrobe, setShowWardrobe] = useState(false);
   const [showEnvironment, setShowEnvironment] = useState(false);
+  const [showSexToys, setShowSexToys] = useState(false);
+  const [showRelation, setShowRelation] = useState(false);
+  const [showGifts, setShowGifts] = useState(false);
   const [currentCharacter, setCurrentCharacter] = useState<CharacterDraft>(character);
   const chatMode: 'normal' | 'encounter' = mode;
   const isEncounter = chatMode === 'encounter';
@@ -91,14 +94,398 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
 
   const [encounterStrikeCount, setEncounterStrikeCount] = useState<number>(0);
   const [encounterBlocked, setEncounterBlocked] = useState<boolean>(false);
+  const [encounterLastViolationReason, setEncounterLastViolationReason] = useState<string>('');
+  const [encounterLastViolationAt, setEncounterLastViolationAt] = useState<Date | null>(null);
 
   const [bondPromptAddon, setBondPromptAddon] = useState<string>('');
   const [bondLevelName, setBondLevelName] = useState<string>('');
+
+  const [statePopoverOpen, setStatePopoverOpen] = useState<boolean>(false);
+
+  const [lastHeatDelta, setLastHeatDelta] = useState<number>(0);
+  const [lastHeatReason, setLastHeatReason] = useState<string>('');
+
+  const [conversationRelation, setConversationRelation] = useState<string>('');
+  const [conversationSexToys, setConversationSexToys] = useState<string[]>([]);
+  const [conversationGifts, setConversationGifts] = useState<any[]>([]);
+  const [customSexToy, setCustomSexToy] = useState<string>('');
 
   const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
   const heatStorageKey = currentCharacter.id ? `heat_${currentCharacter.id}` : null;
   const wardrobeColorsStorageKey = currentCharacter.id ? `wardrobe_colors_${currentCharacter.id}` : null;
   const [heat, setHeat] = useState<number>(() => clamp((character?.heat ?? 25) as number, 0, 100));
+
+  const formatRelativeTime = (d: Date | null): string => {
+    if (!d) return '';
+    const now = Date.now();
+    const diffMs = Math.max(0, now - d.getTime());
+    const sec = Math.floor(diffMs / 1000);
+    if (sec < 60) return `${sec}s ago`;
+    const min = Math.floor(sec / 60);
+    if (min < 60) return `${min}m ago`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return `${hr}h ago`;
+    const day = Math.floor(hr / 24);
+    return `${day}d ago`;
+  };
+
+  const relationOptions = useMemo(
+    () => [
+      'Strangers',
+      'Friends',
+      'Classmates',
+      'Coworkers',
+      'Step-sibling',
+      'Personal secretary',
+      'Roommates',
+      'Crush',
+      'Dating',
+      'Lovers',
+      'Partners',
+      'Married',
+    ],
+    []
+  );
+
+  const sexToyOptions = useMemo(
+    () => ['Vibrator', 'Dildo', 'Butt plug', 'Handcuffs', 'Blindfold', 'Rope', 'Lube', 'Collar', 'Massage oil'],
+    []
+  );
+
+  const giftOptions = useMemo(
+    () => [
+      { name: 'Flowers', bondDelta: 20, heatDelta: 2 },
+      { name: 'Chocolate', bondDelta: 12, heatDelta: 1 },
+      { name: 'Cute note', bondDelta: 10, heatDelta: 2 },
+      { name: 'Plushie', bondDelta: 18, heatDelta: 1 },
+      { name: 'Jewelry', bondDelta: 30, heatDelta: 3 },
+      { name: 'Perfume', bondDelta: 22, heatDelta: 2 },
+    ],
+    []
+  );
+
+  const persistConversationContext = async (payload: { relation?: string | null; sexToys?: string[]; gifts?: any }) => {
+    const id = conversationRef.current?.id;
+    if (!id) return;
+    await characterAPI.setConversationContext({ conversationId: id, ...payload });
+  };
+
+  const handleGiveGift = async (gift: { name: string; bondDelta: number; heatDelta: number }) => {
+    const entry = {
+      id: `${Date.now()}`,
+      name: gift.name,
+      bondDelta: gift.bondDelta,
+      heatDelta: gift.heatDelta,
+      at: new Date().toISOString(),
+    };
+
+    const nextGifts = [...(Array.isArray(conversationGifts) ? conversationGifts : []), entry].slice(-50);
+    setConversationGifts(nextGifts);
+    await persistConversationContext({ gifts: nextGifts });
+
+    if (currentCharacter?.id && typeof gift.bondDelta === 'number' && Number.isFinite(gift.bondDelta)) {
+      const rel = await bondService.addBondPoints(currentCharacter.id, gift.bondDelta);
+      if (rel) {
+        const bondState = getBondState(rel.bond_points);
+        const addon = buildBondSystemPromptAddon(bondState);
+        setBondPromptAddon(addon);
+        setBondLevelName(bondState.level.name);
+      }
+    }
+
+    if (typeof gift.heatDelta === 'number' && Number.isFinite(gift.heatDelta)) {
+      const next = clamp(heat + gift.heatDelta, 0, 100);
+      setHeat(next);
+      setLastHeatDelta(gift.heatDelta);
+      setLastHeatReason(`Gift: ${gift.name}`);
+      setCurrentCharacter((prev) => ({ ...prev, heat: next }));
+    }
+  };
+
+  const outfitLabel =
+    currentCharacter.appearance?.clothing === 'custom'
+      ? (currentCharacter.appearance?.customClothing || 'Custom')
+      : (currentCharacter.appearance?.clothing || '—');
+  const locationLabel = currentCharacter.appearance?.environment || '—';
+
+  const conversationContextPromptAddon = useMemo(() => {
+    if (chatMode !== 'normal') return '';
+
+    const relRaw = String(conversationRelation || '').trim();
+    const relNormalized = relRaw === 'stepsister' || relRaw === 'stepbrother' ? 'Step-sibling' : relRaw;
+    const characterGender = String((currentCharacter as any)?.gender || '').trim().toLowerCase();
+    const isCharacterMale = characterGender === 'male' || characterGender === 'man' || characterGender === 'boy';
+    const toys = Array.isArray(conversationSexToys) ? conversationSexToys.map((t) => String(t).trim()).filter(Boolean) : [];
+    const gifts = Array.isArray(conversationGifts) ? conversationGifts : [];
+    const recentGiftNames = gifts
+      .slice(-3)
+      .map((g: any) => String(g?.name || '').trim())
+      .filter(Boolean);
+
+    const lines: string[] = ['CONVERSATION CONTEXT:'];
+    if (relNormalized) {
+      const relLines: string[] = [];
+
+      if (relNormalized === 'Step-sibling') {
+        const meRole = isCharacterMale ? 'stepbrother' : 'stepsister';
+        const youRole = isCharacterMale ? 'stepsister' : 'stepbrother';
+        relLines.push(`You and I are step-siblings.`);
+        relLines.push(`I am your ${meRole}.`);
+        relLines.push(`You are my ${youRole}.`);
+        relLines.push(`CRITICAL: Never swap these roles. I am your ${meRole}; you are my ${youRole}.`);
+        relLines.push(`In dialogue, refer to me as your ${meRole}, and refer to you as my ${youRole}.`);
+        relLines.push('If you answer questions about our relationship (e.g. “what am I to you?”), use these exact roles and never contradict them.');
+      } else if (relNormalized === 'Personal secretary') {
+        relLines.push(`I am your personal secretary.`);
+        relLines.push(`You are my boss.`);
+        relLines.push('CRITICAL: Never swap roles.');
+        relLines.push('In dialogue, refer to me as your personal secretary, and refer to you as my boss.');
+        relLines.push('If you answer questions about our relationship (e.g. “what am I to you?”), say “You are my boss” and keep it consistent.');
+      } else if (relNormalized === 'Crush') {
+        relLines.push(`I have a crush on you.`);
+        relLines.push(`You are my crush.`);
+        relLines.push('In dialogue, make it clear I have a crush on you.');
+        relLines.push('If you answer questions about our relationship (e.g. “what am I to you?”), say “You are my crush” and keep it consistent.');
+      } else if (relNormalized === 'Dating') {
+        relLines.push(`You and I are dating.`);
+        relLines.push(`You are my romantic partner (dating).`);
+        relLines.push('In dialogue, treat me as your romantic partner (dating), and treat you as my romantic partner.');
+        relLines.push('If you answer questions about our relationship (e.g. “what am I to you?”), say “You are my romantic partner” and keep it consistent.');
+      } else if (relNormalized === 'Married') {
+        relLines.push(`I am your spouse.`);
+        relLines.push(`You are my spouse.`);
+        relLines.push('In dialogue, treat me as your spouse, and treat you as my spouse.');
+        relLines.push('If you answer questions about our relationship (e.g. “what am I to you?”), say “You are my spouse” and keep it consistent.');
+      } else {
+        const noun = relNormalized.toLowerCase();
+        if (noun === 'strangers') {
+          relLines.push('You and I are strangers who have just met.');
+          relLines.push('You are a stranger to me.');
+          relLines.push('In dialogue, treat me like a stranger you just met.');
+          relLines.push('If you answer questions about our relationship (e.g. “what am I to you?”), say “You are a stranger to me” and keep it consistent.');
+        } else if (noun === 'friends') {
+          relLines.push('You and I are friends.');
+          relLines.push('You are my friend.');
+          relLines.push('In dialogue, treat me like your friend.');
+          relLines.push('If you answer questions about our relationship (e.g. “what am I to you?”), say “You are my friend” and keep it consistent.');
+        } else if (noun === 'classmates') {
+          relLines.push('You and I are classmates.');
+          relLines.push('You are my classmate.');
+          relLines.push('In dialogue, treat me like your classmate.');
+          relLines.push('If you answer questions about our relationship (e.g. “what am I to you?”), say “You are my classmate” and keep it consistent.');
+        } else if (noun === 'coworkers') {
+          relLines.push('You and I are coworkers.');
+          relLines.push('You are my coworker.');
+          relLines.push('In dialogue, treat me like your coworker.');
+          relLines.push('If you answer questions about our relationship (e.g. “what am I to you?”), say “You are my coworker” and keep it consistent.');
+        } else if (noun === 'roommates') {
+          relLines.push('You and I are roommates.');
+          relLines.push('You are my roommate.');
+          relLines.push('In dialogue, treat me like your roommate.');
+          relLines.push('If you answer questions about our relationship (e.g. “what am I to you?”), say “You are my roommate” and keep it consistent.');
+        } else if (noun === 'lovers') {
+          relLines.push('You and I are lovers.');
+          relLines.push('You are my lover.');
+          relLines.push('In dialogue, treat me as your lover, and treat you as my lover.');
+          relLines.push('If you answer questions about our relationship (e.g. “what am I to you?”), say “You are my lover” and keep it consistent.');
+        } else if (noun === 'partners') {
+          relLines.push('You and I are partners.');
+          relLines.push('You are my partner.');
+          relLines.push('In dialogue, treat me as your partner, and treat you as my partner.');
+          relLines.push('If you answer questions about our relationship (e.g. “what am I to you?”), say “You are my partner” and keep it consistent.');
+        } else {
+          relLines.push(`Relationship: ${relNormalized}.`);
+        }
+      }
+
+      relLines.forEach((l) => lines.push(l));
+    }
+    if (toys.length > 0) lines.push(`Sex toys available: ${toys.join(', ')}.`);
+    if (recentGiftNames.length > 0) lines.push(`Recent gifts: ${recentGiftNames.join(', ')}.`);
+
+    return lines.length > 1 ? lines.join('\n') : '';
+  }, [chatMode, conversationGifts, conversationRelation, conversationSexToys, (currentCharacter as any)?.gender]);
+
+  const StateChip = ({
+    title,
+    value,
+    icon,
+    tone = 'neutral',
+  }: {
+    title: string;
+    value?: string | number;
+    icon: React.ReactNode;
+    tone?: 'neutral' | 'pink' | 'warn' | 'danger';
+  }) => {
+    const base = 'px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all duration-150';
+    const cls =
+      tone === 'danger'
+        ? 'border-red-500/25 bg-red-500/10 text-red-200 hover:bg-red-500/15'
+        : tone === 'warn'
+          ? 'border-amber-500/25 bg-amber-500/10 text-amber-200 hover:bg-amber-500/15'
+          : tone === 'pink'
+            ? 'border-pink-500/25 bg-pink-500/10 text-pink-100 hover:bg-pink-500/15'
+            : 'border-white/10 bg-dark-900/25 text-dark-100 hover:bg-dark-900/35';
+    return (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setStatePopoverOpen((v) => !v);
+        }}
+        className={`${base} ${cls} inline-flex items-center gap-1`}
+        title={title}
+        aria-label={title}
+      >
+        <span className="w-3.5 h-3.5 inline-flex items-center justify-center">{icon}</span>
+        {typeof value !== 'undefined' && value !== null && String(value).length > 0 ? (
+          <span className="tabular-nums">{value}</span>
+        ) : null}
+      </button>
+    );
+  };
+
+  const HeatIcon = (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <path d="M10.45 1.73a.75.75 0 00-1.18.91c.46.6.69 1.25.69 1.95 0 1.23-.7 2.19-1.45 3.02-.86.95-1.75 1.93-1.75 3.53 0 2.89 2.32 5.26 5.19 5.26 2.9 0 5.25-2.36 5.25-5.26 0-1.9-.93-3.45-2.1-4.78-.86-.99-1.7-1.8-1.7-3.05 0-.7.2-1.35.62-1.96a.75.75 0 00-1.23-.84c-.6.88-.89 1.87-.89 2.8 0 1.92 1.16 3.03 2.13 4.14 1.05 1.2 1.84 2.42 1.84 3.69 0 2.06-1.67 3.76-3.79 3.76-2.06 0-3.69-1.7-3.69-3.76 0-1.02.56-1.7 1.36-2.59.86-.95 1.84-2.03 1.84-3.96 0-.97-.28-1.9-.84-2.63z" />
+    </svg>
+  );
+
+  const BondIcon = (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <path d="M10 18.25s-6.5-4.05-8.67-7.89C-.33 6.52 2.29 3.5 5.37 3.5c1.62 0 3.06.8 3.93 2.03A4.94 4.94 0 0113.23 3.5c3.08 0 5.7 3.02 4.04 6.86C16.5 14.2 10 18.25 10 18.25z" />
+    </svg>
+  );
+
+  const OutfitIcon = (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <path d="M8.2 2.25a.75.75 0 00-.72.53L6.9 4.5l-2.4.96a.75.75 0 00-.47.7V17a.75.75 0 00.75.75h10.44A.75.75 0 0016 17V6.16a.75.75 0 00-.47-.7l-2.4-.96-.58-1.72a.75.75 0 00-.71-.53H8.2zm.56 1.5h2.48l.42 1.25a.75.75 0 00.43.45l2.4.96V16.25H5.5V6.41l2.4-.96a.75.75 0 00.43-.45l.43-1.25z" />
+    </svg>
+  );
+
+  const LocationIcon = (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <path d="M10 19s6-6.36 6-11a6 6 0 10-12 0c0 4.64 6 11 6 11zm0-8.5A2.5 2.5 0 1110 5.5a2.5 2.5 0 010 5z" />
+    </svg>
+  );
+
+  const StrikeIcon = (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <path d="M10 2.25c.16 0 .32.05.45.15l6 4.5a.75.75 0 01.3.6v5.25c0 2.86-1.8 4.74-3.43 5.85-1.2.83-2.45 1.3-2.97 1.47a.75.75 0 01-.47 0c-.52-.17-1.77-.64-2.97-1.47C5.3 17.49 3.5 15.61 3.5 12.75V7.5a.75.75 0 01.3-.6l6-4.5a.75.75 0 01.45-.15zm0 1.7L5 7.75v5c0 2.2 1.33 3.7 2.76 4.68.91.62 1.85 1 2.24 1.14.39-.14 1.33-.52 2.24-1.14 1.43-.98 2.76-2.48 2.76-4.68v-5l-5-3.8z" />
+    </svg>
+  );
+
+  const StatePopover = ({ align = 'right' }: { align?: 'right' | 'center' }) => {
+    if (!statePopoverOpen) return null;
+
+    const alignment = align === 'center'
+      ? 'left-1/2 -translate-x-1/2'
+      : 'right-0';
+
+    return (
+      <div
+        className={`absolute ${alignment} top-full mt-3 w-[min(520px,calc(100vw-32px))] rounded-2xl border border-white/10 bg-dark-950/80 backdrop-blur-xl shadow-2xl shadow-black/50 p-4 z-[70]`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-xs tracking-[0.22em] uppercase text-pink-200/70">State</div>
+            <div className="mt-1 text-sm text-white font-semibold truncate">
+              Heat {Math.round(heat)}/100
+              {bondLevelName ? ` · Bond ${bondLevelName}` : ''}
+              {isEncounter ? ` · ${encounterBlocked ? 'Blocked' : `Strikes ${encounterStrikeCount}/3`}` : ''}
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setStatePopoverOpen(false)}
+            className="px-2.5 py-1 rounded-xl text-xs font-semibold bg-dark-900/40 text-dark-100 border border-white/10 hover:bg-dark-900/55 transition-all"
+          >
+            Close
+          </button>
+        </div>
+
+        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div className="rounded-xl border border-dark-700/50 bg-dark-900/25 px-3 py-2 text-xs text-dark-200">
+            <span className="text-dark-400">Outfit:</span> {outfitLabel}
+            <div className="mt-1">
+              <span className="text-dark-400">Models:</span>{' '}
+              <span className="text-dark-200">LM Studio</span>
+              <span className="text-dark-400"> · </span>
+              <span className="text-dark-200">A1111</span>
+              <span className="text-dark-300"> ({String((STYLE_TO_MODEL_MAP as any)?.[currentCharacter.stylePreset as any] || 'Default')})</span>
+            </div>
+          </div>
+          <div className="rounded-xl border border-dark-700/50 bg-dark-900/25 px-3 py-2 text-xs text-dark-200">
+            <span className="text-dark-400">Location:</span> {locationLabel}
+          </div>
+          <div className="rounded-xl border border-dark-700/50 bg-dark-900/25 px-3 py-2 text-xs text-dark-200">
+            <span className="text-dark-400">Last heat:</span>{' '}
+            <span className={lastHeatDelta >= 0 ? 'text-pink-200' : 'text-red-200'}>
+              {lastHeatDelta >= 0 ? `+${lastHeatDelta}` : `${lastHeatDelta}`}
+            </span>
+            {lastHeatReason ? <span className="text-dark-300"> · {lastHeatReason}</span> : null}
+          </div>
+
+          {isEncounter ? (
+            <div className="rounded-xl border border-dark-700/50 bg-dark-900/25 px-3 py-2 text-xs text-dark-200">
+              <span className="text-dark-400">Last issue:</span>{' '}
+              {encounterLastViolationReason ? encounterLastViolationReason : '—'}
+              {encounterLastViolationAt ? (
+                <span className="text-dark-400"> ({formatRelativeTime(encounterLastViolationAt)})</span>
+              ) : null}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dark-700/50 bg-dark-900/25 px-3 py-2 text-xs text-dark-200">
+              <span className="text-dark-400">Tip:</span> Outfit/location updates are auto-detected from your messages.
+            </div>
+          )}
+        </div>
+
+        {isEncounter && (encounterLastViolationReason || encounterBlocked) && (
+          <div className="mt-3 rounded-xl border border-dark-700/50 bg-dark-900/25 px-3 py-3">
+            <div className="text-xs text-dark-300">Recovery ideas:</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setInputMessage('Okay — slowing down. I stay in the current scene and ask for consent before anything intimate.')}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-pink-500/10 text-pink-100 border border-pink-500/20 hover:border-pink-500/35 hover:bg-pink-500/15 transition-all"
+              >
+                Slow down + consent
+              </button>
+              <button
+                type="button"
+                onClick={() => setInputMessage('Let\'s keep it realistic and just talk for a moment. What do you want to do next?')}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-dark-900/30 text-pink-100 border border-white/10 hover:bg-dark-900/40 transition-all"
+              >
+                De-escalate
+              </button>
+              <button
+                type="button"
+                onClick={() => setInputMessage('I stay where we are. I describe a small, natural action (a glance, a step closer) and wait for your response.')}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-dark-900/30 text-pink-100 border border-white/10 hover:bg-dark-900/40 transition-all"
+              >
+                Small action
+              </button>
+              <button
+                type="button"
+                onClick={() => setInputMessage('We can change the tone. Keep it slow and grounded. No sudden jumps.')}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-dark-900/30 text-pink-100 border border-white/10 hover:bg-dark-900/40 transition-all"
+              >
+                Lower intensity
+              </button>
+            </div>
+            {encounterBlocked && (
+              <div className="mt-2 text-xs text-red-200/90">
+                Encounter is blocked. Reset to start a fresh run.
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -262,10 +649,32 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
     return delta;
   };
 
+  const computeHeatReason = (text: string, current: number): string => {
+    const t = String(text || '').toLowerCase();
+    if (!t.trim()) return '';
+
+    const hasAny = (words: string[]) => words.some((w) => t.includes(w));
+
+    const positive = ['thank', 'thanks', 'please', 'sorry', 'cute', 'beautiful', 'pretty', 'adorable', 'sweet', 'good girl', 'i like you', 'i love you', 'hug', 'kiss'];
+    const negative = ['shut up', 'stupid', 'idiot', 'hate you', 'ugly', 'bitch', 'whore', 'slut', 'die', 'kill yourself'];
+    const flirty = ['flirt', 'tease', 'blush', 'turn me on', 'hot', 'sexy'];
+    const explicit = ['sex', 'fuck', 'blowjob', 'deepthroat', 'pussy', 'cock', 'dick', 'cum', 'orgasm', 'anal', 'nude', 'naked', 'undress', 'undressed', 'strip', 'topless'];
+
+    if (hasAny(negative)) return 'Rude/hostile language';
+    if (hasAny(explicit) && current < 40) return 'Too explicit while heat is low';
+    if (hasAny(positive)) return 'Affection/compliment';
+    if (hasAny(flirty)) return 'Flirting';
+    if (hasAny(explicit)) return 'Explicit content';
+    return 'Neutral chat';
+  };
+
 
   const applyHeatUpdateFromUserText = (text: string): number => {
-    const next = clamp(heat + computeHeatDelta(text, heat), 0, 100);
+    const delta = computeHeatDelta(text, heat);
+    const next = clamp(heat + delta, 0, 100);
     setHeat(next);
+    setLastHeatDelta(delta);
+    setLastHeatReason(computeHeatReason(text, heat));
     setCurrentCharacter((prev) => ({ ...prev, heat: next }));
 
     if (currentCharacter?.id) {
@@ -692,6 +1101,17 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
     return () => document.removeEventListener('click', handleClickOutside);
   }, [showFormatSelector]);
 
+  useEffect(() => {
+    if (!statePopoverOpen) return;
+
+    const handle = () => {
+      setStatePopoverOpen(false);
+    };
+
+    document.addEventListener('click', handle);
+    return () => document.removeEventListener('click', handle);
+  }, [statePopoverOpen]);
+
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const conversationRef = useRef<Conversation | null>(null);
   const initChatInFlightRef = useRef<{ key: string; promise: Promise<void> | null }>({
@@ -866,13 +1286,40 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
       if (enforcement.success) {
         const strike = enforcement.data ? Number((enforcement.data as any).strike_count || 0) : 0;
         const blocked = enforcement.data ? Boolean((enforcement.data as any).blocked) : false;
+        const reason = enforcement.data ? String((enforcement.data as any).last_violation_reason || '') : '';
+        const atRaw = enforcement.data ? (enforcement.data as any).last_violation_at : null;
+        const at = atRaw ? new Date(atRaw) : null;
         setEncounterStrikeCount(Number.isFinite(strike) ? Math.max(0, Math.min(3, Math.floor(strike))) : 0);
         setEncounterBlocked(blocked);
+        setEncounterLastViolationReason(reason);
+        setEncounterLastViolationAt(at && !Number.isNaN(at.getTime()) ? at : null);
       }
     };
 
     loadEnforcement();
   }, [conversation?.id, isEncounter]);
+
+  useEffect(() => {
+    const loadContext = async () => {
+      if (chatMode !== 'normal') return;
+      if (!conversation?.id) return;
+
+      const res = await characterAPI.getConversationContext(conversation.id);
+      if (!res.success) return;
+
+      const data: any = res.data || null;
+      const relRaw = data ? String(data.relation || '') : '';
+      const rel = relRaw === 'stepsister' || relRaw === 'stepbrother' ? 'Step-sibling' : relRaw;
+      const toys = data && Array.isArray(data.sex_toys) ? (data.sex_toys as any[]).map((t) => String(t)) : [];
+      const gifts = data && Array.isArray(data.gifts) ? data.gifts : [];
+
+      setConversationRelation(rel);
+      setConversationSexToys(toys);
+      setConversationGifts(gifts);
+    };
+
+    loadContext();
+  }, [chatMode, conversation?.id]);
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim()) return;
@@ -905,6 +1352,26 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
         });
 
         if (evaluation.violated) {
+          const now = new Date();
+          const shortReason = String(evaluation.reason || '').trim();
+
+          setEncounterLastViolationReason(shortReason);
+          setEncounterLastViolationAt(now);
+
+          // Persist for UI visibility on refresh
+          try {
+            await characterAPI.setEncounterEnforcement({
+              conversationId: activeConversation.id,
+              scenarioId: encounterScenario.id,
+              // Don't touch strike_count here; incrementEncounterStrike handles that.
+              blocked: encounterBlocked,
+              ...(shortReason ? { last_violation_reason: shortReason } : { last_violation_reason: '' }),
+              last_violation_at: now.toISOString(),
+            } as any);
+          } catch {
+            // ignore
+          }
+
           const strikeRes = await characterAPI.incrementEncounterStrike({
             conversationId: activeConversation.id,
             scenarioId: encounterScenario.id,
@@ -919,6 +1386,22 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
 
           setEncounterStrikeCount(Number.isFinite(strike) ? Math.max(0, Math.min(3, Math.floor(strike))) : 0);
           setEncounterBlocked(blockedNow);
+
+          // Ensure blocked state is reflected in enforcement row as well
+          if (blockedNow) {
+            try {
+              await characterAPI.setEncounterEnforcement({
+                conversationId: activeConversation.id,
+                scenarioId: encounterScenario.id,
+                strikeCount: strike,
+                blocked: true,
+                ...(shortReason ? { last_violation_reason: shortReason } : { last_violation_reason: '' }),
+                last_violation_at: now.toISOString(),
+              } as any);
+            } catch {
+              // ignore
+            }
+          }
 
           if (strike < 3) {
             await dialog.alert({
@@ -951,7 +1434,11 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
     const nextHeat = applyHeatUpdateFromUserText(userMessageContent);
     const nextBondAddon = await updateBondFromUserText(userMessageContent);
 
-    const systemPromptAddon = [nextBondAddon, chatMode === 'encounter' ? encounterSystemPromptAddon : '']
+    const systemPromptAddon = [
+      nextBondAddon,
+      chatMode === 'encounter' ? encounterSystemPromptAddon : '',
+      chatMode === 'normal' ? conversationContextPromptAddon : '',
+    ]
       .map((s) => String(s || '').trim())
       .filter(Boolean)
       .join('\n\n');
@@ -1246,6 +1733,8 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
         await characterAPI.resetEncounterEnforcement(conversation.id);
         setEncounterStrikeCount(0);
         setEncounterBlocked(false);
+        setEncounterLastViolationReason('');
+        setEncounterLastViolationAt(null);
       }
       setMessages([]);
       setConversation(null);
@@ -1458,7 +1947,14 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
       // Generate a new response
       setIsTyping(true);
       const chatContext = [...previousMessages.filter(m => m.id !== messageId), lastUserMessage];
-      const llmResponse = await lmStudioService.sendMessage(chatContext, currentCharacter, { heat });
+      const regenAddon = [bondPromptAddon, conversationContextPromptAddon]
+        .map((s) => String(s || '').trim())
+        .filter(Boolean)
+        .join('\n\n');
+      const llmResponse = await lmStudioService.sendMessage(chatContext, currentCharacter, {
+        heat,
+        systemPromptAddon: regenAddon || undefined,
+      });
 
       const characterMsg: Partial<ChatMessage> = {
         conversationId: conversation?.id || 'temp',
@@ -1879,7 +2375,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
           >
             {/* Chat Header */}
             {isEncounter ? (
-              <div className="relative overflow-hidden border-b border-dark-700/50">
+              <div className="relative z-40 overflow-visible border-b border-dark-700/50">
                 <div className="absolute inset-0 bg-gradient-to-br from-dark-950 via-dark-900/80 to-dark-950" />
                 <div className="absolute inset-0 bg-[radial-gradient(900px_circle_at_30%_30%,rgba(236,72,153,0.18),transparent_55%)]" />
                 <div className="relative px-5 sm:px-8 lg:px-12 py-8 sm:py-10 backdrop-blur-sm">
@@ -1906,7 +2402,34 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
                       </div>
                     </div>
 
-                    <div className="shrink-0 flex items-center gap-2">
+                    <div className="shrink-0 relative flex flex-col items-end gap-3">
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <StateChip
+                          title={`Heat ${Math.round(heat)}/100`}
+                          value={Math.round(heat)}
+                          icon={HeatIcon}
+                          tone="pink"
+                        />
+                        {bondLevelName ? (
+                          <StateChip
+                            title={`Bond ${bondLevelName}`}
+                            value={String(bondLevelName).split(/\s+/)[0].slice(0, 3)}
+                            icon={BondIcon}
+                          />
+                        ) : null}
+                        <StateChip title={`Outfit: ${outfitLabel}`} icon={OutfitIcon} />
+                        <StateChip title={`Location: ${locationLabel}`} icon={LocationIcon} />
+                        <StateChip
+                          title={encounterBlocked ? 'Encounter blocked' : `Strikes ${encounterStrikeCount}/3`}
+                          value={encounterBlocked ? undefined : `${encounterStrikeCount}/3`}
+                          icon={StrikeIcon}
+                          tone={encounterBlocked ? 'danger' : encounterStrikeCount > 0 ? 'warn' : 'neutral'}
+                        />
+                      </div>
+
+                      <StatePopover align="right" />
+
+                      <div className="flex items-center gap-2">
                       <button
                         onClick={async () => {
                           if (!latestCharacterMessage) {
@@ -1962,12 +2485,13 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
                       >
                         Leave Encounter
                       </button>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 border-b border-dark-700/50 backdrop-blur-sm">
+              <div className="relative z-40 px-4 sm:px-6 lg:px-8 py-4 sm:py-6 border-b border-dark-700/50 backdrop-blur-sm">
                 <div className="flex items-center">
                   <button
                     onClick={onBack}
@@ -1983,11 +2507,30 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
                   <div className="flex-1 flex justify-center">
                     <div className="flex items-center space-x-3">
                       {/* Character Info */}
-                      <div className="flex flex-col items-center">
+                      <div className="flex flex-col items-center relative">
                         <h1 className="text-xl font-semibold text-white">{currentCharacter.name || 'Character'}</h1>
                         <div className="text-sm text-pink-400 capitalize">
                           {currentCharacter.stylePreset || 'Human'}
                         </div>
+                        <div className="mt-2 flex flex-wrap justify-center gap-2">
+                          <StateChip
+                            title={`Heat ${Math.round(heat)}/100`}
+                            value={Math.round(heat)}
+                            icon={HeatIcon}
+                            tone="pink"
+                          />
+                          {bondLevelName ? (
+                            <StateChip
+                              title={`Bond ${bondLevelName}`}
+                              value={String(bondLevelName).split(/\s+/)[0].slice(0, 3)}
+                              icon={BondIcon}
+                            />
+                          ) : null}
+                          <StateChip title={`Outfit: ${outfitLabel}`} icon={OutfitIcon} />
+                          <StateChip title={`Location: ${locationLabel}`} icon={LocationIcon} />
+                        </div>
+
+                        <StatePopover align="center" />
                       </div>
                     </div>
                   </div>
@@ -2030,7 +2573,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
             )}
 
             {/* Messages Area */}
-            <div className="flex-1 min-h-0 relative">
+            <div className="flex-1 min-h-0 relative z-0">
               {!isEncounter && (
                 <div className="absolute left-4 sm:left-6 lg:left-8 top-4 bottom-4 hidden lg:block pointer-events-none">
                   <HeatMeter value={heat} variant="embedded" className="h-full" />
@@ -2333,6 +2876,43 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </button>
+
+                  <button
+                    onClick={() => setShowSexToys(true)}
+                    className="w-10 h-10 bg-dark-700/50 text-purple-300 rounded-xl border border-purple-500/30 hover:bg-purple-600/20 transition-all duration-200 flex items-center justify-center"
+                    title="Sex toys"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3l1 4m12-4l-1 4M3 9h6l-3 12m12-12h-6l3 12M9 9h6" />
+                    </svg>
+                  </button>
+
+                  <button
+                    onClick={() => setShowRelation(true)}
+                    className="w-10 h-10 bg-dark-700/50 text-rose-300 rounded-xl border border-rose-500/30 hover:bg-rose-600/20 transition-all duration-200 flex items-center justify-center"
+                    title="Relation"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20v-1a4 4 0 00-4-4H7a4 4 0 00-4 4v1" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 11a4 4 0 100-8 4 4 0 000 8z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M23 20v-1a4 4 0 00-3-3.87" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 3.13a4 4 0 010 7.75" />
+                    </svg>
+                  </button>
+
+                  <button
+                    onClick={() => setShowGifts(true)}
+                    className="w-10 h-10 bg-dark-700/50 text-amber-300 rounded-xl border border-amber-500/30 hover:bg-amber-600/20 transition-all duration-200 flex items-center justify-center"
+                    title="Gifts"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12v10H4V12" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2 7h20v5H2V7z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 22V7" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 7H7.5a2.5 2.5 0 110-5C11 2 12 7 12 7z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 7h4.5a2.5 2.5 0 100-5C13 2 12 7 12 7z" />
                     </svg>
                   </button>
                 </div>
@@ -2699,6 +3279,245 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
                     </div>
                   </button>
                 ))}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showSexToys && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setShowSexToys(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-dark-800 border border-dark-600 rounded-2xl p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-white">Sex toys</h2>
+                <button
+                  onClick={() => setShowSexToys(false)}
+                  className="w-8 h-8 flex items-center justify-center text-dark-400 hover:text-white transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {sexToyOptions.map((toy) => {
+                  const active = conversationSexToys.includes(toy);
+                  return (
+                    <button
+                      key={toy}
+                      onClick={() => {
+                        setConversationSexToys((prev) =>
+                          prev.includes(toy) ? prev.filter((t) => t !== toy) : [...prev, toy]
+                        );
+                      }}
+                      className={`p-3 rounded-xl border-2 transition-all duration-200 ${active
+                        ? 'border-purple-500 bg-purple-500/20 text-purple-200'
+                        : 'border-dark-600 bg-dark-700/50 text-dark-200 hover:border-purple-500/50 hover:bg-purple-500/10'
+                        }`}
+                    >
+                      <div className="text-sm font-medium">{toy}</div>
+                      <div className="text-xs opacity-75">{active ? 'Selected' : 'Select'}</div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="mt-6 flex flex-col sm:flex-row gap-3">
+                <input
+                  value={customSexToy}
+                  onChange={(e) => setCustomSexToy(e.target.value)}
+                  placeholder="Add custom toy"
+                  className="flex-1 px-4 py-3 bg-dark-900/30 text-dark-100 rounded-xl border border-dark-600 focus:border-purple-500/40 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const t = customSexToy.trim();
+                    if (!t) return;
+                    if (conversationSexToys.includes(t)) {
+                      setCustomSexToy('');
+                      return;
+                    }
+                    setConversationSexToys((prev) => [...prev, t]);
+                    setCustomSexToy('');
+                  }}
+                  className="h-12 px-5 rounded-xl bg-dark-700/50 text-purple-200 border border-purple-500/25 hover:border-purple-500/45 hover:bg-purple-500/10 transition-all"
+                >
+                  Add
+                </button>
+              </div>
+
+              <div className="mt-6 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowSexToys(false)}
+                  className="h-11 px-4 rounded-2xl bg-dark-800/40 text-dark-200 border border-dark-600 hover:border-dark-500 hover:text-white transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await persistConversationContext({ sexToys: conversationSexToys });
+                    setShowSexToys(false);
+                  }}
+                  className="h-11 px-5 rounded-2xl bg-gradient-to-r from-purple-600 to-purple-500 text-white font-semibold hover:from-purple-500 hover:to-purple-600 transition-all"
+                >
+                  Apply
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showRelation && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setShowRelation(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-dark-800 border border-dark-600 rounded-2xl p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-white">Relation</h2>
+                <button
+                  onClick={() => setShowRelation(false)}
+                  className="w-8 h-8 flex items-center justify-center text-dark-400 hover:text-white transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {relationOptions.map((rel) => {
+                  const active = conversationRelation === rel;
+                  return (
+                    <button
+                      key={rel}
+                      onClick={async () => {
+                        setConversationRelation(rel);
+                        await persistConversationContext({ relation: rel });
+                        setShowRelation(false);
+                      }}
+                      className={`p-3 rounded-xl border-2 transition-all duration-200 ${active
+                        ? 'border-rose-500 bg-rose-500/20 text-rose-200'
+                        : 'border-dark-600 bg-dark-700/50 text-dark-200 hover:border-rose-500/50 hover:bg-rose-500/10'
+                        }`}
+                    >
+                      <div className="text-sm font-medium">{rel}</div>
+                      <div className="text-xs opacity-75">{active ? 'Current' : 'Set'}</div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="mt-6 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setConversationRelation('');
+                    await persistConversationContext({ relation: null });
+                    setShowRelation(false);
+                  }}
+                  className="h-11 px-4 rounded-2xl bg-dark-800/40 text-dark-200 border border-dark-600 hover:border-dark-500 hover:text-white transition-all"
+                >
+                  Clear
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showGifts && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setShowGifts(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-dark-800 border border-dark-600 rounded-2xl p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-white">Gifts</h2>
+                <button
+                  onClick={() => setShowGifts(false)}
+                  className="w-8 h-8 flex items-center justify-center text-dark-400 hover:text-white transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {giftOptions.map((g) => (
+                  <button
+                    key={g.name}
+                    onClick={() => handleGiveGift(g)}
+                    className="p-3 rounded-xl border-2 border-dark-600 bg-dark-700/50 text-dark-200 hover:border-amber-500/50 hover:bg-amber-500/10 transition-all duration-200"
+                  >
+                    <div className="text-sm font-medium">{g.name}</div>
+                    <div className="text-xs opacity-75">+{g.bondDelta} bond · +{g.heatDelta} heat</div>
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-6 rounded-xl border border-dark-700/50 bg-dark-900/25 px-4 py-3 text-xs text-dark-200">
+                <div className="text-dark-400">Recent</div>
+                <div className="mt-2 space-y-1">
+                  {(Array.isArray(conversationGifts) ? conversationGifts : []).slice(-5).reverse().map((g: any) => (
+                    <div key={String(g?.id || Math.random())} className="flex items-center justify-between gap-3">
+                      <div className="min-w-0 truncate">{String(g?.name || '')}</div>
+                      <div className="shrink-0 text-dark-400">{String(g?.at ? formatRelativeTime(new Date(g.at)) : '')}</div>
+                    </div>
+                  ))}
+                  {(Array.isArray(conversationGifts) ? conversationGifts.length : 0) === 0 ? (
+                    <div className="text-dark-400">—</div>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="mt-6 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowGifts(false)}
+                  className="h-11 px-4 rounded-2xl bg-dark-800/40 text-dark-200 border border-dark-600 hover:border-dark-500 hover:text-white transition-all"
+                >
+                  Close
+                </button>
               </div>
             </motion.div>
           </motion.div>

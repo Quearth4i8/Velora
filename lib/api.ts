@@ -956,4 +956,64 @@ export const characterAPI = {
   async resetEncounterEnforcement(conversationId: string) {
     return this.setEncounterEnforcement({ conversationId, strikeCount: 0, blocked: false });
   },
+
+  async getConversationContext(conversationId: string) {
+    try {
+      const id = String(conversationId || '').trim();
+      if (!id) return { success: false, error: new Error('Missing conversationId') };
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase
+        .from('conversation_context')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .eq('conversation_id', id)
+        .maybeSingle();
+
+      if (error) throw error;
+      return { success: true, data: data || null };
+    } catch (error) {
+      console.error('Failed to get conversation context:', error);
+      return { success: false, error };
+    }
+  },
+
+  async setConversationContext(args: {
+    conversationId: string;
+    relation?: string | null;
+    sexToys?: string[];
+    gifts?: any;
+  }) {
+    try {
+      const conversationId = String(args.conversationId || '').trim();
+      if (!conversationId) return { success: false, error: new Error('Missing conversationId') };
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) throw new Error('Not authenticated');
+
+      const payload: Record<string, any> = {
+        user_id: session.user.id,
+        conversation_id: conversationId,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (Object.prototype.hasOwnProperty.call(args, 'relation')) payload.relation = args.relation ? String(args.relation) : null;
+      if (Object.prototype.hasOwnProperty.call(args, 'sexToys')) payload.sex_toys = Array.isArray(args.sexToys) ? args.sexToys.map((t) => String(t)) : [];
+      if (Object.prototype.hasOwnProperty.call(args, 'gifts')) payload.gifts = args.gifts;
+
+      const { data, error } = await supabase
+        .from('conversation_context')
+        .upsert(payload, { onConflict: 'user_id,conversation_id' })
+        .select('*')
+        .single();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error) {
+      console.error('Failed to set conversation context:', error);
+      return { success: false, error };
+    }
+  },
 };

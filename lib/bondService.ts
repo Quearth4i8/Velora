@@ -85,6 +85,32 @@ export const bondService = {
     return updated.data as any;
   },
 
+  async addBondPoints(characterId: string, pointsDelta: number): Promise<CharacterRelationship | null> {
+    const rel = await this.applyInactivityDecay(characterId);
+    if (!rel) return null;
+
+    const delta = Number(pointsDelta);
+    const nextPoints = clampBondPoints(rel.bond_points + (Number.isFinite(delta) ? delta : 0));
+
+    const updated = await supabase
+      .from('character_relationships')
+      .update({
+        bond_points: nextPoints,
+        last_interaction_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', rel.id)
+      .select()
+      .single();
+
+    if (updated.error) {
+      console.error('Failed to add bond points:', updated.error);
+      return rel;
+    }
+
+    return updated.data as any;
+  },
+
   async registerInteraction(characterId: string, userText?: string): Promise<CharacterRelationship | null> {
     const rel = await this.applyInactivityDecay(characterId);
     if (!rel) return null;
