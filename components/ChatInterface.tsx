@@ -114,6 +114,14 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
   const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
 
   const normalizeCommaTagKey = (value: string) => String(value || '').trim().toLowerCase();
+  const toBooruTag = (value: string): string => {
+    const raw = String(value || '').trim().toLowerCase();
+    if (!raw) return '';
+    return raw
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .replace(/_+/g, '_');
+  };
   const splitCommaTags = (input: string): string[] =>
     String(input || '')
       .split(/[,\n]+/g)
@@ -1343,7 +1351,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
 
       setConversationRelation(rel);
       setConversationSexToys(toys);
-      setAppliedConversationSexToys(toys);
+      setAppliedConversationSexToys(toys.map(toBooruTag).filter(Boolean));
       setConversationGifts(gifts);
     };
 
@@ -3405,6 +3413,8 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
                       ? conversationSexToys.map((t) => String(t).trim()).filter(Boolean)
                       : [];
 
+                    const booruToyTags = selectedToys.map(toBooruTag).filter(Boolean);
+
                     await persistConversationContext({ sexToys: selectedToys });
 
                     if (currentCharacter?.id) {
@@ -3414,7 +3424,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
                       const removeKeys = new Set<string>(previouslyApplied.map((t) => normalizeCommaTagKey(t)).filter(Boolean));
                       const existingPersistent = String(currentCharacter.persistentPrompt || '');
                       const persistentWithoutOldToys = removeCommaTagsByKey(existingPersistent, removeKeys);
-                      const nextPersistent = joinAndDedupeCommaTags(persistentWithoutOldToys, selectedToys.join(', '));
+                      const nextPersistent = joinAndDedupeCommaTags(persistentWithoutOldToys, booruToyTags.join(', '));
 
                       if (nextPersistent !== String(currentCharacter.persistentPrompt || '')) {
                         const updated = await characterAPI.updateCharacter(currentCharacter.id, { persistentPrompt: nextPersistent });
@@ -3427,7 +3437,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
                       }
                     }
 
-                    setAppliedConversationSexToys(selectedToys);
+                    setAppliedConversationSexToys(booruToyTags);
                     setShowSexToys(false);
                   }}
                   className="h-11 px-5 rounded-2xl bg-gradient-to-r from-purple-600 to-purple-500 text-white font-semibold hover:from-purple-500 hover:to-purple-600 transition-all"

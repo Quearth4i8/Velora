@@ -251,34 +251,50 @@ export const characterService = {
       localStorage.removeItem('special_characters_list_50');
     }
 
-    // Only include name, age, and futanari in update payload
+    const { data: existing, error: existingError } = await supabase
+      .from('characters')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (existingError) throw existingError;
+
+    const existingDraft = deserializeCharacter(existing);
+    const merged: CharacterDraft = {
+      ...existingDraft,
+      ...draft,
+      identity: {
+        ...existingDraft.identity,
+        ...(draft.identity || {}),
+      },
+      body: {
+        ...existingDraft.body,
+        ...(draft.body || {}),
+      },
+      appearance: {
+        ...existingDraft.appearance,
+        ...(draft.appearance || {}),
+      },
+      personality: {
+        ...existingDraft.personality,
+        ...(draft.personality || {}),
+        traits: {
+          ...(existingDraft.personality?.traits || {}),
+          ...((draft.personality as any)?.traits || {}),
+        },
+      } as any,
+      generation: {
+        ...existingDraft.generation,
+        ...(draft.generation || {}),
+      },
+    };
+
     const updatePayload: Record<string, any> = {
+      ...serializeCharacter(merged),
       updated_at: new Date().toISOString(),
     };
 
-    // Add name if present
-    if (draft.name) {
-      updatePayload.name = draft.name;
-    }
-
-    // Add age if present in identity
-    if (draft.identity?.age !== undefined) {
-      updatePayload.age = draft.identity.age;
-    }
-
-    // Add futanari if present
-    if (draft.futanari !== undefined) {
-      updatePayload.futanari = draft.futanari;
-      console.log('Adding futanari to update payload:', draft.futanari);
-    }
-
-    // Add heat if present
-    if (draft.heat !== undefined) {
-      const heatValue = typeof draft.heat === 'number' && Number.isFinite(draft.heat)
-        ? Math.min(100, Math.max(0, Math.round(draft.heat)))
-        : null;
-      updatePayload.heat = heatValue;
-    }
+    delete updatePayload.user_id;
 
     console.log('Final update payload:', updatePayload);
 
@@ -290,7 +306,7 @@ export const characterService = {
       .single();
 
     if (error) throw error;
-    return data;
+    return deserializeCharacter(data);
   },
 
   async updateCharacterDirect(id: string, updates: Record<string, any>) {
