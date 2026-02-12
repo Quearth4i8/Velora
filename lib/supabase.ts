@@ -421,7 +421,7 @@ export const profileService = {
     return data;
   },
 
-  async updateProfile(userId: string, updates: { full_name?: string; username?: string; avatar_url?: string }): Promise<Profile> {
+  async updateProfile(userId: string, updates: { full_name?: string; username?: string; avatar_url?: string; points_balance?: number; spin_pity_count?: number }): Promise<Profile> {
     const { data, error } = await supabase
       .from('profiles')
       .update({

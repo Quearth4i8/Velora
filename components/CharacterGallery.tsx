@@ -6,6 +6,7 @@ import { getDimensionsFromAspectRatio, MODEL_DEFAULT_SETTINGS } from '@/config/a
 import { CharacterDraft, ChatMessage, CharacterImage } from '@/lib/types';
 import { automatic1111API } from '@/lib/automatic1111';
 import { characterAPI } from '@/lib/api';
+import { wallet } from '@/lib/wallet';
 import { PrimaryCTAButton } from '@/components/ui/PrimaryCTAButton';
 import { GenerationSettingsModal } from '@/components/ui/GenerationSettingsModal';
 import { useBlurNSFW } from '@/lib/useBlurNSFW';
@@ -19,6 +20,9 @@ interface CharacterGalleryProps {
 
 export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate }: CharacterGalleryProps) {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [pointsSpice, setPointsSpice] = useState<'sfw' | 'nsfw'>('sfw');
+  const [pointsError, setPointsError] = useState('');
   const [editedCharacter, setEditedCharacter] = useState<CharacterDraft>(character);
   const { blurNSFW, setBlurNSFW, toggleBlurNSFW } = useBlurNSFW();
   const dialog = useDialog();
@@ -41,6 +45,10 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
   useEffect(() => {
     setEditedCharacter(character);
   }, [character]);
+
+  useEffect(() => {
+    wallet.getBalance().then(setWalletBalance);
+  }, []);
 
   // Local generation settings
   const [generationSettings, setGenerationSettings] = useState<{
@@ -245,6 +253,91 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
       }
     } catch (error) {
       console.error('Failed to load character images:', error);
+    }
+  };
+
+  const handleGenerateWithPoints = async () => {
+    setPointsError('');
+
+    if (!editedCharacter.generation?.style || !editedCharacter.generation?.model) {
+      await dialog.alert({
+        title: 'Missing settings',
+        message: 'Character must have style and model selected to generate images',
+      });
+      return;
+    }
+
+    const age = typeof editedCharacter.identity?.age === 'number' && Number.isFinite(editedCharacter.identity.age)
+      ? editedCharacter.identity.age
+      : null;
+
+    if (pointsSpice === 'nsfw' && (age === null || age < 18)) {
+      setPointsError('NSFW requires the character to be set to age 18+ in the character editor.');
+      return;
+    }
+
+    const cost = pointsSpice === 'nsfw' ? 80 : 50;
+    setIsGenerating(true);
+    try {
+      const spendResult = await wallet.spend(cost);
+      setWalletBalance(spendResult.balance);
+      if (!spendResult.ok) {
+        setPointsError('Not enough points.');
+        return;
+      }
+
+      const nsfwTags = 'nsfw, nude, lingerie, erotic pose, provocative pose, seductive, teasing';
+      const sfwTags = 'high quality, portrait, cinematic lighting';
+
+      const modified: CharacterDraft = {
+        ...editedCharacter,
+        appearance: {
+          ...editedCharacter.appearance,
+          clothing: pointsSpice === 'nsfw'
+            ? ((editedCharacter.appearance?.clothing || 'lingerie') as any)
+            : editedCharacter.appearance?.clothing,
+        },
+        specialPrompt: pointsSpice === 'nsfw'
+          ? [editedCharacter.specialPrompt, nsfwTags].filter(Boolean).join(', ')
+          : [editedCharacter.specialPrompt, sfwTags].filter(Boolean).join(', '),
+      };
+
+      await automatic1111API.generateCharacterImage(modified, {
+        aspectRatio: generationSettings.aspectRatio,
+        steps: generationSettings.steps,
+        cfgScale: generationSettings.cfgScale,
+        sampler: generationSettings.sampler,
+        seed: -1,
+        additionalTags: generationSettings.additionalTags,
+        isFuta: generationSettings.isFuta,
+        hiresFix: generationSettings.hiresFix,
+        hiresScale: generationSettings.hiresScale,
+        hiresUpscaler: generationSettings.hiresUpscaler,
+        hiresSteps: generationSettings.hiresSteps,
+        hiresDenoise: generationSettings.hiresDenoise,
+      });
+
+      await loadCharacterImages();
+
+      const updatedCharacter = {
+        ...editedCharacter,
+        generation: {
+          ...editedCharacter.generation,
+          generationStatus: 'completed' as const,
+        }
+      };
+
+      setEditedCharacter(updatedCharacter);
+      onCharacterUpdate(updatedCharacter);
+
+      wallet.increment(5).then(setWalletBalance);
+    } catch (error) {
+      console.error('Error generating new image with points:', error);
+      setPointsError('Failed to generate image. Please try again.');
+      const current = await wallet.getBalance();
+      setWalletBalance(current);
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -591,6 +684,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
           <div className="max-w-[2000px] mx-auto">
             {/* Filter Pills and Controls - Responsive Layout */}
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+
               {/* Filter Pills - Enhanced with Icons */}
               <div className="flex flex-wrap items-center gap-3">
                 <button
@@ -668,23 +762,66 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
                 </div>
               </div>
 
-              {/* Generate Button - Full Width on Mobile */}
-              <div className="relative group lg:ml-auto">
-                <div className="absolute -inset-1 bg-gradient-to-r from-pink-600 via-pink-400 to-pink-600 rounded-2xl blur-lg opacity-60 group-hover:opacity-100 transition duration-300 animate-pulse"></div>
+              {/* Points + Actions */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 lg:ml-auto">
+                <div className="px-4 py-2 rounded-2xl border border-white/10 bg-dark-950/30 text-white/80 flex items-center justify-between gap-3">
+                  <span className="text-xs font-semibold text-white/60">Points</span>
+                  <span className="text-sm font-extrabold text-white">{walletBalance}</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPointsSpice('sfw')}
+                    className={`px-4 py-2 rounded-2xl border text-xs font-extrabold transition-colors ${pointsSpice === 'sfw'
+                      ? 'bg-pink-600/20 border-pink-500/40 text-pink-200'
+                      : 'bg-dark-950/20 border-white/10 text-white/70 hover:bg-white/10'
+                      }`}
+                  >
+                    SFW
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPointsSpice('nsfw')}
+                    className={`px-4 py-2 rounded-2xl border text-xs font-extrabold transition-colors ${pointsSpice === 'nsfw'
+                      ? 'bg-pink-600/20 border-pink-500/40 text-pink-200'
+                      : 'bg-dark-950/20 border-white/10 text-white/70 hover:bg-white/10'
+                      }`}
+                  >
+                    NSFW
+                  </button>
+                </div>
+
                 <button
-                  onClick={() => setShowGenerationSettingsModal(true)}
+                  type="button"
+                  onClick={handleGenerateWithPoints}
                   disabled={isGenerating || !editedCharacter.generation?.style}
-                  className="relative w-full lg:w-auto px-6 py-3 bg-gradient-to-r from-pink-600 via-pink-500 to-pink-700 text-white rounded-2xl text-sm font-bold hover:from-pink-500 hover:via-pink-400 hover:to-pink-600 disabled:from-dark-700 disabled:via-dark-800 disabled:to-dark-700 disabled:cursor-not-allowed transition-all duration-300 shadow-xl hover:scale-105 disabled:scale-100"
+                  className="px-5 py-3 rounded-2xl border border-pink-500/40 bg-pink-600/15 text-pink-200 hover:bg-pink-600/25 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-extrabold"
                 >
-                  <span className="flex items-center justify-center gap-2">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    Create New
-                  </span>
+                  {pointsSpice === 'nsfw' ? 'Generate (80 pts)' : 'Generate (50 pts)'}
                 </button>
+
+                <div className="relative group">
+                  <div className="absolute -inset-1 bg-gradient-to-r from-pink-600 via-pink-400 to-pink-600 rounded-2xl blur-lg opacity-60 group-hover:opacity-100 transition duration-300 animate-pulse"></div>
+                  <button
+                    onClick={() => setShowGenerationSettingsModal(true)}
+                    disabled={isGenerating || !editedCharacter.generation?.style}
+                    className="relative w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-pink-600 via-pink-500 to-pink-700 text-white rounded-2xl text-sm font-bold hover:from-pink-500 hover:via-pink-400 hover:to-pink-600 disabled:from-dark-700 disabled:via-dark-800 disabled:to-dark-700 disabled:cursor-not-allowed transition-all duration-300 shadow-xl hover:scale-105 disabled:scale-100"
+                  >
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      Create New
+                    </span>
+                  </button>
+                </div>
               </div>
             </div>
+
+            {pointsError && (
+              <div className="mt-3 text-sm text-red-300">{pointsError}</div>
+            )}
           </div>
         </div>
 

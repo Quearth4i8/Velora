@@ -4,7 +4,7 @@ import * as https from 'node:https';
 import type { IncomingMessage } from 'node:http';
 import { Readable } from 'node:stream';
 
-const AUTOMATIC1111_URL = process.env.AUTOMATIC1111_URL || 'http://127.0.0.1:7860';
+const AUTOMATIC1111_URL = process.env.A1111_URL || process.env.AUTOMATIC1111_URL || 'http://localhost:7860';
 
 export const runtime = 'nodejs';
 
@@ -77,6 +77,11 @@ export async function POST(request: Request) {
 
     if (status < 200 || status >= 300) {
       const text = await readStreamAsText(upstream);
+      console.error('Automatic1111 upstream error:', {
+        upstreamUrl,
+        status,
+        details: text,
+      });
       return NextResponse.json(
         {
           error: 'Automatic1111 error',
@@ -96,7 +101,7 @@ export async function POST(request: Request) {
       },
     });
   } catch (error: any) {
-    console.error('Automatic1111 proxy error:', error);
+    console.error('Automatic1111 proxy error:', error?.stack || error);
 
     const upstreamUrl = `${AUTOMATIC1111_URL}/sdapi/v1/txt2img`;
     const cause = error?.cause;

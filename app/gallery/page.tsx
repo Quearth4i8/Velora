@@ -158,17 +158,22 @@ export default function GalleryPage() {
         },
       };
 
-      const AUTOMATIC1111_URL = process.env.AUTOMATIC1111_URL || 'http://127.0.0.1:7860';
-      const response = await fetch(`${AUTOMATIC1111_URL}/sdapi/v1/txt2img`, {
+      const response = await fetch('/api/automatic1111/txt2img', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ payload }),
       });
 
       if (!response.ok) {
-        throw new Error(`Automatic1111 API error: ${response.statusText}`);
+        const details = await response.text().catch(() => '');
+        console.error('Automatic1111 txt2img error:', {
+          status: response.status,
+          statusText: response.statusText,
+          details,
+        });
+        throw new Error(`Automatic1111 API error (${response.status}): ${details || response.statusText}`);
       }
 
       const result = await response.json();
@@ -257,7 +262,7 @@ export default function GalleryPage() {
       await fetchAllCharacterImages(true);
       setSpecialPrompt('');
     } catch (error) {
-      console.error('Failed to generate image:', error);
+      console.error('Failed to generate image:', (error as any)?.stack || error);
       await dialog.alert({
         title: 'Error',
         message: 'Failed to generate image. Please check Automatic1111 and try again.',
@@ -687,17 +692,22 @@ export default function GalleryPage() {
 
       console.log('Generating image with prompt:', prompt);
 
-      const AUTOMATIC1111_URL = process.env.AUTOMATIC1111_URL || 'http://127.0.0.1:7860';
-      const response = await fetch(`${AUTOMATIC1111_URL}/sdapi/v1/txt2img`, {
+      const response = await fetch('/api/automatic1111/txt2img', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ payload }),
       });
 
       if (!response.ok) {
-        throw new Error(`Automatic1111 API error: ${response.statusText}`);
+        const details = await response.text().catch(() => '');
+        console.error('Automatic1111 txt2img error:', {
+          status: response.status,
+          statusText: response.statusText,
+          details,
+        });
+        throw new Error(`Automatic1111 API error (${response.status}): ${details || response.statusText}`);
       }
 
       const result = await response.json();
@@ -791,7 +801,7 @@ export default function GalleryPage() {
 
       console.log('Image generated and added to gallery successfully');
     } catch (error) {
-      console.error('Failed to generate image:', error);
+      console.error('Failed to generate image:', (error as any)?.stack || error);
     } finally {
       setIsGenerating(false);
     }

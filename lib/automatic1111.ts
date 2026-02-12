@@ -29,8 +29,9 @@ import {
   NSFW_LEGLESS_CLOTHING_MAP,
 } from '@/config/clothing-prompts';
 
-const AUTOMATIC1111_URL = process.env.AUTOMATIC1111_URL || 'http://127.0.0.1:7860';
+const AUTOMATIC1111_URL = process.env.A1111_URL || process.env.AUTOMATIC1111_URL || 'http://localhost:7860';
 const AUTOMATIC1111_PROXY_URL = '/api/automatic1111/txt2img';
+const AUTOMATIC1111_GENERIC_PROXY_PREFIX = '/api/automatic1111';
 
 type SdModelEntry = {
   title?: string;
@@ -49,7 +50,7 @@ const fetchSdModels = async (): Promise<SdModelEntry[]> => {
     return cachedSdModels.data;
   }
 
-  const res = await fetch(`${AUTOMATIC1111_URL}/sdapi/v1/sd-models`);
+  const res = await fetch(`${AUTOMATIC1111_GENERIC_PROXY_PREFIX}/sdapi/v1/sd-models`);
   if (!res.ok) {
     throw new Error(`Failed to fetch A1111 sd-models: ${res.status} ${res.statusText}`);
   }
@@ -1639,7 +1640,7 @@ const buildPromptWithHandPose = (draft: CharacterDraft, style: CharacterStyle, s
 export const automatic1111API = {
   async checkConnection(): Promise<boolean> {
     try {
-      const response = await fetch(`${AUTOMATIC1111_URL}/sdapi/v1/samplers`);
+      const response = await fetch(`${AUTOMATIC1111_GENERIC_PROXY_PREFIX}/sdapi/v1/samplers`);
       return response.ok;
     } catch (error) {
       console.error('Automatic1111 connection check failed:', error);
@@ -1652,7 +1653,7 @@ export const automatic1111API = {
       const resolvedModelName = await resolveSdModelCheckpoint(modelName);
 
       // Get current options
-      const optionsResponse = await fetch(`${AUTOMATIC1111_URL}/sdapi/v1/options`);
+      const optionsResponse = await fetch(`${AUTOMATIC1111_GENERIC_PROXY_PREFIX}/sdapi/v1/options`);
       if (!optionsResponse.ok) {
         throw new Error('Failed to get options');
       }
@@ -1661,7 +1662,7 @@ export const automatic1111API = {
       options.sd_model_checkpoint = resolvedModelName;
 
       // Update options to switch model
-      const updateResponse = await fetch(`${AUTOMATIC1111_URL}/sdapi/v1/options`, {
+      const updateResponse = await fetch(`${AUTOMATIC1111_GENERIC_PROXY_PREFIX}/sdapi/v1/options`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2142,7 +2143,7 @@ export const automatic1111API = {
 
   async generateDirectImage(payload: any): Promise<string> {
     try {
-      const response = await fetch(`${AUTOMATIC1111_URL}/sdapi/v1/txt2img`, {
+      const response = await fetch(`${AUTOMATIC1111_GENERIC_PROXY_PREFIX}/sdapi/v1/txt2img`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2151,7 +2152,8 @@ export const automatic1111API = {
       });
 
       if (!response.ok) {
-        throw new Error(`Automatic1111 API error: ${response.statusText}`);
+        const details = await response.text().catch(() => '');
+        throw new Error(`Automatic1111 API error (${response.status}): ${details || response.statusText}`);
       }
 
       const result = await response.json();
@@ -2215,7 +2217,7 @@ export const automatic1111API = {
       });
 
       const attempt = async (hr_upscaler: string) => {
-        const response = await fetch(`${AUTOMATIC1111_URL}/sdapi/v1/txt2img`, {
+        const response = await fetch(`${AUTOMATIC1111_GENERIC_PROXY_PREFIX}/sdapi/v1/txt2img`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

@@ -321,4 +321,6 @@ export interface Profile {
   username?: string;
   full_name?: string;
   avatar_url?: string;
+  points_balance?: number;
+  spin_pity_count?: number;
 }

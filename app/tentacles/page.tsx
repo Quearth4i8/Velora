@@ -2,16 +2,16 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import * as Tabs from '@radix-ui/react-tabs';
 import { Navbar } from '@/components/Navbar';
 import { AnimatedBackground } from '@/components/AnimatedBackground';
 import { characterAPI } from '@/lib/api';
 import { automatic1111API } from '@/lib/automatic1111';
-import { buildCharacterBasePrompts } from '@/lib/automatic1111';
 import type { CharacterDraft, CharacterImage } from '@/lib/types';
 import { buildTentaclesPrompts } from '@/lib/tentaclesPrompt';
 import { PrimaryCTAButton } from '@/components/ui/PrimaryCTAButton';
 import { useBlurNSFW } from '@/lib/useBlurNSFW';
-import { Download, ZoomIn, Trash2, RefreshCw } from 'lucide-react';
+import { Download, ZoomIn, Trash2, RefreshCw, Waves } from 'lucide-react';
 
 type TentacleToolId = 'wrap' | 'tease' | 'bind' | 'lift' | 'ink' | 'pulse';
 
@@ -317,6 +317,7 @@ export default function TentaclesPage() {
 
   const [controlTab, setControlTab] = useState<'scene' | 'tools' | 'advanced'>('scene');
   const [resultsTab, setResultsTab] = useState<'character' | 'feed'>('character');
+  const [mainTab, setMainTab] = useState<'build' | 'generate' | 'results'>('build');
 
   const [genWidth, setGenWidth] = useState(768);
   const [genHeight, setGenHeight] = useState(1344);
@@ -440,16 +441,6 @@ export default function TentaclesPage() {
     if (!selectedId) return null;
     return charactersById.get(selectedId) || null;
   }, [charactersById, selectedId]);
-
-  const characterBasePrompt = useMemo(() => {
-    if (!selectedCharacter) return '';
-    try {
-      const base = buildCharacterBasePrompts(selectedCharacter);
-      return String(base?.prompt || '').trim();
-    } catch {
-      return '';
-    }
-  }, [selectedCharacter]);
 
   const filteredCharacters = useMemo(() => {
     const q = String(characterQuery || '').trim().toLowerCase();
@@ -930,31 +921,22 @@ export default function TentaclesPage() {
         <div className="absolute inset-x-0 top-0 h-[560px] pointer-events-none bg-gradient-to-b from-black/55 via-black/25 to-transparent" />
         <Navbar />
 
-        <div className="w-full px-4 sm:px-8 lg:px-12 py-10">
-          <div className="w-full">
+        <div className="w-full px-4 sm:px-6 lg:px-10 py-6">
+          <div className="w-full max-w-[1440px] mx-auto">
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-              <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-8">
-                <div>
-                  <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-black/30 backdrop-blur">
-                    <span className="w-1.5 h-1.5 rounded-full bg-fuchsia-400 shadow-[0_0_14px_rgba(232,121,249,0.6)]" />
-                    <span className="text-xs tracking-wider text-white/70">ROLEPLAY LAB</span>
+              <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl border border-white/10 bg-black/25 backdrop-blur flex items-center justify-center">
+                    <Waves className="w-5 h-5 text-cyan-200/90" />
                   </div>
-                  <h1 className="mt-3 text-4xl md:text-6xl font-extrabold tracking-tight text-white">
-                    Tentacles
-                    <span className="ml-3 bg-gradient-to-r from-fuchsia-300 via-fuchsia-400 to-cyan-300 bg-clip-text text-transparent">
-                      Tormenting Lab
-                    </span>
-                  </h1>
-                  <p className="mt-3 text-white/65 max-w-2xl">
-                    Pick a character, then use tools to generate themed images. All images are saved to the character gallery.
-                  </p>
+                  <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-white">Tentacles</h1>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => copyToClipboard(exportSceneText() || '')}
-                    className="px-4 py-2 rounded-2xl border border-white/10 bg-black/25 text-white/80 hover:text-white hover:bg-black/35 transition text-sm"
+                    className="px-3 py-2 rounded-2xl border border-white/10 bg-black/25 text-white/80 hover:text-white hover:bg-black/35 transition text-sm"
                   >
                     Copy All
                   </button>
@@ -975,7 +957,7 @@ export default function TentaclesPage() {
                       URL.revokeObjectURL(url);
                       setToast('Downloaded');
                     }}
-                    className="px-4 py-2 rounded-2xl border border-white/10 bg-black/25 text-white/80 hover:text-white hover:bg-black/35 transition text-sm"
+                    className="px-3 py-2 rounded-2xl border border-white/10 bg-black/25 text-white/80 hover:text-white hover:bg-black/35 transition text-sm"
                   >
                     Export
                   </button>
@@ -983,222 +965,218 @@ export default function TentaclesPage() {
               </div>
             </motion.div>
 
-            <div className="rounded-3xl border border-white/10 bg-black/25 backdrop-blur-xl shadow-2xl overflow-hidden mb-6">
-              <div className="p-5 border-b border-white/10">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                  <div>
-                    <h2 className="text-white font-semibold">Scene Builder</h2>
-                    <p className="text-white/55 text-sm mt-1">Use presets to shape the scene, then refine with text.</p>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                    <div className="relative w-full sm:w-[320px]">
-                      <input
-                        value={presetQuery}
-                        onChange={(e) => setPresetQuery(e.target.value)}
-                        placeholder="Search presets..."
-                        className="w-full px-4 py-2.5 rounded-2xl bg-black/35 border border-white/10 text-white placeholder:text-white/35 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/60"
-                      />
-                    </div>
-                    <span className="text-xs text-white/55">
-                      Selected: <span className="text-white/80">{selectedPresets.length}</span>
-                    </span>
-                    {selectedPresets.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={clearPresets}
-                        className="px-3 py-2 rounded-2xl border border-white/10 bg-black/20 text-white/75 hover:text-white transition text-sm"
-                      >
-                        Clear
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-5">
-                {selectedPresets.length > 0 && (
-                  <div
-                    className="flex flex-wrap gap-2 mb-4 rounded-2xl border border-white/10 bg-black/15 p-3"
+            <Tabs.Root value={mainTab} onValueChange={(v) => setMainTab(v as typeof mainTab)} className="w-full">
+              <div className="sticky top-20 z-40 mb-3">
+                <Tabs.List className="inline-flex items-center gap-1 rounded-2xl border border-white/10 bg-black/25 backdrop-blur-xl p-1">
+                  <Tabs.Trigger
+                    value="build"
+                    className="px-3 py-1.5 rounded-xl text-sm font-semibold text-white/70 data-[state=active]:text-white data-[state=active]:bg-fuchsia-500/15 data-[state=active]:border-fuchsia-300/40 border border-transparent transition"
                   >
-                    {(() => {
-                      const maxVisible = 10;
-                      const mapped = selectedPresets
-                        .map((id) => presetMap.get(id))
-                        .filter(Boolean);
-                      const visible = showAllSelectedPresets ? mapped : mapped.slice(0, maxVisible);
-                      const remaining = Math.max(0, mapped.length - visible.length);
-                      return (
-                        <>
-                          {visible.map((p) => (
-                            <button
-                              key={p!.id}
-                              type="button"
-                              onClick={() => togglePreset(p!.id)}
-                              className="px-3 py-1.5 rounded-full text-[11px] border border-fuchsia-300/30 bg-fuchsia-500/10 text-white/90 hover:bg-fuchsia-500/15 transition"
-                              title="Remove"
-                            >
-                              {p!.label}
-                            </button>
-                          ))}
-                          {selectedXRayParts.map((id) => {
-                            const part = XRAY_PARTS.find((p) => p.id === id);
-                            if (!part) return null;
-                            return (
-                              <button
-                                key={`xray_${id}`}
-                                type="button"
-                                onClick={() => toggleXRayPart(id)}
-                                className="px-3 py-1.5 rounded-full text-[11px] border border-cyan-300/20 bg-cyan-500/10 text-white/90 hover:text-white transition"
-                                title="Remove"
-                              >
-                                X-ray: {part.label}
-                              </button>
-                            );
-                          })}
-                          {!showAllSelectedPresets && remaining > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => setShowAllSelectedPresets(true)}
-                              className="w-7 h-7 rounded-full text-[11px] border border-white/10 bg-black/25 text-white/85 hover:text-white transition inline-flex items-center justify-center"
-                              title="Show remaining"
-                            >
-                              +{remaining}
-                            </button>
-                          )}
-                          {showAllSelectedPresets && mapped.length > maxVisible && (
-                            <button
-                              type="button"
-                              onClick={() => setShowAllSelectedPresets(false)}
-                              className="w-7 h-7 rounded-full text-[11px] border border-white/10 bg-black/25 text-white/70 hover:text-white transition inline-flex items-center justify-center"
-                              title="Collapse"
-                            >
-                              −
-                            </button>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-                  <div className="lg:col-span-4">
-                    <div className="rounded-2xl border border-white/10 bg-black/20 p-2">
-                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-1 gap-2">
-                        {PRESET_CATEGORIES.map((cat) => {
-                          const active = cat.id === activePresetCategory;
-                          return (
-                            <button
-                              key={cat.id}
-                              type="button"
-                              onClick={() => setActivePresetCategory(cat.id)}
-                              className={`px-3 py-2 rounded-2xl text-sm border transition text-left ${active
-                                ? 'border-fuchsia-300/60 bg-fuchsia-500/15 text-white'
-                                : 'border-white/10 bg-black/20 text-white/65 hover:text-white'
-                                }`}
-                            >
-                              {cat.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="mt-3">
-                      <button
-                        type="button"
-                        onClick={() => setShowAllPresets((v) => !v)}
-                        className="w-full px-4 py-3 rounded-2xl border border-white/10 bg-black/20 text-white/75 hover:text-white transition text-sm"
-                      >
-                        {showAllPresets ? 'Hide extra presets' : 'Show all presets'}
-                      </button>
-                      {!showAllPresets && !presetQuery.trim() && (
-                        <div className="mt-1 text-[11px] text-white/40">Tip: select a category or use Search.</div>
-                      )}
-                      {presetQuery.trim() && filteredPresetsByCategory.size === 0 && (
-                        <div className="mt-1 text-[11px] text-white/40">No presets match.</div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="lg:col-span-8">
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                      {(activePresetCategory === 'xray'
-                        ? XRAY_PARTS.map((part) => ({
-                            id: part.id,
-                            label: part.label,
-                            active: selectedXRayParts.includes(part.id),
-                            onClick: () => toggleXRayPart(part.id),
-                            tone: 'xray' as const,
-                          }))
-                        : visiblePresets.map((p) => ({
-                            id: p.id,
-                            label: p.label,
-                            active: selectedPresets.includes(p.id),
-                            onClick: () => togglePreset(p.id),
-                            tone: 'preset' as const,
-                          })))
-                        .map((item) => (
-                          <button
-                            key={String(item.id)}
-                            type="button"
-                            onClick={item.onClick}
-                            className={`px-4 py-3 rounded-2xl text-sm border transition shadow-sm text-left leading-snug ${item.active
-                              ? item.tone === 'xray'
-                                ? 'border-cyan-300/60 bg-cyan-500/15 text-white'
-                                : 'border-fuchsia-300/60 bg-gradient-to-r from-fuchsia-500/20 to-cyan-500/10 text-white'
-                              : item.tone === 'xray'
-                                ? 'border-white/10 bg-black/20 text-white/75 hover:text-white hover:bg-black/35'
-                                : 'border-white/10 bg-black/20 text-white/75 hover:text-white hover:bg-black/35'
-                              }`}
-                          >
-                            <div className="font-semibold">{item.label}</div>
-                          </button>
-                        ))}
-                    </div>
-
-                    <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-3">
-                      <textarea
-                        value={actionInput}
-                        onChange={(e) => setActionInput(e.target.value)}
-                        placeholder="Optional extra text to add on top of presets..."
-                        rows={3}
-                        className="w-full px-4 py-3 rounded-2xl border border-white/10 bg-black/25 text-white/90 placeholder:text-white/35 focus:outline-none focus:ring-4 focus:ring-fuchsia-500/10"
-                      />
-                    </div>
-
-                  </div>
-                </div>
+                    Build
+                  </Tabs.Trigger>
+                  <Tabs.Trigger
+                    value="generate"
+                    className="px-3 py-1.5 rounded-xl text-sm font-semibold text-white/70 data-[state=active]:text-white data-[state=active]:bg-cyan-500/10 data-[state=active]:border-cyan-300/40 border border-transparent transition"
+                  >
+                    Generate
+                  </Tabs.Trigger>
+                  <Tabs.Trigger
+                    value="results"
+                    className="px-3 py-1.5 rounded-xl text-sm font-semibold text-white/70 data-[state=active]:text-white data-[state=active]:bg-white/10 data-[state=active]:border-white/15 border border-transparent transition"
+                  >
+                    Results
+                  </Tabs.Trigger>
+                </Tabs.List>
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* Left controls (tabs) */}
-              <div className="lg:col-span-5 xl:col-span-5">
-                <div className="rounded-3xl border border-white/10 bg-black/30 backdrop-blur-xl shadow-2xl overflow-visible">
-                  <div className="p-5 border-b border-white/10">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <h2 className="text-white font-semibold">Studio</h2>
-                        <p className="text-white/55 text-sm mt-1">Build the scene & apply tools.</p>
+              <Tabs.Content value="build" className="outline-none">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:h-[calc(100vh-280px)]">
+                  <div className="lg:col-span-8 rounded-3xl border border-white/10 bg-black/25 backdrop-blur-xl shadow-2xl overflow-hidden flex flex-col min-h-0">
+                    <div className="p-3 border-b border-white/10">
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                        <div>
+                          <h2 className="text-white font-semibold">Scene Builder</h2>
+                          <p className="text-white/55 text-xs mt-1">Presets + quick text. Compact & scrollable.</p>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                          <div className="relative w-full sm:w-[320px]">
+                            <input
+                              value={presetQuery}
+                              onChange={(e) => setPresetQuery(e.target.value)}
+                              placeholder="Search presets..."
+                              className="w-full px-3 py-2 rounded-2xl bg-black/35 border border-white/10 text-white placeholder:text-white/35 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/60 text-sm"
+                            />
+                          </div>
+                          <span className="text-xs text-white/55">
+                            Selected: <span className="text-white/80">{selectedPresets.length}</span>
+                          </span>
+                          {selectedPresets.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={clearPresets}
+                              className="px-3 py-2 rounded-2xl border border-white/10 bg-black/20 text-white/75 hover:text-white transition text-sm"
+                            >
+                              Clear
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={toggleBlurNSFW}
-                        className="px-3 py-2 rounded-2xl border border-white/10 bg-black/20 text-white/75 hover:text-white transition text-sm"
-                      >
-                        {blurNSFW ? 'Unblur' : 'Blur'}
-                      </button>
+                    </div>
+
+                    <div className="p-3 flex-1 min-h-0 overflow-hidden">
+                      <div className="h-full overflow-y-auto pr-1">
+                        {(selectedPresets.length > 0 || selectedXRayParts.length > 0) && (
+                          <div className="flex flex-wrap items-center gap-2 mb-3 rounded-2xl border border-white/10 bg-black/15 p-2">
+                            {selectedPresets.slice(0, 8).map((id) => {
+                              const p = presetMap.get(id);
+                              if (!p) return null;
+                              return (
+                                <button
+                                  key={p.id}
+                                  type="button"
+                                  onClick={() => togglePreset(p.id)}
+                                  className="px-2.5 py-1 rounded-full text-[11px] border border-fuchsia-300/30 bg-fuchsia-500/10 text-white/90 hover:bg-fuchsia-500/15 transition"
+                                >
+                                  {p.label}
+                                </button>
+                              );
+                            })}
+                            {selectedXRayParts.slice(0, 4).map((id) => {
+                              const part = XRAY_PARTS.find((p) => p.id === id);
+                              if (!part) return null;
+                              return (
+                                <button
+                                  key={`xray_${id}`}
+                                  type="button"
+                                  onClick={() => toggleXRayPart(id)}
+                                  className="px-2.5 py-1 rounded-full text-[11px] border border-cyan-300/20 bg-cyan-500/10 text-white/90 hover:text-white transition"
+                                >
+                                  X-ray: {part.label}
+                                </button>
+                              );
+                            })}
+                            <div className="ml-auto flex items-center gap-2">
+                              {selectedPresets.length > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={clearPresets}
+                                  className="px-2.5 py-1 rounded-xl border border-white/10 bg-black/20 text-white/70 hover:text-white transition text-[11px]"
+                                >
+                                  Clear
+                                </button>
+                              )}
+                              {selectedXRayParts.length > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={clearXRay}
+                                  className="px-2.5 py-1 rounded-xl border border-white/10 bg-black/20 text-white/70 hover:text-white transition text-[11px]"
+                                >
+                                  Clear X-ray
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="rounded-2xl border border-white/10 bg-black/20 p-2 mb-3">
+                          <div className="flex items-center gap-1 overflow-x-auto whitespace-nowrap [-webkit-overflow-scrolling:touch]">
+                            {PRESET_CATEGORIES.map((cat) => {
+                              const active = cat.id === activePresetCategory;
+                              return (
+                                <button
+                                  key={cat.id}
+                                  type="button"
+                                  onClick={() => setActivePresetCategory(cat.id)}
+                                  className={`px-3 py-1.5 rounded-xl text-sm border transition ${active
+                                    ? 'border-fuchsia-300/60 bg-fuchsia-500/15 text-white'
+                                    : 'border-white/10 bg-black/20 text-white/65 hover:text-white'
+                                    }`}
+                                >
+                                  {cat.label}
+                                </button>
+                              );
+                            })}
+
+                            <button
+                              type="button"
+                              onClick={() => setShowAllPresets((v) => !v)}
+                              className="ml-auto px-3 py-1.5 rounded-xl text-sm border border-white/10 bg-black/20 text-white/70 hover:text-white transition"
+                            >
+                              {showAllPresets ? 'Focused' : 'All'}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-white/10 bg-black/20 p-2 mb-3">
+                          <textarea
+                            value={actionInput}
+                            onChange={(e) => setActionInput(e.target.value)}
+                            placeholder="Action / extra details (optional)..."
+                            rows={2}
+                            className="w-full px-3 py-2 rounded-2xl border border-white/10 bg-black/25 text-white/90 placeholder:text-white/35 focus:outline-none focus:ring-4 focus:ring-fuchsia-500/10 text-sm"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
+                          {(activePresetCategory === 'xray'
+                            ? XRAY_PARTS.map((part) => ({
+                                id: part.id,
+                                label: part.label,
+                                active: selectedXRayParts.includes(part.id),
+                                onClick: () => toggleXRayPart(part.id),
+                                tone: 'xray' as const,
+                              }))
+                            : visiblePresets.map((p) => ({
+                                id: p.id,
+                                label: p.label,
+                                active: selectedPresets.includes(p.id),
+                                onClick: () => togglePreset(p.id),
+                                tone: 'preset' as const,
+                              })))
+                            .map((item) => (
+                              <button
+                                key={String(item.id)}
+                                type="button"
+                                onClick={item.onClick}
+                                className={`px-3 py-2.5 rounded-2xl text-sm border transition shadow-sm text-left leading-snug ${item.active
+                                  ? item.tone === 'xray'
+                                    ? 'border-cyan-300/60 bg-cyan-500/15 text-white'
+                                    : 'border-fuchsia-300/60 bg-gradient-to-r from-fuchsia-500/20 to-cyan-500/10 text-white'
+                                  : 'border-white/10 bg-black/20 text-white/75 hover:text-white hover:bg-black/35'
+                                  }`}
+                              >
+                                <div className="font-semibold">{item.label}</div>
+                              </button>
+                            ))}
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="p-6 space-y-6">
-                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs uppercase tracking-wider text-white/55">Character</label>
-                        <span className="text-[11px] text-white/40">Pick from list</span>
+                  <div className="lg:col-span-4 rounded-3xl border border-white/10 bg-black/30 backdrop-blur-xl shadow-2xl overflow-visible flex flex-col min-h-0">
+                    <div className="p-3 border-b border-white/10">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <h2 className="text-white font-semibold">Studio</h2>
+                          <p className="text-white/55 text-xs mt-1">Build the scene & apply tools.</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={toggleBlurNSFW}
+                          className="px-3 py-2 rounded-2xl border border-white/10 bg-black/20 text-white/75 hover:text-white transition text-sm"
+                        >
+                          {blurNSFW ? 'Unblur' : 'Blur'}
+                        </button>
                       </div>
+                    </div>
+
+                    <div className="p-3 space-y-3 flex-1 min-h-0">
+                      <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs uppercase tracking-wider text-white/55">Character</label>
+                          <span className="text-[11px] text-white/40">Pick from list</span>
+                        </div>
 
                       <div className="mt-3 flex items-center gap-4">
                         <div className="w-14 h-14 rounded-2xl overflow-hidden border border-white/10 bg-black/20 shrink-0">
@@ -1271,7 +1249,7 @@ export default function TentaclesPage() {
                               animate={{ opacity: 1, y: 0, scale: 1 }}
                               exit={{ opacity: 0, y: 8, scale: 0.98 }}
                               transition={{ duration: 0.15 }}
-                              className="absolute left-0 right-0 top-[calc(100%+10px)] z-50 w-full rounded-2xl border border-white/10 bg-dark-950/90 backdrop-blur-xl shadow-2xl overflow-hidden"
+                              className="absolute left-0 right-0 bottom-[calc(100%+10px)] z-50 w-full rounded-2xl border border-white/10 bg-dark-950/90 backdrop-blur-xl shadow-2xl overflow-hidden"
                             >
                               <div className="p-3 border-b border-white/10">
                                 <input
@@ -1334,38 +1312,26 @@ export default function TentaclesPage() {
                       </div>
                     </div>
 
-                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <label className="text-xs uppercase tracking-wider text-white/55">Base prompt</label>
-                        <button
-                          type="button"
-                          onClick={() => copyToClipboard(String(characterBasePrompt || ''))}
-                          className="px-2.5 py-1.5 rounded-xl border border-white/10 bg-black/20 text-white/70 hover:text-white transition text-[11px]"
-                        >
-                          Copy
-                        </button>
-                      </div>
-                      <div className="mt-2 text-sm text-white/70 break-words">
-                        {characterBasePrompt ? characterBasePrompt : '—'}
-                      </div>
-                      {selectedCharacter?.generation?.model && (
-                        <div className="mt-2 text-[11px] text-white/40">
+                    </div>
+
+                    {selectedCharacter?.generation?.model && (
+                      <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                        <div className="text-[11px] text-white/40">
                           Model: <span className="text-white/60">{String(selectedCharacter.generation.model)}</span>
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
+              </Tabs.Content>
 
-              {/* Right settings */}
-              <div className="lg:col-span-7 xl:col-span-7 space-y-6">
-                <div className="rounded-3xl border border-white/10 bg-black/25 backdrop-blur-xl shadow-2xl overflow-hidden">
-                  <div className="p-5 border-b border-white/10">
+              <Tabs.Content value="generate" className="outline-none">
+                <div className="rounded-3xl border border-white/10 bg-black/25 backdrop-blur-xl shadow-2xl overflow-hidden lg:h-[calc(100vh-280px)] flex flex-col min-h-0">
+                  <div className="p-3 border-b border-white/10">
                     <div className="flex items-center justify-between gap-4">
                       <div>
                         <h2 className="text-white font-semibold">Generation</h2>
-                        <p className="text-white/55 text-sm mt-1">Quality + resolution + sampler.</p>
+                        <p className="text-white/55 text-xs mt-1">Quality + resolution + sampler.</p>
                       </div>
                       <div className="text-xs text-white/55">
                         Model:{' '}
@@ -1373,8 +1339,8 @@ export default function TentaclesPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="p-5">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-3 flex-1 min-h-0 overflow-y-auto">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
                         <div className="text-xs uppercase tracking-wider text-white/55">Resolution</div>
                         <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -1396,7 +1362,7 @@ export default function TentaclesPage() {
                                   setGenHeight(opt.h);
                                 }}
                                 className={`px-3 py-2 rounded-2xl border text-sm transition ${active
-                                  ? 'border-fuchsia-300/60 bg-fuchsia-500/15 text-white'
+                                  ? 'border-cyan-300/60 bg-cyan-500/10 text-white'
                                   : 'border-white/10 bg-black/20 text-white/70 hover:text-white'
                                   }`}
                               >
@@ -1431,7 +1397,7 @@ export default function TentaclesPage() {
                           max={60}
                           value={genSteps}
                           onChange={(e) => setGenSteps(parseInt(e.target.value, 10) || 40)}
-                          className="mt-2 w-full"
+                          className="mt-2 w-full accent-cyan-400"
                         />
                       </div>
 
@@ -1447,7 +1413,7 @@ export default function TentaclesPage() {
                           step={1}
                           value={genCfg}
                           onChange={(e) => setGenCfg(parseInt(e.target.value, 10) || 7)}
-                          className="mt-2 w-full"
+                          className="mt-2 w-full accent-fuchsia-400"
                         />
                       </div>
 
@@ -1491,7 +1457,7 @@ export default function TentaclesPage() {
                       </div>
                     </div>
 
-                    <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
                         <div className="flex items-center justify-between gap-3">
                           <div className="text-xs uppercase tracking-wider text-white/55">Prompt preview</div>
@@ -1512,9 +1478,7 @@ export default function TentaclesPage() {
                             </button>
                           </div>
                         </div>
-                        <div
-                          className={`mt-2 text-xs text-white/70 break-words ${showFullPromptPreview ? '' : 'line-clamp-6'}`}
-                        >
+                        <div className={`mt-2 text-xs text-white/70 break-words ${showFullPromptPreview ? '' : 'line-clamp-6'}`}>
                           {composedAction || actionInput.trim() ? composedAction || actionInput.trim() : '—'}
                         </div>
                       </div>
@@ -1533,177 +1497,179 @@ export default function TentaclesPage() {
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
+              </Tabs.Content>
 
-            <div className="rounded-3xl border border-white/10 bg-black/25 backdrop-blur-xl shadow-2xl overflow-hidden mt-6">
-              <div className="p-5 border-b border-white/10">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <h2 className="text-white font-semibold">Results</h2>
-                    <p className="text-white/55 text-sm mt-1">Browse your renders.</p>
-                  </div>
+              <Tabs.Content value="results" className="outline-none">
+                <div className="rounded-3xl border border-white/10 bg-black/25 backdrop-blur-xl shadow-2xl overflow-hidden lg:h-[calc(100vh-280px)] flex flex-col min-h-0">
+                  <div className="p-3 border-b border-white/10">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <h2 className="text-white font-semibold">Results</h2>
+                        <p className="text-white/55 text-xs mt-1">Browse your renders.</p>
+                      </div>
 
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setResultsTab('character')}
-                      className={`px-3 py-2 rounded-2xl border text-sm transition ${resultsTab === 'character'
-                        ? 'border-fuchsia-300/60 bg-fuchsia-500/15 text-white'
-                        : 'border-white/10 bg-black/20 text-white/70 hover:text-white'
-                        }`}
-                    >
-                      This Character
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setResultsTab('feed')}
-                      className={`px-3 py-2 rounded-2xl border text-sm transition ${resultsTab === 'feed'
-                        ? 'border-cyan-300/60 bg-cyan-500/10 text-white'
-                        : 'border-white/10 bg-black/20 text-white/70 hover:text-white'
-                        }`}
-                    >
-                      Tentacles Feed
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-5">
-                {resultsTab === 'character' ? (
-                  tentacleImages.length === 0 ? (
-                    <div className="text-center py-14">
-                      <div className="text-white/55">No tentacle images yet.</div>
-                      <div className="text-white/40 text-sm mt-2">Generate one from the Scene Builder above.</div>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-4">
-                      <AnimatePresence>
-                        {tentacleImages.map((img, idx) => (
-                          <motion.div
-                            key={img.id}
-                            initial={{ opacity: 0, y: 8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: 8 }}
-                            transition={{ duration: 0.18 }}
-                            className="relative group"
-                          >
-                            <div
-                              className="aspect-[3/4] rounded-2xl overflow-hidden border border-white/10 bg-black/20 cursor-pointer"
-                              onClick={() => {
-                                setZoomedImageIndex(idx);
-                                setZoomedImageSource('character');
-                                setIsZoomed(true);
-                              }}
-                            >
-                              <img
-                                src={img.imageUrl}
-                                alt=""
-                                className={`w-full h-full object-cover transition ${blurNSFW ? 'blur-xl' : ''}`}
-                                loading="lazy"
-                                draggable={false}
-                              />
-                            </div>
-                            <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setShowImageDropdown(img.id);
-                                  const rect = e.currentTarget.getBoundingClientRect();
-                                  setDropdownPosition({ 
-                                    top: rect.bottom + 8, 
-                                    left: Math.max(12, rect.right - 200) // 200px dropdown width
-                                  });
-                                }}
-                                className="p-2 rounded-xl border border-white/10 bg-black/50 text-white/80 hover:text-white"
-                              >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                                </svg>
-                              </button>
-                            </div>
-                            {generatingIds.has(img.id) && (
-                              <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-2xl">
-                                <RefreshCw className="w-6 h-6 text-white animate-spin" />
-                              </div>
-                            )}
-                          </motion.div>
-                        ))}
-                      </AnimatePresence>
-                    </div>
-                  )
-                ) : (
-                  <div>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-                      <div className="text-sm text-white/60">Recent tentacle images from your full library.</div>
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          disabled={isLoadingGlobalTentacleImages || globalTentaclePage === 0}
-                          onClick={() => setGlobalTentaclePage((p) => Math.max(0, p - 1))}
-                          className="px-3 py-2 rounded-2xl border border-white/10 bg-black/20 text-white/75 hover:text-white disabled:opacity-40 disabled:hover:text-white/75 transition text-sm"
+                          onClick={() => setResultsTab('character')}
+                          className={`px-3 py-2 rounded-2xl border text-sm transition ${resultsTab === 'character'
+                            ? 'border-fuchsia-300/60 bg-fuchsia-500/15 text-white'
+                            : 'border-white/10 bg-black/20 text-white/70 hover:text-white'
+                            }`}
                         >
-                          Prev
+                          This Character
                         </button>
-                        <div className="px-3 py-2 rounded-2xl border border-white/10 bg-black/20 text-white/60 text-sm">
-                          Page {globalTentaclePage + 1}
-                        </div>
                         <button
                           type="button"
-                          disabled={isLoadingGlobalTentacleImages || globalTentacleImages.length === 0}
-                          onClick={() => setGlobalTentaclePage((p) => p + 1)}
-                          className="px-3 py-2 rounded-2xl border border-white/10 bg-black/20 text-white/75 hover:text-white disabled:opacity-40 disabled:hover:text-white/75 transition text-sm"
+                          onClick={() => setResultsTab('feed')}
+                          className={`px-3 py-2 rounded-2xl border text-sm transition ${resultsTab === 'feed'
+                            ? 'border-cyan-300/60 bg-cyan-500/10 text-white'
+                            : 'border-white/10 bg-black/20 text-white/70 hover:text-white'
+                            }`}
                         >
-                          Next
+                          Tentacles Feed
                         </button>
                       </div>
                     </div>
+                  </div>
 
-                    {isLoadingGlobalTentacleImages ? (
-                      <div className="text-center py-14 text-white/55">Loading…</div>
-                    ) : globalTentacleImages.length === 0 ? (
-                      <div className="text-center py-14">
-                        <div className="text-white/55">No tentacle images found in this page.</div>
-                        <div className="text-white/40 text-sm mt-2">Try Next or generate some new tentacle renders.</div>
-                      </div>
-                    ) : (
-                      <div key={globalTentaclePage} className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8 gap-4">
-                        <AnimatePresence>
-                          {globalTentacleImages.map((img, idx) => (
-                            <motion.div
-                              key={img.id}
-                              initial={{ opacity: 0, y: 8 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: 8 }}
-                              transition={{ duration: 0.18 }}
-                              className="relative group"
-                            >
-                              <div
-                                className="aspect-[3/4] rounded-2xl overflow-hidden border border-white/10 bg-black/20 cursor-pointer"
-                                onClick={() => {
-                                  setZoomedImageIndex(idx);
-                                  setZoomedImageSource('global');
-                                  setIsZoomed(true);
-                                }}
+                  <div className="p-3 flex-1 min-h-0 overflow-y-auto">
+                    {resultsTab === 'character' ? (
+                      tentacleImages.length === 0 ? (
+                        <div className="text-center py-8">
+                          <div className="text-white/55">No tentacle images yet.</div>
+                          <div className="text-white/40 text-sm mt-2">Generate one from the Scene Builder above.</div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
+                          <AnimatePresence>
+                            {tentacleImages.map((img, idx) => (
+                              <motion.div
+                                key={img.id}
+                                initial={{ opacity: 0, y: 8 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: 8 }}
+                                transition={{ duration: 0.18 }}
+                                className="relative group"
                               >
-                                <img
-                                  src={img.imageUrl}
-                                  alt=""
-                                  className={`w-full h-full object-cover transition ${blurNSFW ? 'blur-xl' : ''}`}
-                                  loading="lazy"
-                                  draggable={false}
-                                />
-                              </div>
-                            </motion.div>
-                          ))}
-                        </AnimatePresence>
+                                <div
+                                  className="aspect-[3/4] rounded-2xl overflow-hidden border border-white/10 bg-black/20 cursor-pointer"
+                                  onClick={() => {
+                                    setZoomedImageIndex(idx);
+                                    setZoomedImageSource('character');
+                                    setIsZoomed(true);
+                                  }}
+                                >
+                                  <img
+                                    src={img.imageUrl}
+                                    alt=""
+                                    className={`w-full h-full object-cover transition ${blurNSFW ? 'blur-xl' : ''}`}
+                                    loading="lazy"
+                                    draggable={false}
+                                  />
+                                </div>
+                                <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setShowImageDropdown(img.id);
+                                      const rect = e.currentTarget.getBoundingClientRect();
+                                      setDropdownPosition({
+                                        top: rect.bottom + 8,
+                                        left: Math.max(12, rect.right - 200) // 200px dropdown width
+                                      });
+                                    }}
+                                    className="p-2 rounded-xl border border-white/10 bg-black/50 text-white/80 hover:text-white"
+                                  >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                                    </svg>
+                                  </button>
+                                </div>
+                                {generatingIds.has(img.id) && (
+                                  <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-2xl">
+                                    <RefreshCw className="w-6 h-6 text-white animate-spin" />
+                                  </div>
+                                )}
+                              </motion.div>
+                            ))}
+                          </AnimatePresence>
+                        </div>
+                      )
+                    ) : (
+                      <div>
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                          <div className="text-sm text-white/60">Recent tentacle images from your full library.</div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              disabled={isLoadingGlobalTentacleImages || globalTentaclePage === 0}
+                              onClick={() => setGlobalTentaclePage((p) => Math.max(0, p - 1))}
+                              className="px-3 py-2 rounded-2xl border border-white/10 bg-black/20 text-white/75 hover:text-white disabled:opacity-40 disabled:hover:text-white/75 transition text-sm"
+                            >
+                              Prev
+                            </button>
+                            <div className="px-3 py-2 rounded-2xl border border-white/10 bg-black/20 text-white/60 text-sm">
+                              Page {globalTentaclePage + 1}
+                            </div>
+                            <button
+                              type="button"
+                              disabled={isLoadingGlobalTentacleImages || globalTentacleImages.length === 0}
+                              onClick={() => setGlobalTentaclePage((p) => p + 1)}
+                              className="px-3 py-2 rounded-2xl border border-white/10 bg-black/20 text-white/75 hover:text-white disabled:opacity-40 disabled:hover:text-white/75 transition text-sm"
+                            >
+                              Next
+                            </button>
+                          </div>
+                        </div>
+
+                        {isLoadingGlobalTentacleImages ? (
+                          <div className="text-center py-10 text-white/55">Loading…</div>
+                        ) : globalTentacleImages.length === 0 ? (
+                          <div className="text-center py-10">
+                            <div className="text-white/55">No tentacle images found in this page.</div>
+                            <div className="text-white/40 text-sm mt-2">Try Next or generate some new tentacle renders.</div>
+                          </div>
+                        ) : (
+                          <div key={globalTentaclePage} className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8 gap-3">
+                            <AnimatePresence>
+                              {globalTentacleImages.map((img, idx) => (
+                                <motion.div
+                                  key={img.id}
+                                  initial={{ opacity: 0, y: 8 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  exit={{ opacity: 0, y: 8 }}
+                                  transition={{ duration: 0.18 }}
+                                  className="relative group"
+                                >
+                                  <div
+                                    className="aspect-[3/4] rounded-2xl overflow-hidden border border-white/10 bg-black/20 cursor-pointer"
+                                    onClick={() => {
+                                      setZoomedImageIndex(idx);
+                                      setZoomedImageSource('global');
+                                      setIsZoomed(true);
+                                    }}
+                                  >
+                                    <img
+                                      src={img.imageUrl}
+                                      alt=""
+                                      className={`w-full h-full object-cover transition ${blurNSFW ? 'blur-xl' : ''}`}
+                                      loading="lazy"
+                                      draggable={false}
+                                    />
+                                  </div>
+                                </motion.div>
+                              ))}
+                            </AnimatePresence>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
-                )}
-              </div>
-            </div>
+                </div>
+              </Tabs.Content>
+            </Tabs.Root>
           </div>
         </div>
       </div>
