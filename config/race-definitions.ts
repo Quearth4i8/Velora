@@ -257,6 +257,14 @@ export const RACE_DEFINITIONS: Record<CharacterStyle, { races: Record<string, Ra
         loraName: undefined,
         loraWeight: 0.8,
       },
+      yordle: {
+        label: 'Yordle',
+        mainTag: 'yordle',
+        specialPrompt:
+          'shortstack, wide hips, cute face, beautiful detailed eyes, perfect symmetrical eyes, clear pupils, sharp eye details, expressive eyes',
+        loraName: 'Yordles.safetensors',
+        loraWeight: 0.9,
+      },
     },
   },
 };

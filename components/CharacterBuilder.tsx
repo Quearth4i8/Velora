@@ -180,13 +180,16 @@ export function CharacterBuilder() {
   };
 
   const canProceed = () => {
+    // Check if Yordle (no ethnicity required)
+    const isYordle = draft.mainTag?.toLowerCase() === 'yordle' || draft.stylePreset?.toLowerCase() === 'yordle';
+
     switch (currentStep) {
       case 0:
         return Boolean(draft.name?.trim()) && typeof draft.identity.age === 'number';
       case 1:
         return Boolean(draft.generation?.style);
       case 2:
-        return Boolean(draft.identity.ethnicity) && Boolean(draft.body.height) && Boolean(draft.identity.skinTone);
+        return (isYordle || Boolean(draft.identity.ethnicity)) && Boolean(draft.body.height) && Boolean(draft.identity.skinTone);
       case 3:
         return (
           Boolean(draft.appearance.hairStyle) &&

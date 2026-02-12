@@ -39,6 +39,9 @@ export const Step2BodyProportions: React.FC = () => {
     setIdentity({ skinTone: skinToneOptions[0] });
   }, [draft.identity.skinTone, setIdentity, skinToneOptions]);
 
+  // Hide ethnicity for Yordles (they have no ethnic background)
+  const isYordle = draft.mainTag?.toLowerCase() === 'yordle' || draft.stylePreset?.toLowerCase() === 'yordle';
+
   const handleEthnicitySelect = (ethnicity: Ethnicity) => {
     setIdentity({ ethnicity });
   };
@@ -58,69 +61,71 @@ export const Step2BodyProportions: React.FC = () => {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
     >
-      <div>
-        <h2 className="text-2xl font-bold text-white mb-2">Ethnic Background</h2>
-        <p className="text-dark-400 mb-6">Choose a background</p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {ethnicityOptions.map((option) => (
-            <motion.button
-              key={option.id}
-              onClick={() => handleEthnicitySelect(option.id as Ethnicity)}
-              className={`relative aspect-[3/4] rounded-xl overflow-hidden transition-all duration-300 ${
-                draft.identity.ethnicity === option.id
-                  ? 'ring-2 ring-pink-500/50 shadow-xl shadow-pink-500/20'
-                  : 'shadow-lg hover:shadow-xl hover:scale-[1.02] border-2 border-transparent'
-              }`}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <div className="relative w-full h-full">
-                <img
-                  src={option.image}
-                  alt={option.label}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = 'none';
-                  }}
-                />
-                
-                {/* Gradient overlay for better text readability */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
-                
-                {/* Selection overlay */}
-                {draft.identity.ethnicity === option.id && (
-                  <motion.div
-                    className="absolute inset-0 bg-gradient-to-br from-pink-500/30 to-purple-500/20"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.3 }}
+      {!isYordle && (
+        <div>
+          <h2 className="text-2xl font-bold text-white mb-2">Ethnic Background</h2>
+          <p className="text-dark-400 mb-6">Choose a background</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {ethnicityOptions.map((option) => (
+              <motion.button
+                key={option.id}
+                onClick={() => handleEthnicitySelect(option.id as Ethnicity)}
+                className={`relative aspect-[3/4] rounded-xl overflow-hidden transition-all duration-300 ${
+                  draft.identity.ethnicity === option.id
+                    ? 'ring-2 ring-pink-500/50 shadow-xl shadow-pink-500/20'
+                    : 'shadow-lg hover:shadow-xl hover:scale-[1.02] border-2 border-transparent'
+                }`}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <div className="relative w-full h-full">
+                  <img
+                    src={option.image}
+                    alt={option.label}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
                   />
-                )}
-                
-                {/* Label text overlay */}
-                <div className="absolute bottom-0 left-0 right-0 p-3">
-                  <p className="text-white text-sm font-medium text-center drop-shadow-lg">
-                    {option.label}
-                  </p>
+                  
+                  {/* Gradient overlay for better text readability */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+                  
+                  {/* Selection overlay */}
+                  {draft.identity.ethnicity === option.id && (
+                    <motion.div
+                      className="absolute inset-0 bg-gradient-to-br from-pink-500/30 to-purple-500/20"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.3 }}
+                    />
+                  )}
+                  
+                  {/* Label text overlay */}
+                  <div className="absolute bottom-0 left-0 right-0 p-3">
+                    <p className="text-white text-sm font-medium text-center drop-shadow-lg">
+                      {option.label}
+                    </p>
+                  </div>
+                  
+                  {/* Selection indicator */}
+                  {draft.identity.ethnicity === option.id && (
+                    <motion.div
+                      className="absolute top-2 right-2 bg-white rounded-full p-1.5 shadow-lg"
+                      initial={{ scale: 0, rotate: -180 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                    >
+                      <Check className="w-3.5 h-3.5 text-pink-500" />
+                    </motion.div>
+                  )}
                 </div>
-                
-                {/* Selection indicator */}
-                {draft.identity.ethnicity === option.id && (
-                  <motion.div
-                    className="absolute top-2 right-2 bg-white rounded-full p-1.5 shadow-lg"
-                    initial={{ scale: 0, rotate: -180 }}
-                    animate={{ scale: 1, rotate: 0 }}
-                    transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                  >
-                    <Check className="w-3.5 h-3.5 text-pink-500" />
-                  </motion.div>
-                )}
-              </div>
-            </motion.button>
-          ))}
+              </motion.button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="border-t border-dark-700 pt-8">
         <h2 className="text-2xl font-bold text-white mb-2">Skin Tone</h2>

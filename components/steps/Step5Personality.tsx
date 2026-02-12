@@ -10,9 +10,10 @@ interface PersonalityArchetype {
   name: string;
   description: string;
   traits: PersonalityTraits;
+  tags?: string; // 4-word tags for Yordle personalities
 }
 
-const archetypes: PersonalityArchetype[] = [
+const defaultArchetypes: PersonalityArchetype[] = [
   {
     id: 'jealous-flame',
     name: 'Jealous Flame',
@@ -75,19 +76,146 @@ const archetypes: PersonalityArchetype[] = [
   },
 ];
 
+// Yordle-specific personality archetypes (4-word tags)
+const yordleArchetypes: PersonalityArchetype[] = [
+  {
+    id: 'yordle-cheerful',
+    name: 'Cheerful Prankster',
+    description: 'Playful & benevolent',
+    tags: 'cheerful playful prankster benevolent',
+    traits: { submissiveDominant: 30, insecureConfident: 70, coldPassionate: 60, reservedOutgoing: 90, seriousPlayful: 95 },
+  },
+  {
+    id: 'yordle-whimsical',
+    name: 'Whimsical Dreamer',
+    description: 'Dreamy & empathetic',
+    tags: 'whimsical dreamy mischievous empathetic',
+    traits: { submissiveDominant: 40, insecureConfident: 60, coldPassionate: 70, reservedOutgoing: 60, seriousPlayful: 80 },
+  },
+  {
+    id: 'yordle-jovial',
+    name: 'Jovial Optimist',
+    description: 'Outgoing & friendly',
+    tags: 'jovial optimistic outgoing friendly',
+    traits: { submissiveDominant: 35, insecureConfident: 80, coldPassionate: 75, reservedOutgoing: 95, seriousPlayful: 90 },
+  },
+  {
+    id: 'yordle-adventurous',
+    name: 'Adventurous Spirit',
+    description: 'Bold & thrill-seeking',
+    tags: 'energetic adventurous thrill-seeking bold',
+    traits: { submissiveDominant: 60, insecureConfident: 85, coldPassionate: 80, reservedOutgoing: 90, seriousPlayful: 85 },
+  },
+  {
+    id: 'yordle-curious',
+    name: 'Curious Wonder',
+    description: 'Innocent & excited',
+    tags: 'curious innocent wonder-filled excited',
+    traits: { submissiveDominant: 25, insecureConfident: 70, coldPassionate: 85, reservedOutgoing: 80, seriousPlayful: 95 },
+  },
+  {
+    id: 'yordle-brave',
+    name: 'Brave Hero',
+    description: 'Determined & dutiful',
+    tags: 'brave determined heroic dutiful',
+    traits: { submissiveDominant: 70, insecureConfident: 90, coldPassionate: 75, reservedOutgoing: 75, seriousPlayful: 40 },
+  },
+  {
+    id: 'yordle-eccentric',
+    name: 'Eccentric Inventor',
+    description: 'Brilliant & absent-minded',
+    tags: 'eccentric inventive brilliant absent-minded',
+    traits: { submissiveDominant: 40, insecureConfident: 75, coldPassionate: 60, reservedOutgoing: 50, seriousPlayful: 70 },
+  },
+  {
+    id: 'yordle-fiery',
+    name: 'Fiery Rebel',
+    description: 'Passionate & rebellious',
+    tags: 'fiery passionate rebellious underdog',
+    traits: { submissiveDominant: 75, insecureConfident: 70, coldPassionate: 90, reservedOutgoing: 80, seriousPlayful: 60 },
+  },
+  {
+    id: 'yordle-chaotic',
+    name: 'Chaotic Fun',
+    description: 'Explosive & fun-loving',
+    tags: 'chaotic explosive fun-loving destructive',
+    traits: { submissiveDominant: 50, insecureConfident: 80, coldPassionate: 70, reservedOutgoing: 85, seriousPlayful: 95 },
+  },
+  {
+    id: 'yordle-mischievous',
+    name: 'Mischievous Sneak',
+    description: 'Cunning & deceptive',
+    tags: 'mischievous sneaky cunning deceptive',
+    traits: { submissiveDominant: 55, insecureConfident: 65, coldPassionate: 50, reservedOutgoing: 70, seriousPlayful: 85 },
+  },
+  {
+    id: 'yordle-gloomy',
+    name: 'Gloomy Soul',
+    description: 'Pessimistic & emo',
+    tags: 'gloomy pessimistic depressive emo',
+    traits: { submissiveDominant: 45, insecureConfident: 25, coldPassionate: 30, reservedOutgoing: 20, seriousPlayful: 20 },
+  },
+  {
+    id: 'yordle-villainous',
+    name: 'Comically Villainous',
+    description: 'Evil & twisted',
+    tags: 'villainous evil comically malevolent twisted',
+    traits: { submissiveDominant: 85, insecureConfident: 70, coldPassionate: 40, reservedOutgoing: 60, seriousPlayful: 50 },
+  },
+  {
+    id: 'yordle-dual',
+    name: 'Dual Nature',
+    description: 'Cheerful but dark',
+    tags: 'dual cheerful ruthless hidden dark',
+    traits: { submissiveDominant: 70, insecureConfident: 60, coldPassionate: 50, reservedOutgoing: 50, seriousPlayful: 50 },
+  },
+  {
+    id: 'yordle-lonely',
+    name: 'Lonely Tormented',
+    description: 'Isolated & cursed',
+    tags: 'lonely isolated tormented cursed',
+    traits: { submissiveDominant: 40, insecureConfident: 20, coldPassionate: 25, reservedOutgoing: 15, seriousPlayful: 15 },
+  },
+  {
+    id: 'yordle-protective',
+    name: 'Protective Guardian',
+    description: 'Loyal & fierce',
+    tags: 'protective loyal fierce guardian',
+    traits: { submissiveDominant: 65, insecureConfident: 85, coldPassionate: 70, reservedOutgoing: 60, seriousPlayful: 30 },
+  },
+  {
+    id: 'yordle-mad',
+    name: 'Mad Wild',
+    description: 'Unpredictable & chaotic',
+    tags: 'mad chaotic unpredictable wild',
+    traits: { submissiveDominant: 60, insecureConfident: 75, coldPassionate: 65, reservedOutgoing: 70, seriousPlayful: 90 },
+  },
+  {
+    id: 'custom',
+    name: 'Custom',
+    description: 'Create your own',
+    tags: '',
+    traits: { submissiveDominant: 50, insecureConfident: 50, coldPassionate: 50, reservedOutgoing: 50, seriousPlayful: 50 },
+  },
+];
+
 export const Step5Personality: React.FC = () => {
   const { draft, setPersonality, setPersonalityTraits } = useCharacterBuilder();
   const isCustom = draft.personality.archetype === 'custom';
+
+  // Use Yordle archetypes if the character is a Yordle
+  const isYordle = draft.mainTag?.toLowerCase() === 'yordle' || draft.stylePreset?.toLowerCase() === 'yordle';
+  const archetypes = isYordle ? yordleArchetypes : defaultArchetypes;
 
   const handleArchetypeSelect = (archetype: PersonalityArchetype) => {
     setPersonality({
       archetype: archetype.id,
       isCustom: archetype.id === 'custom',
       traits: archetype.traits,
-      customSpecialty: archetype.id === 'custom' ? draft.personality.customSpecialty : undefined,
+      customSpecialty: archetype.id === 'custom' ? draft.personality.customSpecialty : (archetype.tags || undefined),
     });
 
-    if (archetype.id !== 'custom' && draft.personality.customSpecialty) {
+    if (archetype.id !== 'custom' && draft.personality.customSpecialty && !archetype.tags) {
       setPersonality({ customSpecialty: undefined });
     }
   };

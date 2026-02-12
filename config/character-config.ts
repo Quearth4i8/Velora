@@ -58,6 +58,7 @@ export const RACE_SKIN_TONE_OPTIONS: Record<string, string[]> = {
     '#EE82EE',
     '#DA70D6',
   ],
+  yordle: ['#0000FF', '#800080', '#8B4513', '#FF8C00', '#FF69B4', '#008000', '#808080'],
 };
 
 export const getSkinToneOptionsForRace = (raceId?: string, mainTag?: string): string[] => {
@@ -71,6 +72,9 @@ export const getSkinToneOptionsForRace = (raceId?: string, mainTag?: string): st
     if (RACE_SKIN_TONE_OPTIONS[normalizedMainTag]) return RACE_SKIN_TONE_OPTIONS[normalizedMainTag];
     if (normalizedMainTag === 'goblin girl' || normalizedMainTag.includes('goblin')) {
       return RACE_SKIN_TONE_OPTIONS['goblin-girl'];
+    }
+    if (normalizedMainTag === 'yordle' || normalizedMainTag.includes('yordle')) {
+      return RACE_SKIN_TONE_OPTIONS['yordle'];
     }
   }
 
