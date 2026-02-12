@@ -1,4 +1,4 @@
-import { CharacterDraft, CharacterStyle, AIModel, Ethnicity, ClothingStyle, ImageGenerationPlan } from './types';
+import { CharacterDraft, CharacterStyle, AIModel, Ethnicity, ClothingStyle, ImageGenerationPlan, Environment } from './types';
 
 import { characterAPI } from './api';
 import { supabase } from './supabase';
@@ -936,6 +936,14 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle, settings?: an
   const clothing = appearance.clothing?.toLowerCase() || '';
   const environment = appearance.environment?.toLowerCase().replace('_', ' ') || '';
 
+  // Check if environment is a preset or custom text
+  const isPresetEnvironment = Object.values(Environment).includes(appearance.environment as Environment);
+  const environmentTag = environment
+    ? isPresetEnvironment
+      ? `in ${environment} setting`
+      : `in ${environment}`
+    : '';
+
   const getPersonalityPromptTags = (): string[] => {
     const tags: string[] = [];
 
@@ -1086,7 +1094,6 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle, settings?: an
   const hairColorTag = hairColor ? `${hexToColorName(hairColor)} hair` : '';
   const eyeColorTag = eyeColor ? `${eyeColor} eyes` : '';
   const eyeTypeTag = eyeType ? (eyeTypeDescriptions[eyeType] || `${eyeType} eyes`) : '';
-  const environmentTag = environment ? `in ${environment} setting` : '';
 
   const centaurAnatomy = isCentaur ? 'equine lower body, horse body, four legs, four hooves' : '';
   const arachneCpt = getArachneCptContext(draft);

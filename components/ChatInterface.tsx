@@ -54,6 +54,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
     character?.appearance?.customClothing || ''
   );
   const [wardrobeOutfitColors, setWardrobeOutfitColors] = useState<Record<string, string>>({});
+  const [pendingCustomEnvironment, setPendingCustomEnvironment] = useState<string>('');
   const [isZoomed, setIsZoomed] = useState(false);
   const [zoomedImageUrl, setZoomedImageUrl] = useState<string | null>(null);
   const [blurImages, setBlurImages] = useState(false);
@@ -379,7 +380,17 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
     currentCharacter.appearance?.clothing === 'custom'
       ? (currentCharacter.appearance?.customClothing || 'Custom')
       : (currentCharacter.appearance?.clothing || '—');
-  const locationLabel = currentCharacter.appearance?.environment || '—';
+  const locationLabel = useMemo(() => {
+    const env = currentCharacter.appearance?.environment;
+    if (!env) return '—';
+    // Check if it's a preset environment
+    const isPreset = Object.values(Environment).includes(env as Environment);
+    if (isPreset) {
+      return env.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+    // It's a custom location (stored as plain text in environment column)
+    return env;
+  }, [currentCharacter.appearance?.environment]);
 
   const conversationContextPromptAddon = useMemo(() => {
     if (chatMode !== 'normal') return '';
@@ -3307,7 +3318,13 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
                           placeholder="e.g., Victorian gothic dress with lace trim and corset..."
                           className="flex-1 px-4 py-3 bg-dark-800/50 text-white rounded-xl border border-pink-500/50 focus:border-green-500/50 focus:outline-none focus:ring-2 focus:ring-green-500/20 placeholder-pink-400"
                           value={pendingWardrobeCustomClothing}
-                          onChange={(e) => setPendingWardrobeCustomClothing(e.target.value)}
+                          onChange={(e) => {
+                            setPendingWardrobeCustomClothing(e.target.value);
+                            // Auto-select CUSTOM when user types
+                            if (e.target.value.trim() && pendingWardrobeClothing !== ClothingStyle.CUSTOM) {
+                              setPendingWardrobeClothing(ClothingStyle.CUSTOM);
+                            }
+                          }}
                         />
                         <motion.button
                           whileHover={{ scale: 1.02 }}
@@ -3451,6 +3468,82 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
                   </button>
                 ))}
               </div>
+
+              {/* Custom Location Section - Show when CUSTOM is selected */}
+              {currentCharacter.appearance?.environment === Environment.CUSTOM && (
+                <div className="mt-6 pt-6 border-t border-dark-600">
+                  <h3 className="text-lg font-semibold text-white mb-3">Custom Location</h3>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <input
+                      type="text"
+                      value={pendingCustomEnvironment}
+                      onChange={(e) => setPendingCustomEnvironment(e.target.value)}
+                      placeholder="e.g., Crystal Cave, Space Station, Tropical Beach..."
+                      className="flex-1 px-4 py-3 bg-dark-900/30 text-dark-100 rounded-xl border border-dark-600 focus:border-green-500/40 focus:outline-none focus:ring-2 focus:ring-green-500/15 placeholder:text-dark-400"
+                    />
+                    <button
+                      onClick={async () => {
+                        const customEnv = pendingCustomEnvironment?.trim();
+                        if (!customEnv) return;
+                        
+                        // Save custom location text directly to environment column
+                        const updatedCharacter = {
+                          ...currentCharacter,
+                          appearance: {
+                            ...currentCharacter.appearance,
+                            environment: customEnv as any // Save custom text to environment column
+                          }
+                        };
+                        
+                        setCurrentCharacter(updatedCharacter);
+                        setShowEnvironment(false);
+                        setPendingCustomEnvironment('');
+                        
+                        // Save to database - custom text goes directly to environment column
+                        if (currentCharacter.id) {
+                          try {
+                            const result = await characterAPI.updateCharacterDirect(currentCharacter.id, {
+                              environment: customEnv
+                            });
+                            
+                            if (!result.success) {
+                              console.error('Failed to save custom environment:', result.error);
+                            } else {
+                              const refreshedCharacter = await characterAPI.getCharacterFresh(currentCharacter.id);
+                              if (refreshedCharacter.success && refreshedCharacter.data) {
+                                setCurrentCharacter(refreshedCharacter.data);
+                                onCharacterUpdate?.(refreshedCharacter.data);
+                              }
+                            }
+                          } catch (error) {
+                            console.error('Failed to save custom environment:', error);
+                          }
+                        }
+                        
+                        // Add a message about the environment change
+                        const environmentMessage: Partial<ChatMessage> = {
+                          conversationId: conversation?.id || 'temp',
+                          characterId: currentCharacter.id || 'temp',
+                          content: `*The scene changes to ${customEnv}*`,
+                          sender: 'character',
+                        };
+                        
+                        const savedMsg = await characterAPI.saveMessage(environmentMessage);
+                        if (savedMsg.success) {
+                          setMessages(prev => [...prev, {
+                            ...savedMsg.data,
+                            timestamp: new Date(savedMsg.data.timestamp)
+                          }]);
+                        }
+                      }}
+                      disabled={!pendingCustomEnvironment?.trim()}
+                      className="h-12 px-5 rounded-xl bg-gradient-to-r from-green-600 to-green-500 text-white font-semibold hover:from-green-500 hover:to-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    >
+                      Apply Custom
+                    </button>
+                  </div>
+                </div>
+              )}
             </motion.div>
           </motion.div>
         )}

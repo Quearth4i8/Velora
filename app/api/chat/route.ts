@@ -4,7 +4,8 @@ export async function POST(request: Request) {
     try {
         const body = await request.json();
 
-        const lmStudioResponse = await fetch('http://127.0.0.1:1234/v1/chat/completions', {
+        const lmStudioUrl = process.env.LM_STUDIO_URL || 'http://127.0.0.1:1234';
+        const lmStudioResponse = await fetch(`${lmStudioUrl}/v1/chat/completions`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

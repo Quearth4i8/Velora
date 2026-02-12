@@ -161,6 +161,7 @@ export enum Environment {
   OFFICE = 'office',
   GYM = 'gym',
   POOL = 'pool',
+  CUSTOM = 'custom',
 }
 
 export interface PersonalityTraits {
