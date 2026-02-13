@@ -143,40 +143,60 @@ export default function GalleryPage() {
       const finalPrompt = buildSpecialPrompt(specialPrompt, generationSettings.style);
       const finalNegativePrompt = buildSpecialNegativePrompt(specialNegativePrompt);
 
-      const payload = {
-        prompt: finalPrompt,
-        negative_prompt: finalNegativePrompt,
-        width: dimensions.width,
-        height: dimensions.height,
-        steps: generationSettings.steps || 30,
-        cfg_scale: generationSettings.cfgScale || 8,
-        sampler_name: generationSettings.sampler || 'DPM++ 2M Karras',
-        seed: generationSettings.seed === -1 ? -1 : generationSettings.seed,
-        model_name: resolvedModel,
-        override_settings: {
-          sd_model_checkpoint: resolvedModel,
-        },
-      };
-
-      const response = await fetch('/api/automatic1111/txt2img', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ payload }),
-      });
-
-      if (!response.ok) {
-        const details = await response.text().catch(() => '');
-        console.error('Automatic1111 txt2img error:', {
-          status: response.status,
-          statusText: response.statusText,
-          details,
+      let response;
+      if (generationSettings.useHires) {
+        response = await automatic1111API.generateHiresImage({
+          prompt: finalPrompt,
+          negative_prompt: finalNegativePrompt,
+          width: dimensions.width,
+          height: dimensions.height,
+          steps: generationSettings.steps || 30,
+          cfg_scale: generationSettings.cfgScale || 8,
+          sampler_name: generationSettings.sampler || 'DPM++ 2M Karras',
+          seed: generationSettings.seed === -1 ? -1 : generationSettings.seed,
+          model_name: resolvedModel,
+          override_settings: {
+            sd_model_checkpoint: resolvedModel,
+          },
         });
-        throw new Error(`Automatic1111 API error (${response.status}): ${details || response.statusText}`);
+      } else {
+        const payload = {
+          prompt: finalPrompt,
+          negative_prompt: finalNegativePrompt,
+          width: dimensions.width,
+          height: dimensions.height,
+          steps: generationSettings.steps || 30,
+          cfg_scale: generationSettings.cfgScale || 8,
+          sampler_name: generationSettings.sampler || 'DPM++ 2M Karras',
+          seed: generationSettings.seed === -1 ? -1 : generationSettings.seed,
+          model_name: resolvedModel,
+          override_settings: {
+            sd_model_checkpoint: resolvedModel,
+          },
+        };
+
+        const fetchResponse = await fetch('/api/automatic1111/txt2img', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ payload }),
+        });
+
+        if (!fetchResponse.ok) {
+          const details = await fetchResponse.text().catch(() => '');
+          console.error('Automatic1111 txt2img error:', {
+            status: fetchResponse.status,
+            statusText: fetchResponse.statusText,
+            details,
+          });
+          throw new Error(`Automatic1111 API error (${fetchResponse.status}): ${details || fetchResponse.statusText}`);
+        }
+
+        response = await fetchResponse.json();
       }
 
-      const result = await response.json();
+      const result = generationSettings.useHires ? response : await response.json();
 
       if (!result.images || result.images.length === 0) {
         throw new Error('No images returned from Automatic1111');
@@ -358,7 +378,8 @@ export default function GalleryPage() {
     cfgScale: 7,
     sampler: 'DPM++ 2M Karras',
     negativePrompt: '',
-    seed: -1
+    seed: -1,
+    useHires: false
   });
 
   useEffect(() => {
@@ -692,25 +713,43 @@ export default function GalleryPage() {
 
       console.log('Generating image with prompt:', prompt);
 
-      const response = await fetch('/api/automatic1111/txt2img', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ payload }),
-      });
-
-      if (!response.ok) {
-        const details = await response.text().catch(() => '');
-        console.error('Automatic1111 txt2img error:', {
-          status: response.status,
-          statusText: response.statusText,
-          details,
+      let result;
+      if (generationSettings.useHires) {
+        result = await automatic1111API.generateHiresImage({
+          prompt: getEnhancedPrompt(prompt, generationSettings.style),
+          negative_prompt: finalNegativePrompt,
+          width: dimensions.width,
+          height: dimensions.height,
+          steps: generationSettings.steps || 30,
+          cfg_scale: generationSettings.cfgScale || 8,
+          sampler_name: generationSettings.sampler || 'DPM++ 2M Karras',
+          seed: generationSettings.seed === -1 ? -1 : generationSettings.seed,
+          model_name: resolvedModel,
+          override_settings: {
+            sd_model_checkpoint: resolvedModel,
+          },
         });
-        throw new Error(`Automatic1111 API error (${response.status}): ${details || response.statusText}`);
-      }
+      } else {
+        const response = await fetch('/api/automatic1111/txt2img', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ payload }),
+        });
 
-      const result = await response.json();
+        if (!response.ok) {
+          const details = await response.text().catch(() => '');
+          console.error('Automatic1111 txt2img error:', {
+            status: response.status,
+            statusText: response.statusText,
+            details,
+          });
+          throw new Error(`Automatic1111 API error (${response.status}): ${details || response.statusText}`);
+        }
+
+        result = await response.json();
+      }
 
       if (!result.images || result.images.length === 0) {
         throw new Error('No images returned from Automatic1111');
@@ -1047,6 +1086,24 @@ export default function GalleryPage() {
               placeholder="-1 for random"
             />
           </div>
+
+          <div className="flex items-center justify-between">
+            <label className="block text-dark-300 text-xs font-medium">Hi-Res Upscale</label>
+            <button
+              type="button"
+              onClick={() => setGenerationSettings(prev => ({ ...prev, useHires: !prev.useHires }))}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                generationSettings.useHires ? 'bg-pink-500' : 'bg-dark-700'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  generationSettings.useHires ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+          <div className="text-xs text-dark-400">2x upscaling with detail preservation</div>
 
           <div>
             <label className="block text-dark-300 text-xs font-medium mb-1">Negative Prompt</label>

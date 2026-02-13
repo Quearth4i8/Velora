@@ -2276,16 +2276,13 @@ export const automatic1111API = {
           body: JSON.stringify(makeHiresPayload(hr_upscaler))
         });
 
-        const contentType = response.headers.get('content-type') || '';
-        const raw = await response.text();
-
-        return { response, contentType, raw, hr_upscaler };
+        return { response, hr_upscaler };
       };
 
       let attemptResult = await attempt(preferredUpscaler);
 
       if (!attemptResult.response.ok) {
-        const message = String(attemptResult.raw || '');
+        const message = await attemptResult.response.text().catch(() => '');
         const maybeUpscalerError = message.toLowerCase().includes('could not find upscaler named');
         if (maybeUpscalerError && preferredUpscaler !== 'Latent') {
           attemptResult = await attempt('Latent');
@@ -2293,14 +2290,13 @@ export const automatic1111API = {
       }
 
       if (!attemptResult.response.ok) {
+        const errorText = await attemptResult.response.text().catch(() => attemptResult.response.statusText);
         throw new Error(
-          `Automatic1111 API error (${attemptResult.response.status}): ${attemptResult.raw || attemptResult.response.statusText}`
+          `Automatic1111 API error (${attemptResult.response.status}): ${errorText}`
         );
       }
 
-      const result = attemptResult.contentType.includes('application/json')
-        ? JSON.parse(attemptResult.raw)
-        : JSON.parse(attemptResult.raw);
+      const result = await attemptResult.response.json();
 
       if (!result.images || result.images.length === 0) {
         throw new Error('No images returned from Automatic1111');
