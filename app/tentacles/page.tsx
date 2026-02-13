@@ -141,79 +141,95 @@ const PRESET_CATEGORIES: PresetCategory[] = [
   { id: 'xray', label: 'X-ray' },
 ];
 
-const TENTACLES_PRESETS: Array<{ id: TentaclesPresetId; label: string; prompt: string; category: PresetCategoryId }> = [
-  { id: 'wrap_arms', label: 'Wrap Arms', prompt: 'tentacles wrapping around arms, arms up, restrained', category: 'pose_restraint' },
-  { id: 'wrap_legs', label: 'Wrap Legs', prompt: 'tentacles wrapping around legs, ankles bound, dynamic pose', category: 'pose_restraint' },
-  { id: 'restraint', label: 'Restraint', prompt: 'restrained posture, wrists and ankles secured, controlled pose', category: 'pose_restraint' },
-  { id: 'lift_pose', label: 'Lift Pose', prompt: 'lifted and suspended pose, toes pointed, dramatic composition', category: 'pose_restraint' },
-  { id: 'kneeling_pose', label: 'Kneeling', prompt: 'kneeling pose, shoulders back, submissive posture', category: 'pose_restraint' },
-  { id: 'arched_back', label: 'Arched Back', prompt: 'arched back, chest forward, tense silhouette', category: 'pose_restraint' },
-  { id: 'chains', label: 'Chains', prompt: 'decorative chains, restrained aesthetic, metallic highlights', category: 'pose_restraint' },
-  { id: 'shibari_rope', label: 'Rope', prompt: 'rope harness, intricate knots, restraint aesthetic', category: 'pose_restraint' },
+const TENTACLES_PRESETS: Array<{ id: TentaclesPresetId; label: string; prompt: string; category: PresetCategoryId; subcategory?: string }> = [
+  // Poses & Restraint
+  { id: 'wrap_arms', label: 'Wrap Arms', prompt: 'tentacles wrapping around arms, arms up, restrained', category: 'pose_restraint', subcategory: 'Poses & Restraint' },
+  { id: 'wrap_legs', label: 'Wrap Legs', prompt: 'tentacles wrapping around legs, ankles bound, dynamic pose', category: 'pose_restraint', subcategory: 'Poses & Restraint' },
+  { id: 'restraint', label: 'Restraint', prompt: 'restrained posture, wrists and ankles secured, controlled pose', category: 'pose_restraint', subcategory: 'Poses & Restraint' },
+  { id: 'lift_pose', label: 'Lift Pose', prompt: 'lifted and suspended pose, toes pointed, dramatic composition', category: 'pose_restraint', subcategory: 'Poses & Restraint' },
+  { id: 'kneeling_pose', label: 'Kneeling', prompt: 'kneeling pose, shoulders back, submissive posture', category: 'pose_restraint', subcategory: 'Poses & Restraint' },
+  { id: 'arched_back', label: 'Arched Back', prompt: 'arched back, chest forward, tense silhouette', category: 'pose_restraint', subcategory: 'Poses & Restraint' },
+  { id: 'chains', label: 'Chains', prompt: 'decorative chains, restrained aesthetic, metallic highlights', category: 'pose_restraint', subcategory: 'Poses & Restraint' },
+  { id: 'shibari_rope', label: 'Rope', prompt: 'rope harness, intricate knots, restraint aesthetic', category: 'pose_restraint', subcategory: 'Poses & Restraint' },
+  { id: 'extreme_restraint', label: 'Extreme Restraint', prompt: 'restrained by tentacles, arms restrained by tentacles, restrained_tentacles, tight bondage', category: 'pose_restraint', subcategory: 'Poses & Restraint' },
+  { id: 'suspended_air', label: 'Suspended in Air', prompt: 'suspended in air, suspension, floating, levitating, hanging by tentacles', category: 'pose_restraint', subcategory: 'Poses & Restraint' },
+  { id: 'spread_arms_legs', label: 'Spread Arms & Legs', prompt: 'spread arms, outstretched arms, spread legs, forced spread position', category: 'pose_restraint', subcategory: 'Poses & Restraint' },
+  { id: 'arms_behind_back', label: 'Arms Behind Back', prompt: 'arms behind back, reverse prayer position, restrained arms', category: 'pose_restraint', subcategory: 'Poses & Restraint' },
 
-  { id: 'teasing_touch', label: 'Teasing Touch', prompt: 'teasing touch, gentle caress, slow tension, seductive atmosphere', category: 'tentacle_behavior' },
-  { id: 'surrounded', label: 'Surrounded', prompt: 'surrounded by tentacles, encircled, looming shapes', category: 'tentacle_behavior' },
-  { id: 'multiple_tentacles', label: 'Many Tentacles', prompt: 'multiple tentacles, layered coils, complex shapes', category: 'tentacle_behavior' },
-  { id: 'coiling', label: 'Coiling', prompt: 'tight coiling, spiral wraps, squeezing embrace', category: 'tentacle_behavior' },
-  { id: 'pull_close', label: 'Pull Close', prompt: 'pulled close, pinned against rock, controlled movement', category: 'tentacle_behavior' },
-  { id: 'face_covered', label: 'Face Covered', prompt: 'face partly covered by coils, obscured expression, dramatic mood', category: 'tentacle_behavior' },
-  { id: 'tentacle_crown', label: 'Tentacle Crown', prompt: 'tentacle crown silhouette, framing the head, elegant menace', category: 'tentacle_behavior' },
-  { id: 'hair_grab', label: 'Hair Grab', prompt: 'hair pulled back, tense posture, dominant framing', category: 'tentacle_behavior' },
-  { id: 'dynamic_motion', label: 'Dynamic Motion', prompt: 'dynamic motion, motion blur, dramatic angle', category: 'tentacle_behavior' },
+  // Tentacle Behavior
+  { id: 'teasing_touch', label: 'Teasing Touch', prompt: 'teasing touch, gentle caress, slow tension, seductive atmosphere', category: 'tentacle_behavior', subcategory: 'Tentacle Behavior' },
+  { id: 'surrounded', label: 'Surrounded', prompt: 'surrounded by tentacles, encircled, looming shapes', category: 'tentacle_behavior', subcategory: 'Tentacle Behavior' },
+  { id: 'multiple_tentacles', label: 'Many Tentacles', prompt: 'multiple tentacles, layered coils, complex shapes', category: 'tentacle_behavior', subcategory: 'Tentacle Behavior' },
+  { id: 'coiling', label: 'Coiling', prompt: 'tight coiling, spiral wraps, squeezing embrace', category: 'tentacle_behavior', subcategory: 'Tentacle Behavior' },
+  { id: 'pull_close', label: 'Pull Close', prompt: 'pulled close, pinned against rock, controlled movement', category: 'tentacle_behavior', subcategory: 'Tentacle Behavior' },
+  { id: 'face_covered', label: 'Face Covered', prompt: 'face partly covered by coils, obscured expression, dramatic mood', category: 'tentacle_behavior', subcategory: 'Tentacle Behavior' },
+  { id: 'tentacle_crown', label: 'Tentacle Crown', prompt: 'tentacle crown silhouette, framing the head, elegant menace', category: 'tentacle_behavior', subcategory: 'Tentacle Behavior' },
+  { id: 'hair_grab', label: 'Hair Grab', prompt: 'hair pulled back, tense posture, dominant framing', category: 'tentacle_behavior', subcategory: 'Tentacle Behavior' },
+  { id: 'dynamic_motion', label: 'Dynamic Motion', prompt: 'dynamic motion, motion blur, dramatic angle', category: 'tentacle_behavior', subcategory: 'Tentacle Behavior' },
+  { id: 'huge_tentacles', label: 'Huge Tentacles', prompt: 'huge tentacle, massive tentacles, giant tentacles, enormous tentacles', category: 'tentacle_behavior', subcategory: 'Tentacle Behavior' },
+  { id: 'veiny_tentacles', label: 'Veiny Tentacles', prompt: 'veins tentacle, veiny tentacles, throbbing veins, vascular tentacles', category: 'tentacle_behavior', subcategory: 'Tentacle Behavior' },
+  { id: 'glowing_tentacles', label: 'Glowing Tentacles', prompt: 'glowing tentacles, bioluminescent tentacles, radiant tentacles, ethereal glow', category: 'tentacle_behavior', subcategory: 'Tentacle Behavior' },
+  { id: 'knotty_tentacles', label: 'Knotty Tentacles', prompt: 'knotty tentacles, knotted tentacles, textured surface, bumpy tentacles', category: 'tentacle_behavior', subcategory: 'Tentacle Behavior' },
 
-  { id: 'slime_tentacles', label: 'Slime Tentacles', prompt: 'slimy tentacles, glossy wet texture, wet shine', category: 'atmosphere' },
-  { id: 'dripping_slime', label: 'Dripping Slime', prompt: 'dripping slime, viscous trails, glossy highlights', category: 'atmosphere' },
-  { id: 'wet_gloss', label: 'Wet Gloss', prompt: 'wet gloss, specular highlights, moisture in the air', category: 'atmosphere' },
-  { id: 'ink_mist', label: 'Ink Mist', prompt: 'inky mist, dark fog, floating particles', category: 'atmosphere' },
-  { id: 'bioluminescent_glow', label: 'Bio Glow', prompt: 'bioluminescent glow, neon rim light, glowing spores', category: 'atmosphere' },
-  { id: 'fog', label: 'Fog', prompt: 'thick fog, volumetric light, moody cave air', category: 'atmosphere' },
-  { id: 'dramatic_lighting', label: 'Dramatic Light', prompt: 'dramatic lighting, high contrast, sharp shadows', category: 'atmosphere' },
-  { id: 'backlit_silhouette', label: 'Backlit', prompt: 'backlit silhouette, rim light, strong outline', category: 'atmosphere' },
+  // Atmosphere & Effects
+  { id: 'slime_tentacles', label: 'Slime Tentacles', prompt: 'slimy tentacles, glossy wet texture, wet shine', category: 'atmosphere', subcategory: 'Atmosphere & Effects' },
+  { id: 'dripping_slime', label: 'Dripping Slime', prompt: 'dripping slime, viscous trails, glossy highlights', category: 'atmosphere', subcategory: 'Atmosphere & Effects' },
+  { id: 'wet_gloss', label: 'Wet Gloss', prompt: 'wet gloss, specular highlights, moisture in the air', category: 'atmosphere', subcategory: 'Atmosphere & Effects' },
+  { id: 'ink_mist', label: 'Ink Mist', prompt: 'inky mist, dark fog, floating particles', category: 'atmosphere', subcategory: 'Atmosphere & Effects' },
+  { id: 'bioluminescent_glow', label: 'Bio Glow', prompt: 'bioluminescent glow, neon rim light, glowing spores', category: 'atmosphere', subcategory: 'Atmosphere & Effects' },
+  { id: 'fog', label: 'Fog', prompt: 'thick fog, volumetric light, moody cave air', category: 'atmosphere', subcategory: 'Atmosphere & Effects' },
+  { id: 'dramatic_lighting', label: 'Dramatic Light', prompt: 'dramatic lighting, high contrast, sharp shadows', category: 'atmosphere', subcategory: 'Atmosphere & Effects' },
+  { id: 'backlit_silhouette', label: 'Backlit', prompt: 'backlit silhouette, rim light, strong outline', category: 'atmosphere', subcategory: 'Atmosphere & Effects' },
+  { id: 'tentacle_pit', label: 'Tentacle Pit', prompt: 'tentacle pit, pit full of tentacles, surrounded by tentacles, tentacle nest', category: 'atmosphere', subcategory: 'Atmosphere & Effects' },
+  { id: 'magic_circle', label: 'Magic Circle', prompt: 'magic circle, ritual circle, glowing runes, summoning circle, mystical symbols', category: 'atmosphere', subcategory: 'Atmosphere & Effects' },
+  { id: 'background_tentacles', label: 'Background Tentacles', prompt: 'background fill tentacle, tentacle background, surrounded by tentacles, tentacle environment', category: 'atmosphere', subcategory: 'Atmosphere & Effects' },
 
-  { id: 'cinematic_angle', label: 'Cinematic', prompt: 'cinematic composition, rule of thirds, film still', category: 'cinematography' },
-  { id: 'close_up', label: 'Close-Up', prompt: 'close-up framing, intimate crop, skin detail', category: 'cinematography' },
-  { id: 'low_angle', label: 'Low Angle', prompt: 'low angle shot, looming perspective, powerful framing', category: 'cinematography' },
-  { id: 'handheld_camera', label: 'Handheld', prompt: 'handheld camera feel, subtle shake, gritty realism', category: 'cinematography' },
-  { id: 'depth_of_field', label: 'Depth of Field', prompt: 'shallow depth of field, bokeh, subject separation', category: 'cinematography' },
+  // Camera & Cinematography
+  { id: 'cinematic_angle', label: 'Cinematic', prompt: 'cinematic composition, rule of thirds, film still', category: 'cinematography', subcategory: 'Camera & Cinematography' },
+  { id: 'close_up', label: 'Close-Up', prompt: 'close-up framing, intimate crop, skin detail', category: 'cinematography', subcategory: 'Camera & Cinematography' },
+  { id: 'low_angle', label: 'Low Angle', prompt: 'low angle shot, looming perspective, powerful framing', category: 'cinematography', subcategory: 'Camera & Cinematography' },
+  { id: 'handheld_camera', label: 'Handheld', prompt: 'handheld camera feel, subtle shake, gritty realism', category: 'cinematography', subcategory: 'Camera & Cinematography' },
+  { id: 'depth_of_field', label: 'Depth of Field', prompt: 'shallow depth of field, bokeh, subject separation', category: 'cinematography', subcategory: 'Camera & Cinematography' },
 
-  { id: 'torn_fabric', label: 'Torn Fabric', prompt: 'torn fabric scraps, ruined cloth, dramatic texture', category: 'details' },
-  { id: 'ripped_stockings', label: 'Ripped Stockings', prompt: 'ripped stockings, torn lace, distressed outfit remnants', category: 'details' },
-  { id: 'scratch_marks', label: 'Scratch Marks', prompt: 'scratch marks on stone, torn marks, signs of struggle', category: 'details' },
+  // Details & Extras
+  { id: 'torn_fabric', label: 'Torn Fabric', prompt: 'torn fabric scraps, ruined cloth, dramatic texture', category: 'details', subcategory: 'Details & Extras' },
+  { id: 'ripped_stockings', label: 'Ripped Stockings', prompt: 'ripped stockings, torn lace, distressed outfit remnants', category: 'details', subcategory: 'Details & Extras' },
+  { id: 'scratch_marks', label: 'Scratch Marks', prompt: 'scratch marks on stone, torn marks, signs of struggle', category: 'details', subcategory: 'Details & Extras' },
+  { id: 'extreme_intensity', label: 'Extreme Intensity', prompt: 'extremely, extreme intensity, hardcore, brutal, intense', category: 'details', subcategory: 'Details & Extras' },
+  { id: 'emotional_distress', label: 'Emotional Distress', prompt: 'look of fear, tears, runny nose, drool, crying, distressed expression', category: 'details', subcategory: 'Details & Extras' },
 
-  { id: 'nipple_insertion', label: 'Nipple Insertion', prompt: 'tentacles focused on nipples, nipple insertion, nipples teased', category: 'explicit' },
-  { id: 'nipple_inflation', label: 'Nipple Inflation', prompt: 'nipple inflation, swollen nipples, tentacles inflating nipples', category: 'explicit' },
-  { id: 'nipple_milking', label: 'Nipple Milking', prompt: 'nipple milking, milk leaking, lactation pressure, nipples milked by tentacles', category: 'explicit' },
-  { id: 'lactation', label: 'Lactation', prompt: 'lactation, milky nipples, milk dripping, glossy milk', category: 'explicit' },
-  { id: 'belly_bulge', label: 'Belly Bulge', prompt: 'belly bulge, inflated belly, tentacles pressing against belly', category: 'explicit' },
-  { id: 'oviposition', label: 'Oviposition', prompt: 'oviposition, eggs inside belly, egg laying, egg-filled belly', category: 'explicit' },
-  { id: 'egg_belly', label: 'Egg Belly', prompt: 'egg belly, eggs visible under skin, round egg bulges, swollen belly', category: 'explicit' },
-  { id: 'egg_birth', label: 'Egg Birth', prompt: 'egg birth, laying eggs, eggs emerging, dripping fluids', category: 'explicit' },
-  { id: 'monster_birth', label: 'Monster Birth', prompt: 'monster birth, birthing scene, creature emerging, wet birth fluids', category: 'explicit' },
-  { id: 'mouth_play', label: 'Mouth Play', prompt: 'open mouth, tentacle near mouth, saliva strings', category: 'explicit' },
-  { id: 'impregnation', label: 'Impregnation', prompt: 'impregnation, breeding, tentacles filling womb, swollen belly', category: 'explicit' },
+  // Breasts
+  { id: 'nipple_insertion', label: 'Nipple Insertion', prompt: 'tentacles focused on nipples, nipple insertion, nipples teased', category: 'explicit', subcategory: 'Breasts' },
+  { id: 'nipple_inflation', label: 'Nipple Inflation', prompt: 'nipple inflation, swollen nipples, tentacles inflating nipples', category: 'explicit', subcategory: 'Breasts' },
+  { id: 'nipple_milking', label: 'Nipple Milking', prompt: 'nipple milking, milk leaking, lactation pressure, nipples milked by tentacles', category: 'explicit', subcategory: 'Breasts' },
+  { id: 'lactation', label: 'Lactation', prompt: 'lactation, milky nipples, milk dripping, glossy milk', category: 'explicit', subcategory: 'Breasts' },
+  { id: 'breast_manipulation', label: 'Breast Manipulation', prompt: 'grabbing breasts, squeezing breasts, bloated breasts, breast manipulation', category: 'explicit', subcategory: 'Breasts' },
+  { id: 'breast_fluids', label: 'Breast Fluids', prompt: 'breasts dripping, nipples dripping, breast fluids, nipple fluids', category: 'explicit', subcategory: 'Breasts' },
+  { id: 'extreme_nipple_play', label: 'Extreme Nipple Play', prompt: 'nipplepen, nipple penetration, nipple insertion, extreme nipple play', category: 'explicit', subcategory: 'Breasts' },
+  { id: 'open_breasts', label: 'Open Breasts', prompt: 'open breasts, exposed breasts, breast exposure, chest exposure', category: 'explicit', subcategory: 'Breasts' },
+
+  // Vagina & Penetration
+  { id: 'tentacle_penetration', label: 'Tentacle Penetration', prompt: 'tentacle sex, vaginal penetration, double penetration, tentacle fuck, tentacle insertation', category: 'explicit', subcategory: 'Vagina & Penetration' },
+
+  // Belly & Womb
+  { id: 'belly_bulge', label: 'Belly Bulge', prompt: 'belly bulge, inflated belly, tentacles pressing against belly', category: 'explicit', subcategory: 'Belly & Womb' },
+  { id: 'oviposition', label: 'Oviposition', prompt: 'oviposition, eggs inside belly, egg laying, egg-filled belly', category: 'explicit', subcategory: 'Belly & Womb' },
+  { id: 'egg_belly', label: 'Egg Belly', prompt: 'egg belly, eggs visible under skin, round egg bulges, swollen belly', category: 'explicit', subcategory: 'Belly & Womb' },
+  { id: 'egg_birth', label: 'Egg Birth', prompt: 'egg birth, laying eggs, eggs emerging, dripping fluids', category: 'explicit', subcategory: 'Belly & Womb' },
+  { id: 'monster_birth', label: 'Monster Birth', prompt: 'monster birth, birthing scene, creature emerging, wet birth fluids', category: 'explicit', subcategory: 'Belly & Womb' },
+  { id: 'impregnation', label: 'Impregnation', prompt: 'impregnation, breeding, tentacles filling womb, swollen belly', category: 'explicit', subcategory: 'Belly & Womb' },
+
+  // Mouth & Throat
+  { id: 'mouth_play', label: 'Mouth Play', prompt: 'open mouth, tentacle near mouth, saliva strings', category: 'explicit', subcategory: 'Mouth & Throat' },
+  { id: 'extreme_throat', label: 'Extreme Throat', prompt: 'extreme deep throat, mouth bulge, throat bulge, esophagus bulge', category: 'explicit', subcategory: 'Mouth & Throat' },
+
+  // Fluids & Cum
+  { id: 'extreme_cumshot', label: 'Extreme Fluids', prompt: 'bukkake, facial, excessive cum, cum in mouth, cum drip, cum over, cum in pussy', category: 'explicit', subcategory: 'Fluids & Cum' },
+
+  // BDSM & Domination
+  { id: 'bdsm_tentacles', label: 'BDSM Tentacles', prompt: 'bdsm, tentacle bdsm, bondage, submission, domination, power play', category: 'explicit', subcategory: 'BDSM & Domination' },
 
   // New extreme tentacle presets
-  { id: 'huge_tentacles', label: 'Huge Tentacles', prompt: 'huge tentacle, massive tentacles, giant tentacles, enormous tentacles', category: 'tentacle_behavior' },
-  { id: 'veiny_tentacles', label: 'Veiny Tentacles', prompt: 'veins tentacle, veiny tentacles, throbbing veins, vascular tentacles', category: 'tentacle_behavior' },
-  { id: 'glowing_tentacles', label: 'Glowing Tentacles', prompt: 'glowing tentacles, bioluminescent tentacles, radiant tentacles, ethereal glow', category: 'tentacle_behavior' },
-  { id: 'knotty_tentacles', label: 'Knotty Tentacles', prompt: 'knotty tentacles, knotted tentacles, textured surface, bumpy tentacles', category: 'tentacle_behavior' },
-  { id: 'extreme_restraint', label: 'Extreme Restraint', prompt: 'restrained by tentacles, arms restrained by tentacles, restrained_tentacles, tight bondage', category: 'pose_restraint' },
-  { id: 'suspended_air', label: 'Suspended in Air', prompt: 'suspended in air, suspension, floating, levitating, hanging by tentacles', category: 'pose_restraint' },
-  { id: 'spread_arms_legs', label: 'Spread Arms & Legs', prompt: 'spread arms, outstretched arms, spread legs, forced spread position', category: 'pose_restraint' },
-  { id: 'arms_behind_back', label: 'Arms Behind Back', prompt: 'arms behind back, reverse prayer position, restrained arms', category: 'pose_restraint' },
-  { id: 'tentacle_pit', label: 'Tentacle Pit', prompt: 'tentacle pit, pit full of tentacles, surrounded by tentacles, tentacle nest', category: 'atmosphere' },
-  { id: 'magic_circle', label: 'Magic Circle', prompt: 'magic circle, ritual circle, glowing runes, summoning circle, mystical symbols', category: 'atmosphere' },
-  { id: 'background_tentacles', label: 'Background Tentacles', prompt: 'background fill tentacle, tentacle background, surrounded by tentacles, tentacle environment', category: 'atmosphere' },
-  { id: 'extreme_intensity', label: 'Extreme Intensity', prompt: 'extremely, extreme intensity, hardcore, brutal, intense', category: 'details' },
-  { id: 'breast_manipulation', label: 'Breast Manipulation', prompt: 'grabbing breasts, squeezing breasts, bloated breasts, breast manipulation', category: 'explicit' },
-  { id: 'breast_fluids', label: 'Breast Fluids', prompt: 'breasts dripping, nipples dripping, breast fluids, nipple fluids', category: 'explicit' },
-  { id: 'extreme_nipple_play', label: 'Extreme Nipple Play', prompt: 'nipplepen, nipple penetration, nipple insertion, extreme nipple play', category: 'explicit' },
-  { id: 'extreme_throat', label: 'Extreme Throat', prompt: 'extreme deep throat, mouth bulge, throat bulge, esophagus bulge', category: 'explicit' },
-  { id: 'emotional_distress', label: 'Emotional Distress', prompt: 'look of fear, tears, runny nose, drool, crying, distressed expression', category: 'details' },
-  { id: 'extreme_cumshot', label: 'Extreme Cumshot', prompt: 'bukkake, facial, excessive cum, cum in mouth, cum drip, cum over, cum in pussy', category: 'explicit' },
-  { id: 'open_breasts', label: 'Open Breasts', prompt: 'open breasts, exposed breasts, breast exposure, chest exposure', category: 'explicit' },
-  { id: 'tentacle_penetration', label: 'Tentacle Penetration', prompt: 'tentacle sex, vaginal penetration, double penetration, tentacle fuck, tentacle insertation', category: 'explicit' },
-  { id: 'bdsm_tentacles', label: 'BDSM Tentacles', prompt: 'bdsm, tentacle bdsm, bondage, submission, domination, power play', category: 'explicit' },
 ];
 
 function toPresetMap(list: typeof TENTACLES_PRESETS) {
@@ -1086,67 +1102,67 @@ export default function TentaclesPage() {
 
                             <div className="p-3 flex-1 min-h-0 overflow-hidden">
                               <div className="h-full overflow-y-auto pr-1">
-                                {(selectedPresets.length > 0 || selectedXRayParts.length > 0) && (
-                                  <div className="flex flex-wrap items-center gap-2 mb-3 rounded-2xl border border-white/10 bg-black/15 p-2">
-                                    {(showAllSelectedPresets ? selectedPresets : selectedPresets.slice(0, 8)).map((id) => {
-                                      const p = presetMap.get(id);
-                                      if (!p) return null;
-                                      return (
-                                        <button
-                                          key={p.id}
-                                          type="button"
-                                          onClick={() => togglePreset(p.id)}
-                                          className="px-2.5 py-1 rounded-full text-[11px] border border-fuchsia-300/30 bg-fuchsia-500/10 text-white/90 hover:bg-fuchsia-500/15 transition"
-                                        >
-                                          {p.label}
-                                        </button>
-                                      );
-                                    })}
-                                    {(showAllSelectedPresets ? selectedXRayParts : selectedXRayParts.slice(0, 4)).map((id) => {
-                                      const part = XRAY_PARTS.find((p) => p.id === id);
-                                      if (!part) return null;
-                                      return (
-                                        <button
-                                          key={`xray_${id}`}
-                                          type="button"
-                                          onClick={() => toggleXRayPart(id)}
-                                          className="px-2.5 py-1 rounded-full text-[11px] border border-cyan-300/20 bg-cyan-500/10 text-white/90 hover:text-white transition"
-                                        >
-                                          X-ray: {part.label}
-                                        </button>
-                                      );
-                                    })}
-                                    {(selectedPresets.length > 8 || selectedXRayParts.length > 4) && (
-                                      <button
-                                        type="button"
-                                        onClick={() => setShowAllSelectedPresets((v) => !v)}
-                                        className="px-2.5 py-1 rounded-full text-[11px] border border-white/20 bg-white/10 text-white/70 hover:text-white hover:bg-white/15 transition"
-                                      >
-                                        {showAllSelectedPresets ? 'Show Less' : `+${selectedPresets.length - 8 + selectedXRayParts.length - 4} more`}
-                                      </button>
-                                    )}
-                                    <div className="ml-auto flex items-center gap-2">
-                                      {selectedPresets.length > 0 && (
+                                <div
+                                  className={`flex flex-wrap items-center gap-2 mb-3 rounded-2xl border border-white/10 bg-black/15 p-2 transition-opacity duration-150 ${(selectedPresets.length === 0 && selectedXRayParts.length === 0) ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+                                >
+                                      {(showAllSelectedPresets ? selectedPresets : selectedPresets.slice(0, 8)).map((id) => {
+                                        const p = presetMap.get(id);
+                                        if (!p) return null;
+                                        return (
+                                          <button
+                                            key={p.id}
+                                            type="button"
+                                            onClick={() => togglePreset(p.id)}
+                                            className="px-2.5 py-1 rounded-full text-[11px] border border-fuchsia-300/30 bg-fuchsia-500/10 text-white/90 hover:bg-fuchsia-500/15 transition"
+                                          >
+                                            {p.label}
+                                          </button>
+                                        );
+                                      })}
+                                      {(showAllSelectedPresets ? selectedXRayParts : selectedXRayParts.slice(0, 4)).map((id) => {
+                                        const part = XRAY_PARTS.find((p) => p.id === id);
+                                        if (!part) return null;
+                                        return (
+                                          <button
+                                            key={`xray_${id}`}
+                                            type="button"
+                                            onClick={() => toggleXRayPart(id)}
+                                            className="px-2.5 py-1 rounded-full text-[11px] border border-cyan-300/20 bg-cyan-500/10 text-white/90 hover:text-white transition"
+                                          >
+                                            X-ray: {part.label}
+                                          </button>
+                                        );
+                                      })}
+                                      {(selectedPresets.length > 8 || selectedXRayParts.length > 4) && (
                                         <button
                                           type="button"
-                                          onClick={clearPresets}
-                                          className="px-2.5 py-1 rounded-xl border border-white/10 bg-black/20 text-white/70 hover:text-white transition text-[11px]"
+                                          onClick={() => setShowAllSelectedPresets((v) => !v)}
+                                          className="px-2.5 py-1 rounded-full text-[11px] border border-white/20 bg-white/10 text-white/70 hover:text-white hover:bg-white/15 transition"
                                         >
-                                          Clear
+                                          {showAllSelectedPresets ? 'Show Less' : `+${selectedPresets.length - 8 + selectedXRayParts.length - 4} more`}
                                         </button>
                                       )}
-                                      {selectedXRayParts.length > 0 && (
-                                        <button
-                                          type="button"
-                                          onClick={clearXRay}
-                                          className="px-2.5 py-1 rounded-xl border border-white/10 bg-black/20 text-white/70 hover:text-white transition text-[11px]"
-                                        >
-                                          Clear X-ray
-                                        </button>
-                                      )}
+                                      <div className="ml-auto flex items-center gap-2">
+                                        {selectedPresets.length > 0 && (
+                                          <button
+                                            type="button"
+                                            onClick={clearPresets}
+                                            className="px-2.5 py-1 rounded-xl border border-white/10 bg-black/20 text-white/70 hover:text-white transition text-[11px]"
+                                          >
+                                            Clear
+                                          </button>
+                                        )}
+                                        {selectedXRayParts.length > 0 && (
+                                          <button
+                                            type="button"
+                                            onClick={clearXRay}
+                                            className="px-2.5 py-1 rounded-xl border border-white/10 bg-black/20 text-white/70 hover:text-white transition text-[11px]"
+                                          >
+                                            Clear X-ray
+                                          </button>
+                                        )}
+                                      </div>
                                     </div>
-                                  </div>
-                                )}
 
                                 {/* Category Tabs - Redesigned */}
                                 <div className="flex flex-wrap items-center gap-1.5 mb-3">
@@ -1207,56 +1223,109 @@ export default function TentaclesPage() {
                                   />
                                 </div>
 
-                                {/* Preset Grid - Redesigned Cards */}
-                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
-                                  {(activePresetCategory === 'xray'
-                                    ? XRAY_PARTS.map((part) => ({
-                                        id: part.id,
-                                        label: part.label,
-                                        active: selectedXRayParts.includes(part.id),
-                                        onClick: () => toggleXRayPart(part.id),
-                                        tone: 'xray' as const,
-                                      }))
-                                    : visiblePresets.map((p) => ({
-                                        id: p.id,
-                                        label: p.label,
-                                        active: selectedPresets.includes(p.id),
-                                        onClick: () => togglePreset(p.id),
-                                        tone: 'preset' as const,
-                                      })))
-                                    .map((item) => (
+                                {/* Preset Grid - Organized by Subcategory */}
+                                {activePresetCategory === 'xray' ? (
+                                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+                                    {XRAY_PARTS.map((part) => (
                                       <motion.button
-                                        key={String(item.id)}
+                                        key={part.id}
                                         type="button"
-                                        onClick={item.onClick}
+                                        onClick={() => toggleXRayPart(part.id)}
                                         whileHover={{ scale: 1.02 }}
                                         whileTap={{ scale: 0.98 }}
-                                        className={`group relative px-3 py-3 rounded-xl text-xs font-medium transition-all duration-200 text-left leading-snug overflow-hidden ${item.active
-                                          ? item.tone === 'xray'
-                                            ? 'bg-gradient-to-br from-cyan-500/30 to-cyan-600/20 text-white border border-cyan-400/50 shadow-lg shadow-cyan-500/20'
-                                            : 'bg-gradient-to-br from-fuchsia-500/30 via-fuchsia-500/20 to-cyan-500/10 text-white border border-fuchsia-400/50 shadow-lg shadow-fuchsia-500/20'
+                                        className={`group relative px-3 py-3 rounded-xl text-xs font-medium transition-all duration-200 text-left leading-snug overflow-hidden ${selectedXRayParts.includes(part.id)
+                                          ? 'bg-gradient-to-br from-cyan-500/30 to-cyan-600/20 text-white border border-cyan-400/50 shadow-lg shadow-cyan-500/20'
                                           : 'bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/25 hover:bg-white/10'
                                           }`}
                                       >
-                                        {/* Active indicator dot */}
-                                        {item.active && (
-                                          <span className={`absolute top-2 right-2 w-1.5 h-1.5 rounded-full ${item.tone === 'xray' ? 'bg-cyan-300' : 'bg-fuchsia-300'} animate-pulse`} />
+                                        {selectedXRayParts.includes(part.id) && (
+                                          <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-cyan-300 animate-pulse" />
                                         )}
-                                        
-                                        {/* Glow effect for active items */}
-                                        {item.active && (
-                                          <span className={`absolute inset-0 bg-gradient-to-br ${item.tone === 'xray' ? 'from-cyan-400/5' : 'from-fuchsia-400/5'} to-transparent`} />
+                                        {selectedXRayParts.includes(part.id) && (
+                                          <span className="absolute inset-0 bg-gradient-to-br from-cyan-400/5 to-transparent" />
                                         )}
-                                        
-                                        <span className="relative z-10">{item.label}</span>
-                                        
-                                        {/* Hover glow */}
-                                        {!item.active && (
+                                        <span className="relative z-10">{part.label}</span>
+                                        {!selectedXRayParts.includes(part.id) && (
                                           <span className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
                                         )}
                                       </motion.button>
                                     ))}
-                                </div>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-4">
+                                    {(() => {
+                                      // Group by subcategory
+                                      const grouped = new Map<string, typeof TENTACLES_PRESETS>();
+                                      visiblePresets.forEach((p) => {
+                                        const sub = p.subcategory || 'Other';
+                                        const arr = grouped.get(sub) || [];
+                                        arr.push(p);
+                                        grouped.set(sub, arr);
+                                      });
+
+                                      // Define subcategory order for consistent display
+                                      const order = [
+                                        'Poses & Restraint',
+                                        'Tentacle Behavior',
+                                        'Breasts',
+                                        'Vagina & Penetration',
+                                        'Belly & Womb',
+                                        'Mouth & Throat',
+                                        'Fluids & Cum',
+                                        'BDSM & Domination',
+                                        'Atmosphere & Effects',
+                                        'Camera & Cinematography',
+                                        'Details & Extras',
+                                        'Other'
+                                      ];
+
+                                      const sortedGroups = Array.from(grouped.entries()).sort((a, b) => {
+                                        const idxA = order.indexOf(a[0]);
+                                        const idxB = order.indexOf(b[0]);
+                                        if (idxA === -1 && idxB === -1) return a[0].localeCompare(b[0]);
+                                        if (idxA === -1) return 1;
+                                        if (idxB === -1) return -1;
+                                        return idxA - idxB;
+                                      });
+
+                                      return sortedGroups.map(([subcategory, presets]) => (
+                                        <div key={subcategory}>
+                                          <div className="flex items-center gap-2 mb-2">
+                                            <div className="h-px flex-1 bg-gradient-to-r from-fuchsia-500/30 to-transparent" />
+                                            <h3 className="text-xs font-medium text-white/60 uppercase tracking-wider">{subcategory}</h3>
+                                            <div className="h-px flex-1 bg-gradient-to-l from-fuchsia-500/30 to-transparent" />
+                                          </div>
+                                          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+                                            {presets.map((p) => (
+                                              <motion.button
+                                                key={p.id}
+                                                type="button"
+                                                onClick={() => togglePreset(p.id)}
+                                                whileHover={{ scale: 1.02 }}
+                                                whileTap={{ scale: 0.98 }}
+                                                className={`group relative px-3 py-3 rounded-xl text-xs font-medium transition-all duration-200 text-left leading-snug overflow-hidden ${selectedPresets.includes(p.id)
+                                                  ? 'bg-gradient-to-br from-fuchsia-500/30 via-fuchsia-500/20 to-cyan-500/10 text-white border border-fuchsia-400/50 shadow-lg shadow-fuchsia-500/20'
+                                                  : 'bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/25 hover:bg-white/10'
+                                                  }`}
+                                              >
+                                                {selectedPresets.includes(p.id) && (
+                                                  <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-fuchsia-300 animate-pulse" />
+                                                )}
+                                                {selectedPresets.includes(p.id) && (
+                                                  <span className="absolute inset-0 bg-gradient-to-br from-fuchsia-400/5 to-transparent" />
+                                                )}
+                                                <span className="relative z-10">{p.label}</span>
+                                                {!selectedPresets.includes(p.id) && (
+                                                  <span className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                                                )}
+                                              </motion.button>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      ));
+                                    })()}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </motion.div>

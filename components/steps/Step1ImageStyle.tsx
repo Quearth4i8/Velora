@@ -10,12 +10,12 @@ import { CHARACTER_CONFIG } from '@/config/character-config';
 type StylePreset = (typeof CHARACTER_CONFIG.imageStylePresets)[CharacterStyle][number];
 
 const styleOptions = [
-  { id: CharacterStyle.ANIME, label: 'Anime', description: 'Stylized anime aesthetic' },
-  { id: CharacterStyle.ANIME_ILLUSTRIOUS, label: 'Anime Illustrative', description: 'High-quality anime illustration style' },
-  { id: CharacterStyle.MOE_FUSSION, label: 'Moe Fussion', description: 'Moe-style anime renders' },
-  { id: CharacterStyle.REALISTIC, label: 'Realistic', description: 'Photorealistic appearance' },
-  { id: CharacterStyle.ARTISTIC, label: 'Artistic', description: 'Artistic and creative style' },
-  { id: CharacterStyle.SPECIAL, label: 'Special', description: 'Monster girls and exotic species' },
+  { id: CharacterStyle.ANIME, label: 'Anime', description: 'Stylized anime aesthetic', imageSrc: '/image style/anime (perfectIllustrationXL_v3).jpg' },
+  { id: CharacterStyle.ANIME_ILLUSTRIOUS, label: 'Anime Illustrative', description: 'High-quality anime illustration style', imageSrc: '/image style/anime illustrative (waiIllustriousSDXL_v160).jpg' },
+  { id: CharacterStyle.MOE_FUSSION, label: 'Moe Fussion', description: 'Moe-style anime renders', imageSrc: '/image style/moe fussion (moeFussionV1.5.0_Z_vz).jpg' },
+  { id: CharacterStyle.REALISTIC, label: 'Realistic', description: 'Photorealistic appearance', imageSrc: '/image style/realastic.jpg' },
+  { id: CharacterStyle.ARTISTIC, label: 'Artistic', description: 'Artistic and creative style', imageSrc: '/image style/artistic (perfectdeliberate_v30).jpg' },
+  { id: CharacterStyle.SPECIAL, label: 'Special', description: 'Monster girls and exotic species', imageSrc: '/image style/special (perfectIllustriousXL_v3).jpg' },
 ];
 
 export const Step1ImageStyle: React.FC = () => {
@@ -95,20 +95,49 @@ export const Step1ImageStyle: React.FC = () => {
       <div>
         <h2 className="text-2xl font-bold text-white mb-2">Image Style</h2>
         <p className="text-dark-400 mb-6">Choose the artistic style for your character</p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {styleOptions.map((option) => (
             <motion.button
               key={option.id}
               onClick={() => handleStyleSelect(option.id)}
-              className={`p-4 rounded-lg border-2 transition-all duration-300 text-left ${draft.generation?.style === option.id
-                ? 'border-pink-500 bg-pink-500/10 shadow-lg shadow-pink-500/20'
-                : 'border-dark-700 bg-dark-950/40 hover:border-pink-500/30'
+              className={`group relative aspect-square rounded-xl border-2 transition-all duration-300 overflow-hidden ${draft.generation?.style === option.id
+                ? 'border-pink-500 shadow-lg shadow-pink-500/30 ring-2 ring-pink-500/20'
+                : 'border-dark-700 hover:border-pink-500/50'
                 }`}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
-              <h3 className="font-semibold text-white mb-1">{option.label}</h3>
-              <p className="text-sm text-dark-400">{option.description}</p>
+              {/* Background Image */}
+              <img
+                src={option.imageSrc}
+                alt={option.label}
+                className="absolute inset-0 w-full h-full object-cover"
+                loading="lazy"
+                decoding="async"
+              />
+              
+              {/* Gradient Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+              
+              {/* Selected Overlay */}
+              {draft.generation?.style === option.id && (
+                <div className="absolute inset-0 bg-pink-500/10" />
+              )}
+              
+              {/* Content */}
+              <div className="absolute inset-x-0 bottom-0 p-3">
+                <h3 className="font-semibold text-white text-sm mb-0.5">{option.label}</h3>
+                <p className="text-xs text-white/60 line-clamp-1">{option.description}</p>
+              </div>
+              
+              {/* Selection Indicator */}
+              {draft.generation?.style === option.id && (
+                <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-pink-500 flex items-center justify-center">
+                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+              )}
             </motion.button>
           ))}
         </div>
