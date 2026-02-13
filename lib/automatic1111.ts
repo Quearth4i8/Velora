@@ -346,6 +346,43 @@ const shouldIncludeMalePartnerFromCurrentText = (messageContent?: string): boole
   return partnerCues.some((cue) => t.includes(cue));
 };
 
+const shouldIncludeUserFromCurrentText = (messageContent?: string): boolean => {
+  const t = String(messageContent || '').toLowerCase();
+  if (!t) return false;
+
+  // Detect when the user is mentioned as being present/interacting in the scene
+  // This is separate from sexual/romantic partner detection
+  const userPresenceCues = [
+    'user',
+    'next to user',
+    'beside user',
+    'with user',
+    'to user',
+    'at user',
+    'looking at user',
+    'facing user',
+    'talking to user',
+    'speaking to user',
+    'handing',
+    'giving to',
+    'offering to',
+    'showing to user',
+    'sharing with user',
+    'sitting next to',
+    'standing next to',
+    'walking with',
+    'sitting with',
+    'standing with',
+    'together with user',
+    'POV',
+    'point of view',
+    'viewer',
+    'looking at viewer',
+    'facing viewer',
+  ];
+  return userPresenceCues.some((cue) => t.includes(cue));
+};
+
 const isSelfActionFromCurrentText = (messageContent?: string): boolean => {
   const t = String(messageContent || '').toLowerCase();
   if (!t) return false;
@@ -2025,12 +2062,19 @@ export const automatic1111API = {
     const wantsPartner =
       !isSelfActionFromCurrentText(messageContent) &&
       (shouldIncludeMalePartnerFromCurrentText(messageContent) || shouldIncludeMalePartnerFromCurrentText(customPromptBase));
+    
+    // Check if user is present in the scene (non-sexual interaction)
+    const hasUserPresent = 
+      shouldIncludeUserFromCurrentText(messageContent) || 
+      shouldIncludeUserFromCurrentText(customPromptBase);
 
     const customPrompt = oralIntent.explicitOral
       ? sanitizedCustomPromptBase
       : wantsPartner
         ? ensureCouplePromptTags(sanitizedCustomPromptBase)
-        : ensureSoloPromptTags(sanitizedCustomPromptBase);
+        : hasUserPresent
+          ? removeCommaTags(sanitizedCustomPromptBase, SOLO_ENFORCING_TAGS_LOWER)
+          : ensureSoloPromptTags(sanitizedCustomPromptBase);
     
 
     console.log(`[PROMPT DEBUG] Custom prompt built: "${customPrompt}"`);

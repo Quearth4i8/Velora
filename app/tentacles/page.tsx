@@ -12,6 +12,7 @@ import { buildTentaclesPrompts } from '@/lib/tentaclesPrompt';
 import { PrimaryCTAButton } from '@/components/ui/PrimaryCTAButton';
 import { useBlurNSFW } from '@/lib/useBlurNSFW';
 import { Download, ZoomIn, Trash2, RefreshCw, Waves } from 'lucide-react';
+import { useDialog } from '@/components/ui/DialogProvider';
 
 type TentacleToolId = 'wrap' | 'tease' | 'bind' | 'lift' | 'ink' | 'pulse';
 
@@ -258,6 +259,7 @@ function makeToolPrompt(opts: {
 }
 
 export default function TentaclesPage() {
+  const dialog = useDialog();
   const [allCharacters, setAllCharacters] = useState<CharacterDraft[]>([]);
   const [loadingCharacters, setLoadingCharacters] = useState(true);
   const [selectedId, setSelectedId] = useState<string>('');
@@ -293,31 +295,27 @@ export default function TentaclesPage() {
   const [isZoomed, setIsZoomed] = useState(false);
   const [zoomedImageIndex, setZoomedImageIndex] = useState(0);
   const [zoomedImageSource, setZoomedImageSource] = useState<'character' | 'global'>('character');
-  const [showImageDropdown, setShowImageDropdown] = useState<string | null>(null);
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
-
-  // Close dropdown on click outside or scroll
-  useEffect(() => {
-    const handleClickOutside = () => setShowImageDropdown(null);
-    const handleScroll = () => setShowImageDropdown(null);
-    
-    if (showImageDropdown) {
-      document.addEventListener('click', handleClickOutside);
-      document.addEventListener('scroll', handleScroll, true);
-      return () => {
-        document.removeEventListener('click', handleClickOutside);
-        document.removeEventListener('scroll', handleScroll, true);
-      };
-    }
-  }, [showImageDropdown]);
 
   const [globalTentacleImages, setGlobalTentacleImages] = useState<CharacterImage[]>([]);
+  const imageStoreRef = useRef<CharacterImage[]>([]);
   const [isLoadingGlobalTentacleImages, setIsLoadingGlobalTentacleImages] = useState(false);
+  const loadingRef = useRef(false);
   const [globalTentaclePage, setGlobalTentaclePage] = useState(0);
+  const [showAllImages, setShowAllImages] = useState(false);
+  const [renderTick, setRenderTick] = useState(0);
 
   const [controlTab, setControlTab] = useState<'scene' | 'tools' | 'advanced'>('scene');
   const [resultsTab, setResultsTab] = useState<'character' | 'feed'>('character');
   const [mainTab, setMainTab] = useState<'build' | 'generate' | 'results'>('build');
+  const [tabDirection, setTabDirection] = useState<'left' | 'right'>('right');
+
+  const setMainTabWithDirection = (newTab: typeof mainTab) => {
+    const order = ['build', 'generate', 'results'];
+    const currentIndex = order.indexOf(mainTab);
+    const newIndex = order.indexOf(newTab);
+    setTabDirection(newIndex > currentIndex ? 'right' : 'left');
+    setMainTab(newTab);
+  };
 
   const [genWidth, setGenWidth] = useState(768);
   const [genHeight, setGenHeight] = useState(1344);
@@ -502,65 +500,127 @@ export default function TentaclesPage() {
 
   const GLOBAL_TENTACLE_PAGE_SIZE = 16; // 2 rows × 8 columns (2xl screen)
 
-  const loadGlobalTentacleImages = async (page: number) => {
-    const safePage = Math.max(0, Number(page) || 0);
-    setIsLoadingGlobalTentacleImages(true);
-    try {
-      // For page 0, fetch from beginning
-      // For page > 0, we need to fetch from beginning to get all tentacle images
-      const fetchOffset = safePage === 0 ? 0 : 0;
-      const fetchLimit = safePage === 0 ? 240 : 1000; // Fetch more for later pages
+  useEffect(() => {
+    const loadGlobalTentacleImages = async (page: number) => {
+      const safePage = Math.max(0, Number(page) || 0);
       
-      console.log(`Loading page ${safePage}, fetching offset ${fetchOffset}, limit ${fetchLimit}`);
-      const res = await characterAPI.getAllCharacterImagesPagedGlobal({
-        limit: fetchLimit,
-        offset: fetchOffset,
-      });
-
-      if (!res.success || !Array.isArray(res.data)) {
-        console.log('API call failed or returned invalid data');
-        setGlobalTentacleImages([]);
+      // Prevent race conditions from multiple rapid calls using ref
+      if (loadingRef.current) {
+        console.log('Already loading, skipping...');
         return;
       }
-
-      console.log(`Fetched ${res.data.length} total images`);
-      const tentacleOnly = res.data.filter((img) => {
-        const prompt = String(img.generationPrompt || '').toLowerCase();
-        return prompt.includes('tentacle') || prompt.includes('tentacles');
-      });
-
-      console.log(`Found ${tentacleOnly.length} total tentacle images`);
-
-      // Show up to 10 tentacle images per page, properly paginated
-      const startIndex = safePage * GLOBAL_TENTACLE_PAGE_SIZE;
-      const endIndex = startIndex + GLOBAL_TENTACLE_PAGE_SIZE;
-      const paginatedImages = tentacleOnly.slice(startIndex, endIndex);
-      console.log(`Showing images ${startIndex} to ${endIndex - 1}, actual count: ${paginatedImages.length}`);
       
-      setGlobalTentacleImages(paginatedImages);
-    } catch (error) {
-      console.error('Error loading tentacle images:', error);
-      setGlobalTentacleImages([]);
-    } finally {
-      setIsLoadingGlobalTentacleImages(false);
-    }
-  };
+      loadingRef.current = true;
+      setIsLoadingGlobalTentacleImages(true);
+      console.log(`[LOAD START] Page ${safePage}, showAll=${showAllImages}`);
+      
+      try {
+        if (showAllImages) {
+          // Normal pagination for "Show All" mode
+          const fetchOffset = safePage * GLOBAL_TENTACLE_PAGE_SIZE;
+          const fetchLimit = GLOBAL_TENTACLE_PAGE_SIZE;
+          
+          console.log(`Loading page ${safePage}, offset ${fetchOffset}, limit ${fetchLimit}, showAll=${showAllImages}`);
+          const res = await characterAPI.getAllCharacterImagesPagedGlobal({
+            limit: fetchLimit,
+            offset: fetchOffset,
+          });
 
-  useEffect(() => {
+          if (!res.success || !Array.isArray(res.data)) {
+            console.log('API call failed or returned invalid data');
+            setGlobalTentacleImages([]);
+            return;
+          }
+
+          setGlobalTentacleImages(res.data);
+          imageStoreRef.current = res.data;
+        } else {
+          // For "Tentacles Only" mode, fetch multiple batches to find scattered tentacle images
+          // API has max limit of 100 per request, so we make multiple calls
+          const BATCH_SIZE = 100;
+          const MAX_BATCHES = 10; // Fetch up to 1000 images total
+          
+          console.log(`Loading tentacles: fetching up to ${BATCH_SIZE * MAX_BATCHES} images in ${MAX_BATCHES} batches`);
+          
+          let allImages: CharacterImage[] = [];
+          
+          for (let batch = 0; batch < MAX_BATCHES; batch++) {
+            const offset = batch * BATCH_SIZE;
+            const res = await characterAPI.getAllCharacterImagesPagedGlobal({
+              limit: BATCH_SIZE,
+              offset: offset,
+            });
+            
+            if (!res.success || !Array.isArray(res.data) || res.data.length === 0) {
+              break; // No more images
+            }
+            
+            allImages = [...allImages, ...res.data];
+            
+            // If we got fewer than BATCH_SIZE results, we've reached the end
+            if (res.data.length < BATCH_SIZE) {
+              break;
+            }
+          }
+          
+          console.log(`Fetched ${allImages.length} total images from all batches`);
+          
+          // Filter to only tentacle images
+          const tentacleKeywords = ['tentacle', 'tentacles', 'extreme_tentacles', '<lora:extreme_tentacles', 'lora:extreme'];
+          const allTentacleImages = allImages.filter((img) => {
+            const prompt = String(img.generationPrompt || '').toLowerCase();
+            const hasTentacle = tentacleKeywords.some(kw => prompt.includes(kw));
+            
+            // Debug: log first few image prompts to see what we're working with
+            if (allImages.indexOf(img) < 5) {
+              console.log(`Image ${img.id} prompt:`, prompt.substring(0, 150));
+            }
+            
+            return hasTentacle;
+          });
+          
+          console.log(`Found ${allTentacleImages.length} tentacle images out of ${allImages.length} total`);
+          
+          // Paginate the filtered results
+          const startIndex = safePage * GLOBAL_TENTACLE_PAGE_SIZE;
+          const endIndex = startIndex + GLOBAL_TENTACLE_PAGE_SIZE;
+          const paginatedTentacles = allTentacleImages.slice(startIndex, endIndex);
+          
+          console.log(`Showing tentacles ${startIndex} to ${endIndex - 1}, count: ${paginatedTentacles.length}`);
+          // Use functional update to avoid stale closure issues
+          imageStoreRef.current = paginatedTentacles;
+          setGlobalTentacleImages(() => paginatedTentacles);
+          // Force re-render to ensure images display
+          setRenderTick(t => t + 1);
+        }
+      } catch (error) {
+        console.error('Error loading tentacle images:', error);
+        setGlobalTentacleImages([]);
+      } finally {
+        loadingRef.current = false;
+        setIsLoadingGlobalTentacleImages(false);
+      }
+    };
+
     loadGlobalTentacleImages(globalTentaclePage);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [globalTentaclePage]);
+    
+    return () => {
+      // Reset loading ref when effect cleans up (important for React StrictMode)
+      loadingRef.current = false;
+    };
+  }, [globalTentaclePage, showAllImages]);
 
   const tentacleImages = useMemo(() => {
+    const tentacleKeywords = ['tentacle', 'tentacles', 'extreme_tentacles', '<lora:extreme_tentacles'];
     return characterImages.filter((img) => {
       const prompt = img.generationPrompt?.toLowerCase() || '';
-      return prompt.includes('tentacle') || prompt.includes('tentacles');
+      return tentacleKeywords.some(kw => prompt.includes(kw));
     });
   }, [characterImages]);
 
   const zoomImages = useMemo(() => {
-    return zoomedImageSource === 'global' ? globalTentacleImages : tentacleImages;
-  }, [globalTentacleImages, tentacleImages, zoomedImageSource]);
+    return zoomedImageSource === 'global' ? imageStoreRef.current : tentacleImages;
+  }, [zoomedImageSource, tentacleImages, globalTentacleImages]);
 
   // Keyboard navigation for zoom modal
   useEffect(() => {
@@ -626,13 +686,63 @@ export default function TentaclesPage() {
     }
   };
 
-  const deleteImage = async (imageId: string) => {
+  const [deletingImageId, setDeletingImageId] = useState<string | null>(null);
+
+  const deleteCharacterImageWithModal = async (imageId: string) => {
+    const ok = await dialog.confirm({
+      title: 'Delete image?',
+      message: 'This will permanently delete this image from your library (database + storage). This cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      destructive: true,
+    });
+
+    if (!ok) return;
+
+    setDeletingImageId(imageId);
     try {
-      await characterAPI.deleteCharacterImageFromGallery(imageId);
+      const result = await characterAPI.deleteCharacterImageFromGallery(imageId);
+      if (!result.success) {
+        await dialog.alert({ title: 'Error', message: 'Failed to delete image. Please try again.' });
+        return;
+      }
+
       setCharacterImages((prev) => prev.filter((img) => img.id !== imageId));
-      setToast('Deleted');
+      setToast('Image deleted');
     } catch {
-      setToast('Delete failed');
+      await dialog.alert({ title: 'Error', message: 'Failed to delete image. Please try again.' });
+    } finally {
+      setDeletingImageId(null);
+    }
+  };
+
+  const handleDeleteTentacleImage = async (imageId: string) => {
+    const ok = await dialog.confirm({
+      title: 'Delete image?',
+      message: 'This will permanently delete this image from your library (database + storage). This cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      destructive: true,
+    });
+
+    if (!ok) return;
+
+    setDeletingImageId(imageId);
+    try {
+      const result = await characterAPI.deleteCharacterImageFromGallery(imageId);
+      if (!result.success) {
+        await dialog.alert({ title: 'Error', message: 'Failed to delete image. Please try again.' });
+        return;
+      }
+
+      imageStoreRef.current = imageStoreRef.current.filter((img) => img.id !== imageId);
+      setGlobalTentacleImages((prev) => prev.filter((img) => img.id !== imageId));
+      setRenderTick((t) => t + 1);
+      setToast('Image deleted');
+    } catch {
+      await dialog.alert({ title: 'Error', message: 'Failed to delete image. Please try again.' });
+    } finally {
+      setDeletingImageId(null);
     }
   };
 
@@ -923,806 +1033,892 @@ export default function TentaclesPage() {
 
         <div className="w-full px-4 sm:px-6 lg:px-10 py-6">
           <div className="w-full max-w-[1440px] mx-auto">
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-              <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-5">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl border border-white/10 bg-black/25 backdrop-blur flex items-center justify-center">
-                    <Waves className="w-5 h-5 text-cyan-200/90" />
-                  </div>
-                  <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-white">Tentacles</h1>
-                </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(exportSceneText() || '')}
-                    className="px-3 py-2 rounded-2xl border border-white/10 bg-black/25 text-white/80 hover:text-white hover:bg-black/35 transition text-sm"
-                  >
-                    Copy All
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const text = exportSceneText();
-                      if (!text) {
-                        setToast('Nothing to export');
-                        return;
-                      }
-                      const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = `tentacles-scene-${Date.now()}.txt`;
-                      a.click();
-                      URL.revokeObjectURL(url);
-                      setToast('Downloaded');
-                    }}
-                    className="px-3 py-2 rounded-2xl border border-white/10 bg-black/25 text-white/80 hover:text-white hover:bg-black/35 transition text-sm"
-                  >
-                    Export
-                  </button>
-                </div>
-              </div>
-            </motion.div>
+            <Tabs.Root value={mainTab} onValueChange={(v) => setMainTabWithDirection(v as typeof mainTab)} className="w-full">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:h-[calc(100vh-100px)]">
+                <div className="lg:col-span-9 flex flex-col min-h-0 relative overflow-hidden">
+                  {/* Tab content area - scrollable */}
+                  <div className="flex-1 min-h-0 overflow-hidden relative">
+                    <AnimatePresence mode="wait" initial={false}>
+                      {mainTab === 'build' && (
+                        <motion.div
+                          key="build"
+                          initial={{ opacity: 0, x: -40 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: -40 }}
+                          transition={{ duration: 0.25, ease: "easeInOut" }}
+                          className="absolute inset-0"
+                          style={{ willChange: 'transform, opacity' }}
+                        >
+                          <motion.div 
+                            className="rounded-t-3xl border border-white/10 bg-black/25 backdrop-blur-xl shadow-2xl overflow-hidden flex flex-col h-full"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ duration: 0.15, delay: 0.05 }}
+                          >
+                            <div className="p-3 border-b border-white/10">
+                              <div className="flex items-center justify-between gap-4">
+                                <div className="flex items-center gap-3">
+                                  <h2 className="text-white font-semibold">Scene Builder</h2>
+                                  <span className="text-xs text-white/50">{selectedPresets.length > 0 ? `${selectedPresets.length} selected` : ''}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <div className="relative w-52">
+                                    <input
+                                      value={presetQuery}
+                                      onChange={(e) => setPresetQuery(e.target.value)}
+                                      placeholder="Search tags..."
+                                      className="w-full px-3 py-1.5 rounded-xl bg-black/35 border border-white/10 text-white placeholder:text-white/35 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/60 text-sm"
+                                    />
+                                  </div>
+                                  {selectedPresets.length > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={clearPresets}
+                                      className="px-2.5 py-1.5 rounded-xl border border-white/10 bg-black/20 text-white/75 hover:text-white transition text-xs"
+                                    >
+                                      Clear
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
 
-            <Tabs.Root value={mainTab} onValueChange={(v) => setMainTab(v as typeof mainTab)} className="w-full">
-              <div className="sticky top-20 z-40 mb-3">
-                <Tabs.List className="inline-flex items-center gap-1 rounded-2xl border border-white/10 bg-black/25 backdrop-blur-xl p-1">
-                  <Tabs.Trigger
-                    value="build"
-                    className="px-3 py-1.5 rounded-xl text-sm font-semibold text-white/70 data-[state=active]:text-white data-[state=active]:bg-fuchsia-500/15 data-[state=active]:border-fuchsia-300/40 border border-transparent transition"
-                  >
-                    Build
-                  </Tabs.Trigger>
-                  <Tabs.Trigger
-                    value="generate"
-                    className="px-3 py-1.5 rounded-xl text-sm font-semibold text-white/70 data-[state=active]:text-white data-[state=active]:bg-cyan-500/10 data-[state=active]:border-cyan-300/40 border border-transparent transition"
-                  >
-                    Generate
-                  </Tabs.Trigger>
-                  <Tabs.Trigger
-                    value="results"
-                    className="px-3 py-1.5 rounded-xl text-sm font-semibold text-white/70 data-[state=active]:text-white data-[state=active]:bg-white/10 data-[state=active]:border-white/15 border border-transparent transition"
-                  >
-                    Results
-                  </Tabs.Trigger>
-                </Tabs.List>
-              </div>
+                            <div className="p-3 flex-1 min-h-0 overflow-hidden">
+                              <div className="h-full overflow-y-auto pr-1">
+                                {(selectedPresets.length > 0 || selectedXRayParts.length > 0) && (
+                                  <div className="flex flex-wrap items-center gap-2 mb-3 rounded-2xl border border-white/10 bg-black/15 p-2">
+                                    {(showAllSelectedPresets ? selectedPresets : selectedPresets.slice(0, 8)).map((id) => {
+                                      const p = presetMap.get(id);
+                                      if (!p) return null;
+                                      return (
+                                        <button
+                                          key={p.id}
+                                          type="button"
+                                          onClick={() => togglePreset(p.id)}
+                                          className="px-2.5 py-1 rounded-full text-[11px] border border-fuchsia-300/30 bg-fuchsia-500/10 text-white/90 hover:bg-fuchsia-500/15 transition"
+                                        >
+                                          {p.label}
+                                        </button>
+                                      );
+                                    })}
+                                    {(showAllSelectedPresets ? selectedXRayParts : selectedXRayParts.slice(0, 4)).map((id) => {
+                                      const part = XRAY_PARTS.find((p) => p.id === id);
+                                      if (!part) return null;
+                                      return (
+                                        <button
+                                          key={`xray_${id}`}
+                                          type="button"
+                                          onClick={() => toggleXRayPart(id)}
+                                          className="px-2.5 py-1 rounded-full text-[11px] border border-cyan-300/20 bg-cyan-500/10 text-white/90 hover:text-white transition"
+                                        >
+                                          X-ray: {part.label}
+                                        </button>
+                                      );
+                                    })}
+                                    {(selectedPresets.length > 8 || selectedXRayParts.length > 4) && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setShowAllSelectedPresets((v) => !v)}
+                                        className="px-2.5 py-1 rounded-full text-[11px] border border-white/20 bg-white/10 text-white/70 hover:text-white hover:bg-white/15 transition"
+                                      >
+                                        {showAllSelectedPresets ? 'Show Less' : `+${selectedPresets.length - 8 + selectedXRayParts.length - 4} more`}
+                                      </button>
+                                    )}
+                                    <div className="ml-auto flex items-center gap-2">
+                                      {selectedPresets.length > 0 && (
+                                        <button
+                                          type="button"
+                                          onClick={clearPresets}
+                                          className="px-2.5 py-1 rounded-xl border border-white/10 bg-black/20 text-white/70 hover:text-white transition text-[11px]"
+                                        >
+                                          Clear
+                                        </button>
+                                      )}
+                                      {selectedXRayParts.length > 0 && (
+                                        <button
+                                          type="button"
+                                          onClick={clearXRay}
+                                          className="px-2.5 py-1 rounded-xl border border-white/10 bg-black/20 text-white/70 hover:text-white transition text-[11px]"
+                                        >
+                                          Clear X-ray
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
 
-              <Tabs.Content value="build" className="outline-none">
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:h-[calc(100vh-280px)]">
-                  <div className="lg:col-span-8 rounded-3xl border border-white/10 bg-black/25 backdrop-blur-xl shadow-2xl overflow-hidden flex flex-col min-h-0">
-                    <div className="p-3 border-b border-white/10">
-                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                        <div>
-                          <h2 className="text-white font-semibold">Scene Builder</h2>
-                          <p className="text-white/55 text-xs mt-1">Presets + quick text. Compact & scrollable.</p>
-                        </div>
+                                {/* Category Tabs - Redesigned */}
+                                <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                                  {PRESET_CATEGORIES.map((cat) => {
+                                    const active = cat.id === activePresetCategory;
+                                    return (
+                                      <button
+                                        key={cat.id}
+                                        type="button"
+                                        onClick={() => setActivePresetCategory(cat.id)}
+                                        className={`group relative px-3 py-2 rounded-xl text-xs font-medium transition-all duration-200 overflow-hidden ${active
+                                          ? 'bg-gradient-to-r from-fuchsia-500/30 to-cyan-500/20 text-white shadow-lg shadow-fuchsia-500/20 border border-fuchsia-400/40'
+                                          : 'bg-black/30 text-white/60 hover:text-white/90 border border-white/5 hover:border-white/15 hover:bg-white/5'
+                                          }`}
+                                      >
+                                        <span className="relative z-10 flex items-center gap-1.5">
+                                          {active && (
+                                            <span className="w-1.5 h-1.5 rounded-full bg-fuchsia-300 animate-pulse" />
+                                          )}
+                                          {cat.label}
+                                        </span>
+                                        {active && (
+                                          <span className="absolute inset-0 bg-gradient-to-r from-fuchsia-500/10 via-cyan-500/10 to-fuchsia-500/10 opacity-50" />
+                                        )}
+                                      </button>
+                                    );
+                                  })}
+                                  
+                                  <div className="ml-auto flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => setShowAllPresets((v) => !v)}
+                                      className={`px-3 py-2 rounded-xl text-xs font-medium transition-all duration-200 flex items-center gap-1.5 ${showAllPresets
+                                        ? 'bg-cyan-500/20 text-cyan-200 border border-cyan-400/40'
+                                        : 'bg-black/30 text-white/60 hover:text-white/90 border border-white/5 hover:border-white/15'
+                                        }`}
+                                    >
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        {showAllPresets ? (
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                        ) : (
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                        )}
+                                      </svg>
+                                      {showAllPresets ? 'Focused' : 'Show All'}
+                                    </button>
+                                  </div>
+                                </div>
 
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                          <div className="relative w-full sm:w-[320px]">
-                            <input
-                              value={presetQuery}
-                              onChange={(e) => setPresetQuery(e.target.value)}
-                              placeholder="Search presets..."
-                              className="w-full px-3 py-2 rounded-2xl bg-black/35 border border-white/10 text-white placeholder:text-white/35 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/60 text-sm"
-                            />
-                          </div>
-                          <span className="text-xs text-white/55">
-                            Selected: <span className="text-white/80">{selectedPresets.length}</span>
-                          </span>
-                          {selectedPresets.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={clearPresets}
-                              className="px-3 py-2 rounded-2xl border border-white/10 bg-black/20 text-white/75 hover:text-white transition text-sm"
-                            >
-                              Clear
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+                                {/* Custom Input */}
+                                <div className="relative mb-3">
+                                  <textarea
+                                    value={actionInput}
+                                    onChange={(e) => setActionInput(e.target.value)}
+                                    placeholder="Add custom action or extra details..."
+                                    rows={1}
+                                    className="w-full px-4 py-2.5 rounded-xl bg-black/30 border border-white/10 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/40 focus:border-fuchsia-500/30 text-sm resize-none transition-all"
+                                  />
+                                </div>
 
-                    <div className="p-3 flex-1 min-h-0 overflow-hidden">
-                      <div className="h-full overflow-y-auto pr-1">
-                        {(selectedPresets.length > 0 || selectedXRayParts.length > 0) && (
-                          <div className="flex flex-wrap items-center gap-2 mb-3 rounded-2xl border border-white/10 bg-black/15 p-2">
-                            {selectedPresets.slice(0, 8).map((id) => {
-                              const p = presetMap.get(id);
-                              if (!p) return null;
-                              return (
-                                <button
-                                  key={p.id}
-                                  type="button"
-                                  onClick={() => togglePreset(p.id)}
-                                  className="px-2.5 py-1 rounded-full text-[11px] border border-fuchsia-300/30 bg-fuchsia-500/10 text-white/90 hover:bg-fuchsia-500/15 transition"
-                                >
-                                  {p.label}
-                                </button>
-                              );
-                            })}
-                            {selectedXRayParts.slice(0, 4).map((id) => {
-                              const part = XRAY_PARTS.find((p) => p.id === id);
-                              if (!part) return null;
-                              return (
-                                <button
-                                  key={`xray_${id}`}
-                                  type="button"
-                                  onClick={() => toggleXRayPart(id)}
-                                  className="px-2.5 py-1 rounded-full text-[11px] border border-cyan-300/20 bg-cyan-500/10 text-white/90 hover:text-white transition"
-                                >
-                                  X-ray: {part.label}
-                                </button>
-                              );
-                            })}
-                            <div className="ml-auto flex items-center gap-2">
-                              {selectedPresets.length > 0 && (
-                                <button
-                                  type="button"
-                                  onClick={clearPresets}
-                                  className="px-2.5 py-1 rounded-xl border border-white/10 bg-black/20 text-white/70 hover:text-white transition text-[11px]"
-                                >
-                                  Clear
-                                </button>
-                              )}
-                              {selectedXRayParts.length > 0 && (
-                                <button
-                                  type="button"
-                                  onClick={clearXRay}
-                                  className="px-2.5 py-1 rounded-xl border border-white/10 bg-black/20 text-white/70 hover:text-white transition text-[11px]"
-                                >
-                                  Clear X-ray
-                                </button>
+                                {/* Preset Grid - Redesigned Cards */}
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+                                  {(activePresetCategory === 'xray'
+                                    ? XRAY_PARTS.map((part) => ({
+                                        id: part.id,
+                                        label: part.label,
+                                        active: selectedXRayParts.includes(part.id),
+                                        onClick: () => toggleXRayPart(part.id),
+                                        tone: 'xray' as const,
+                                      }))
+                                    : visiblePresets.map((p) => ({
+                                        id: p.id,
+                                        label: p.label,
+                                        active: selectedPresets.includes(p.id),
+                                        onClick: () => togglePreset(p.id),
+                                        tone: 'preset' as const,
+                                      })))
+                                    .map((item) => (
+                                      <motion.button
+                                        key={String(item.id)}
+                                        type="button"
+                                        onClick={item.onClick}
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        className={`group relative px-3 py-3 rounded-xl text-xs font-medium transition-all duration-200 text-left leading-snug overflow-hidden ${item.active
+                                          ? item.tone === 'xray'
+                                            ? 'bg-gradient-to-br from-cyan-500/30 to-cyan-600/20 text-white border border-cyan-400/50 shadow-lg shadow-cyan-500/20'
+                                            : 'bg-gradient-to-br from-fuchsia-500/30 via-fuchsia-500/20 to-cyan-500/10 text-white border border-fuchsia-400/50 shadow-lg shadow-fuchsia-500/20'
+                                          : 'bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/25 hover:bg-white/10'
+                                          }`}
+                                      >
+                                        {/* Active indicator dot */}
+                                        {item.active && (
+                                          <span className={`absolute top-2 right-2 w-1.5 h-1.5 rounded-full ${item.tone === 'xray' ? 'bg-cyan-300' : 'bg-fuchsia-300'} animate-pulse`} />
+                                        )}
+                                        
+                                        {/* Glow effect for active items */}
+                                        {item.active && (
+                                          <span className={`absolute inset-0 bg-gradient-to-br ${item.tone === 'xray' ? 'from-cyan-400/5' : 'from-fuchsia-400/5'} to-transparent`} />
+                                        )}
+                                        
+                                        <span className="relative z-10">{item.label}</span>
+                                        
+                                        {/* Hover glow */}
+                                        {!item.active && (
+                                          <span className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                                        )}
+                                      </motion.button>
+                                    ))}
+                                </div>
+                              </div>
+                            </div>
+                          </motion.div>
+                        </motion.div>
+                      )}
+
+                      {mainTab === 'generate' && (
+                        <motion.div
+                          key="generate"
+                          initial={{ opacity: 0, x: tabDirection === 'right' ? 40 : -40 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: tabDirection === 'right' ? -40 : 40 }}
+                          transition={{ duration: 0.25, ease: "easeInOut" }}
+                          className="absolute inset-0"
+                          style={{ willChange: 'transform, opacity' }}
+                        >
+                          <motion.div 
+                            className="rounded-t-3xl border border-white/10 bg-black/25 backdrop-blur-xl shadow-2xl overflow-hidden flex flex-col h-full"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ duration: 0.15, delay: 0.05 }}
+                          >
+                            <div className="p-3 border-b border-white/10">
+                              <div className="flex items-center justify-between gap-4">
+                                <div>
+                                  <h2 className="text-white font-semibold">Generation</h2>
+                                  <p className="text-white/55 text-xs mt-1">Quality + resolution + sampler.</p>
+                                </div>
+                                <div className="text-xs text-white/55">
+                                  Model:{' '}
+                                  <span className="text-white/80">{selectedCharacter?.generation?.model ? String(selectedCharacter.generation.model) : 'default'}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="p-3 flex-1 min-h-0 overflow-y-auto">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                                  <div className="text-xs uppercase tracking-wider text-white/55">Resolution</div>
+                                  <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                    {[
+                                      { w: 640, h: 1152, l: '640×1152' },
+                                      { w: 768, h: 1344, l: '768×1344' },
+                                      { w: 832, h: 1472, l: '832×1472' },
+                                      { w: 1024, h: 576, l: '1024×576' },
+                                      { w: 1152, h: 648, l: '1152×648' },
+                                      { w: 1280, h: 720, l: '1280×720' },
+                                    ].map((opt) => {
+                                      const active = genWidth === opt.w && genHeight === opt.h;
+                                      return (
+                                        <button
+                                          key={opt.l}
+                                          type="button"
+                                          onClick={() => {
+                                            setGenWidth(opt.w);
+                                            setGenHeight(opt.h);
+                                          }}
+                                          className={`px-3 py-2 rounded-2xl border text-sm transition ${active
+                                            ? 'border-cyan-300/60 bg-cyan-500/10 text-white'
+                                            : 'border-white/10 bg-black/20 text-white/70 hover:text-white'
+                                            }`}
+                                        >
+                                          {opt.l}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+
+                                <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                                  <div className="text-xs uppercase tracking-wider text-white/55">Sampler</div>
+                                  <select
+                                    value={genSampler}
+                                    onChange={(e) => setGenSampler(e.target.value)}
+                                    className="mt-2 w-full px-3 py-2 rounded-2xl border border-white/10 bg-black/30 text-white/90 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                                  >
+                                    <option value="DPM++ 2M Karras">DPM++ 2M Karras</option>
+                                    <option value="DPM++ SDE Karras">DPM++ SDE Karras</option>
+                                    <option value="Euler a">Euler a</option>
+                                  </select>
+                                </div>
+
+                                <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                                  <div className="flex items-center justify-between">
+                                    <div className="text-xs uppercase tracking-wider text-white/55">Steps</div>
+                                    <div className="text-xs text-white/70">{genSteps}</div>
+                                  </div>
+                                  <input
+                                    type="range"
+                                    min={10}
+                                    max={60}
+                                    value={genSteps}
+                                    onChange={(e) => setGenSteps(parseInt(e.target.value, 10) || 40)}
+                                    className="mt-2 w-full accent-cyan-400"
+                                  />
+                                </div>
+
+                                <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                                  <div className="flex items-center justify-between">
+                                    <div className="text-xs uppercase tracking-wider text-white/55">CFG</div>
+                                    <div className="text-xs text-white/70">{genCfg}</div>
+                                  </div>
+                                  <input
+                                    type="range"
+                                    min={3}
+                                    max={12}
+                                    step={1}
+                                    value={genCfg}
+                                    onChange={(e) => setGenCfg(parseInt(e.target.value, 10) || 7)}
+                                    className="mt-2 w-full accent-fuchsia-400"
+                                  />
+                                </div>
+
+                                <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                                  <div className="flex items-center justify-between">
+                                    <div className="text-xs uppercase tracking-wider text-white/55">Hi-Res</div>
+                                    <button
+                                      type="button"
+                                      onClick={() => setUseHires(!useHires)}
+                                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                        useHires ? 'bg-fuchsia-500' : 'bg-white/20'
+                                      }`}
+                                    >
+                                      <span
+                                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                          useHires ? 'translate-x-6' : 'translate-x-1'
+                                        }`}
+                                      />
+                                    </button>
+                                  </div>
+                                  <div className="text-xs text-white/40 mt-2">2x upscaling with detail preservation</div>
+                                </div>
+
+                                <div className="rounded-2xl border border-white/10 bg-black/20 p-4 md:col-span-2">
+                                  <div className="flex items-center justify-between">
+                                    <div className="text-xs uppercase tracking-wider text-white/55">Seed</div>
+                                    <button
+                                      type="button"
+                                      onClick={() => setGenSeed(-1)}
+                                      className="text-[11px] text-white/45 hover:text-white/70 transition"
+                                    >
+                                      Random
+                                    </button>
+                                  </div>
+                                  <input
+                                    value={String(genSeed)}
+                                    onChange={(e) => setGenSeed(parseInt(e.target.value, 10) || 0)}
+                                    className="mt-2 w-full px-3 py-2 rounded-2xl border border-white/10 bg-black/30 text-white/90 placeholder:text-white/35 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/40"
+                                  />
+                                  <div className="mt-2 text-[11px] text-white/40">Use -1 for random seed.</div>
+                                </div>
+                              </div>
+
+                              <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <div className="text-xs uppercase tracking-wider text-white/55">Prompt preview</div>
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => copyToClipboard(composedAction || actionInput.trim() || '')}
+                                        className="px-2.5 py-1.5 rounded-xl border border-white/10 bg-black/20 text-white/70 hover:text-white transition text-[11px]"
+                                      >
+                                        Copy
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setShowFullPromptPreview((v) => !v)}
+                                        className="px-2.5 py-1.5 rounded-xl border border-white/10 bg-black/20 text-white/70 hover:text-white transition text-[11px]"
+                                      >
+                                        {showFullPromptPreview ? 'Collapse' : 'Expand'}
+                                      </button>
+                                    </div>
+                                  </div>
+                                  <div className={`mt-2 text-xs text-white/70 break-words ${showFullPromptPreview ? '' : 'line-clamp-6'}`}>
+                                    {composedAction || actionInput.trim() ? composedAction || actionInput.trim() : '—'}
+                                  </div>
+                                </div>
+                                <div className="rounded-2xl border border-white/10 bg-black/20 p-4 flex flex-col justify-between">
+                                  <div className="text-xs uppercase tracking-wider text-white/55">Generate</div>
+                                  <PrimaryCTAButton
+                                    label={isGenerating ? 'Generating...' : 'Generate Image'}
+                                    onClick={generateFromAction}
+                                    className="w-full mt-3"
+                                    disabled={isGenerating || !selectedCharacter || (!composedAction && !actionInput.trim())}
+                                  />
+                                  <div className="mt-2 text-[11px] text-white/40">
+                                    Saved to <span className="text-white/60">{selectedCharacter?.name || 'character'}</span> gallery.
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </motion.div>
+                        </motion.div>
+                      )}
+
+                      {mainTab === 'results' && (
+                        <motion.div
+                          key="results"
+                          initial={{ opacity: 0, x: tabDirection === 'right' ? 40 : -40 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: tabDirection === 'right' ? -40 : 40 }}
+                          transition={{ duration: 0.25, ease: "easeInOut" }}
+                          className="absolute inset-0"
+                          style={{ willChange: 'transform, opacity' }}
+                        >
+                          <motion.div 
+                            className="rounded-t-3xl border border-white/10 bg-black/25 backdrop-blur-xl shadow-2xl overflow-hidden flex flex-col h-full"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ duration: 0.15, delay: 0.05 }}
+                          >
+                            <div className="p-3 border-b border-white/10">
+                              <div className="flex items-center justify-between gap-4">
+                                <div>
+                                  <h2 className="text-white font-semibold">Results</h2>
+                                  <p className="text-white/55 text-xs mt-1">Browse your renders.</p>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setResultsTab('character')}
+                                    className={`px-3 py-2 rounded-2xl border text-sm transition ${resultsTab === 'character'
+                                      ? 'border-fuchsia-300/60 bg-fuchsia-500/15 text-white'
+                                      : 'border-white/10 bg-black/20 text-white/70 hover:text-white'
+                                      }`}
+                                  >
+                                    This Character
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setResultsTab('feed')}
+                                    className={`px-3 py-2 rounded-2xl border text-sm transition ${resultsTab === 'feed'
+                                      ? 'border-cyan-300/60 bg-cyan-500/10 text-white'
+                                      : 'border-white/10 bg-black/20 text-white/70 hover:text-white'
+                                      }`}
+                                  >
+                                    Tentacles Feed
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="p-3 flex-1 min-h-0 overflow-y-auto">
+                              {resultsTab === 'character' ? (
+                                tentacleImages.length === 0 ? (
+                                  <div className="text-center py-8">
+                                    <div className="text-white/55">No tentacle images yet.</div>
+                                    <div className="text-white/40 text-sm mt-2">Generate one from the Scene Builder above.</div>
+                                  </div>
+                                ) : (
+                                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
+                                    <AnimatePresence>
+                                      {tentacleImages.map((img, idx) => (
+                                        <motion.div
+                                          key={img.id}
+                                          initial={{ opacity: 0, y: 8 }}
+                                          animate={{ opacity: 1, y: 0 }}
+                                          exit={{ opacity: 0, y: 8 }}
+                                          transition={{ duration: 0.18 }}
+                                          className="relative group"
+                                        >
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              deleteCharacterImageWithModal(img.id);
+                                            }}
+                                            disabled={deletingImageId === img.id}
+                                            className="absolute top-2 right-2 z-10 p-1.5 rounded-lg bg-red-500/80 hover:bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-all duration-200 disabled:opacity-50"
+                                            title="Delete image"
+                                          >
+                                            {deletingImageId === img.id ? (
+                                              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                              </svg>
+                                            ) : (
+                                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                              </svg>
+                                            )}
+                                          </button>
+                                          <div
+                                            className="aspect-[3/4] rounded-2xl overflow-hidden border border-white/10 bg-black/20 cursor-pointer"
+                                            onClick={() => {
+                                              setZoomedImageIndex(idx);
+                                              setZoomedImageSource('character');
+                                              setIsZoomed(true);
+                                            }}
+                                          >
+                                            <img
+                                              src={img.imageUrl}
+                                              alt=""
+                                              className={`w-full h-full object-cover transition ${blurNSFW ? 'blur-xl' : ''}`}
+                                              loading="lazy"
+                                              draggable={false}
+                                            />
+                                          </div>
+                                        </motion.div>
+                                      ))}
+                                    </AnimatePresence>
+                                  </div>
+                                )) : (
+                                <div>
+                                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                                    <div className="flex items-center gap-3">
+                                      <div className="text-sm text-white/60">
+                                        {showAllImages ? 'All images from your library.' : 'Tentacle images from your library.'}
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setShowAllImages((v) => !v);
+                                          setGlobalTentaclePage(0);
+                                        }}
+                                        className={`px-2 py-1 rounded-lg text-xs border transition ${
+                                          showAllImages
+                                            ? 'border-cyan-300/60 bg-cyan-500/15 text-white'
+                                            : 'border-white/10 bg-black/20 text-white/70 hover:text-white'
+                                        }`}
+                                      >
+                                        {showAllImages ? 'Tentacles Only' : 'Show All'}
+                                      </button>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        type="button"
+                                        disabled={isLoadingGlobalTentacleImages || globalTentaclePage === 0}
+                                        onClick={() => setGlobalTentaclePage((p) => Math.max(0, p - 1))}
+                                        className="px-3 py-2 rounded-2xl border border-white/10 bg-black/20 text-white/75 hover:text-white disabled:opacity-40 disabled:hover:text-white/75 transition text-sm"
+                                      >
+                                        Prev
+                                      </button>
+                                      <div className="px-3 py-2 rounded-2xl border border-white/10 bg-black/20 text-white/60 text-sm">
+                                        Page {globalTentaclePage + 1}
+                                      </div>
+                                      <button
+                                        type="button"
+                                        disabled={isLoadingGlobalTentacleImages || imageStoreRef.current.length === 0}
+                                        onClick={() => setGlobalTentaclePage((p) => p + 1)}
+                                        className="px-3 py-2 rounded-2xl border border-white/10 bg-black/20 text-white/75 hover:text-white disabled:opacity-40 disabled:hover:text-white/75 transition text-sm"
+                                      >
+                                        Next
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {isLoadingGlobalTentacleImages ? (
+                                    <div className="text-center py-10 text-white/55">Loading…</div>
+                                  ) : imageStoreRef.current.length === 0 ? (
+                                    <div className="text-center py-10">
+                                      <div className="text-white/55">
+                                        {showAllImages ? 'No images found in your library.' : 'No tentacle images found.'}
+                                      </div>
+                                      <div className="text-white/40 text-sm mt-2">
+                                        {showAllImages 
+                                          ? 'Try generating some images first.' 
+                                          : 'Try toggling "Show All" to see all images, or generate new tentacle renders.'}
+                                      </div>
+                                      {!showAllImages && (
+                                        <div className="text-white/30 text-xs mt-4">
+                                          Debug: Check browser console (F12) for fetched image count
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <div key={globalTentaclePage} className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8 gap-3">
+                                      <AnimatePresence>
+                                        {imageStoreRef.current.map((img, idx) => (
+                                          <motion.div
+                                            key={img.id}
+                                            initial={{ opacity: 0, y: 8 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: 8 }}
+                                            transition={{ duration: 0.18 }}
+                                            className="relative group"
+                                          >
+                                            {/* Delete button - appears on hover */}
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDeleteTentacleImage(img.id);
+                                              }}
+                                              disabled={deletingImageId === img.id}
+                                              className="absolute top-2 right-2 z-10 p-1.5 rounded-lg bg-red-500/80 hover:bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-all duration-200 disabled:opacity-50"
+                                              title="Delete image"
+                                            >
+                                              {deletingImageId === img.id ? (
+                                                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                              ) : (
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                              )}
+                                            </button>
+                                            <div
+                                              className="aspect-[3/4] rounded-2xl overflow-hidden border border-white/10 bg-black/20 cursor-pointer"
+                                              onClick={() => {
+                                                setZoomedImageIndex(idx);
+                                                setZoomedImageSource('global');
+                                                setIsZoomed(true);
+                                              }}
+                                            >
+                                              <img
+                                                src={img.imageUrl}
+                                                alt=""
+                                                className={`w-full h-full object-cover transition ${blurNSFW ? 'blur-xl' : ''}`}
+                                                loading="lazy"
+                                                draggable={false}
+                                              />
+                                            </div>
+                                          </motion.div>
+                                        ))}
+                                      </AnimatePresence>
+                                    </div>
+                                  )}
+                                </div>
                               )}
                             </div>
+                          </motion.div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  {/* Static Navigation Bar - Blended with content */}
+                  <div className="shrink-0 rounded-b-3xl border-x border-b border-white/10 bg-black/25 backdrop-blur-xl px-4 py-3 shadow-2xl">
+                    <div className="flex items-center justify-between">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (mainTab === 'build') return;
+                          if (mainTab === 'generate') setMainTabWithDirection('build');
+                          if (mainTab === 'results') setMainTabWithDirection('generate');
+                        }}
+                        disabled={mainTab === 'build'}
+                        className="px-4 py-2 rounded-xl text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 transition flex items-center gap-2 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-white/70 disabled:cursor-not-allowed"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                        <span>
+                          {mainTab === 'build' ? 'Build' : mainTab === 'generate' ? 'Build' : 'Generate'}
+                        </span>
+                      </button>
+
+                      {/* Step Indicators */}
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setMainTabWithDirection('build')}
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 ${
+                            mainTab === 'build'
+                              ? 'bg-fuchsia-500/20 border border-fuchsia-400/40 text-fuchsia-300 shadow-lg shadow-fuchsia-500/20'
+                              : 'bg-black/20 border border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5'
+                          }`}
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" />
+                          </svg>
+                        </button>
+                        <div className="w-8 h-px bg-gradient-to-r from-fuchsia-500/30 to-cyan-500/30" />
+                        <button
+                          type="button"
+                          onClick={() => setMainTabWithDirection('generate')}
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 ${
+                            mainTab === 'generate'
+                              ? 'bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 shadow-lg shadow-cyan-500/20'
+                              : 'bg-black/20 border border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5'
+                          }`}
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                          </svg>
+                        </button>
+                        <div className="w-8 h-px bg-gradient-to-r from-cyan-500/30 to-white/30" />
+                        <button
+                          type="button"
+                          onClick={() => setMainTabWithDirection('results')}
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 ${
+                            mainTab === 'results'
+                              ? 'bg-white/20 border border-white/40 text-white shadow-lg shadow-white/10'
+                              : 'bg-black/20 border border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5'
+                          }`}
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (mainTab === 'results') return;
+                          if (mainTab === 'build') setMainTabWithDirection('generate');
+                          if (mainTab === 'generate') setMainTabWithDirection('results');
+                        }}
+                        disabled={mainTab === 'results'}
+                        className="px-4 py-2 rounded-xl text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 transition flex items-center gap-2 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-white/70 disabled:cursor-not-allowed"
+                      >
+                        <span>
+                          {mainTab === 'build' ? 'Generate' : mainTab === 'generate' ? 'Results' : 'Results'}
+                        </span>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+            <div className="lg:col-span-3 rounded-3xl border border-white/10 bg-black/30 backdrop-blur-xl shadow-2xl overflow-visible flex flex-col lg:h-[calc(100vh-100px)]">
+              <div className="p-3 pb-2 shrink-0">
+                    <div className="relative" ref={pickerRef}>
+                      <button
+                        type="button"
+                        onClick={() => setIsPickerOpen((v) => !v)}
+                        disabled={loadingCharacters}
+                        className="w-full px-3 py-2.5 rounded-xl bg-black/40 border border-white/15 text-left text-white/90 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/60 flex items-center justify-between hover:bg-black/50 transition-colors"
+                      >
+                        <span className="flex items-center gap-3 min-w-0">
+                          <span className="w-10 h-10 rounded-xl overflow-hidden border border-white/10 bg-black/20 shrink-0">
+                            {selectedImage ? (
+                              <img
+                                src={selectedImage}
+                                alt={selectedCharacter?.name || 'Character'}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <span className="w-full h-full flex items-center justify-center text-white/60 text-sm font-bold">
+                                {selectedCharacter?.name?.charAt(0) || '?'}
+                              </span>
+                            )}
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block font-semibold truncate leading-tight">
+                              {selectedCharacter?.name || (loadingCharacters ? 'Loading...' : 'Select a character')}
+                            </span>
+                            <span className="block text-xs text-white/50 truncate leading-tight">
+                              {selectedCharacter?.personality?.archetype || selectedCharacter?.mainTag || '—'}
+                            </span>
+                          </span>
+                        </span>
+                        <svg
+                          className={`w-5 h-5 text-white/60 transition-transform duration-200 ${isPickerOpen ? 'rotate-180' : ''}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+
+                      <AnimatePresence>
+                        {isPickerOpen && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                            transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+                            className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 w-full rounded-xl border border-white/10 bg-dark-950/95 backdrop-blur-xl shadow-2xl overflow-hidden"
+                          >
+                            <div className="p-2 border-b border-white/10">
+                              <input
+                                autoFocus
+                                value={characterQuery}
+                                onChange={(e) => setCharacterQuery(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Escape') setIsPickerOpen(false);
+                                }}
+                                placeholder="Search characters..."
+                                className="w-full px-3 py-2 rounded-lg bg-black/35 border border-white/10 text-white placeholder:text-white/35 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/60 text-sm"
+                              />
+                            </div>
+
+                            <div className="max-h-64 overflow-y-auto">
+                              {filteredCharacters.length === 0 ? (
+                                <div className="p-3 text-sm text-white/60">No matches.</div>
+                              ) : (
+                                filteredCharacters.map((c: CharacterDraft) => {
+                                  const img = c.generation?.generatedImage;
+                                  const active = c.id === selectedId;
+                                  return (
+                                    <button
+                                      key={c.id}
+                                      type="button"
+                                      onClick={() => handleSelectCharacter(c.id!)}
+                                      className={`w-full px-3 py-2.5 flex items-center gap-3 text-left transition ${active
+                                        ? 'bg-fuchsia-500/15 text-white'
+                                        : 'hover:bg-white/5 text-white/90'
+                                        }`}
+                                    >
+                                      <span className="w-9 h-9 rounded-lg overflow-hidden border border-white/10 bg-black/20 shrink-0">
+                                        {img ? (
+                                          <img src={img} alt={c.name || 'Character'} className="w-full h-full object-cover" />
+                                        ) : (
+                                          <span className="w-full h-full flex items-center justify-center text-white/55 text-sm font-bold">
+                                            {c.name?.charAt(0) || '?'}
+                                          </span>
+                                        )}
+                                      </span>
+                                      <span className="min-w-0 flex-1">
+                                        <span className="block font-semibold truncate text-sm">{c.name || c.id}</span>
+                                        <span className="block text-xs text-white/55 truncate">
+                                          {c.personality?.archetype || c.mainTag || '—'}
+                                        </span>
+                                      </span>
+                                      {active && (
+                                        <span className="text-[11px] px-2 py-0.5 rounded-full border border-fuchsia-400/40 bg-fuchsia-500/10 text-white/90">
+                                          Active
+                                        </span>
+                                      )}
+                                    </button>
+                                  );
+                                })
+                              )}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+
+                  <div className="px-3 pb-3 flex-1 min-h-0 overflow-hidden">
+                    <div className="h-full rounded-2xl border border-white/10 bg-black/20 overflow-hidden flex items-center justify-center">
+                      <div className="h-full w-full relative">
+                        {selectedImage ? (
+                          <img
+                            src={selectedImage}
+                            alt={selectedCharacter?.name || 'Character'}
+                            className={`w-full h-full object-cover ${blurNSFW ? 'blur-xl' : ''}`}
+                            draggable={false}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-white/45 text-sm">
+                            {loadingCharacters ? 'Loading…' : 'Choose a character to preview'}
                           </div>
                         )}
 
-                        <div className="rounded-2xl border border-white/10 bg-black/20 p-2 mb-3">
-                          <div className="flex items-center gap-1 overflow-x-auto whitespace-nowrap [-webkit-overflow-scrolling:touch]">
-                            {PRESET_CATEGORIES.map((cat) => {
-                              const active = cat.id === activePresetCategory;
-                              return (
-                                <button
-                                  key={cat.id}
-                                  type="button"
-                                  onClick={() => setActivePresetCategory(cat.id)}
-                                  className={`px-3 py-1.5 rounded-xl text-sm border transition ${active
-                                    ? 'border-fuchsia-300/60 bg-fuchsia-500/15 text-white'
-                                    : 'border-white/10 bg-black/20 text-white/65 hover:text-white'
-                                    }`}
-                                >
-                                  {cat.label}
-                                </button>
-                              );
-                            })}
-
-                            <button
-                              type="button"
-                              onClick={() => setShowAllPresets((v) => !v)}
-                              className="ml-auto px-3 py-1.5 rounded-xl text-sm border border-white/10 bg-black/20 text-white/70 hover:text-white transition"
-                            >
-                              {showAllPresets ? 'Focused' : 'All'}
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="rounded-2xl border border-white/10 bg-black/20 p-2 mb-3">
-                          <textarea
-                            value={actionInput}
-                            onChange={(e) => setActionInput(e.target.value)}
-                            placeholder="Action / extra details (optional)..."
-                            rows={2}
-                            className="w-full px-3 py-2 rounded-2xl border border-white/10 bg-black/25 text-white/90 placeholder:text-white/35 focus:outline-none focus:ring-4 focus:ring-fuchsia-500/10 text-sm"
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
-                          {(activePresetCategory === 'xray'
-                            ? XRAY_PARTS.map((part) => ({
-                                id: part.id,
-                                label: part.label,
-                                active: selectedXRayParts.includes(part.id),
-                                onClick: () => toggleXRayPart(part.id),
-                                tone: 'xray' as const,
-                              }))
-                            : visiblePresets.map((p) => ({
-                                id: p.id,
-                                label: p.label,
-                                active: selectedPresets.includes(p.id),
-                                onClick: () => togglePreset(p.id),
-                                tone: 'preset' as const,
-                              })))
-                            .map((item) => (
-                              <button
-                                key={String(item.id)}
-                                type="button"
-                                onClick={item.onClick}
-                                className={`px-3 py-2.5 rounded-2xl text-sm border transition shadow-sm text-left leading-snug ${item.active
-                                  ? item.tone === 'xray'
-                                    ? 'border-cyan-300/60 bg-cyan-500/15 text-white'
-                                    : 'border-fuchsia-300/60 bg-gradient-to-r from-fuchsia-500/20 to-cyan-500/10 text-white'
-                                  : 'border-white/10 bg-black/20 text-white/75 hover:text-white hover:bg-black/35'
-                                  }`}
-                              >
-                                <div className="font-semibold">{item.label}</div>
-                              </button>
-                            ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="lg:col-span-4 rounded-3xl border border-white/10 bg-black/30 backdrop-blur-xl shadow-2xl overflow-visible flex flex-col min-h-0">
-                    <div className="p-3 border-b border-white/10">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <h2 className="text-white font-semibold">Studio</h2>
-                          <p className="text-white/55 text-xs mt-1">Build the scene & apply tools.</p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={toggleBlurNSFW}
-                          className="px-3 py-2 rounded-2xl border border-white/10 bg-black/20 text-white/75 hover:text-white transition text-sm"
-                        >
-                          {blurNSFW ? 'Unblur' : 'Blur'}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="p-3 space-y-3 flex-1 min-h-0">
-                      <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                        <div className="flex items-center justify-between">
-                          <label className="text-xs uppercase tracking-wider text-white/55">Character</label>
-                          <span className="text-[11px] text-white/40">Pick from list</span>
-                        </div>
-
-                      <div className="mt-3 flex items-center gap-4">
-                        <div className="w-14 h-14 rounded-2xl overflow-hidden border border-white/10 bg-black/20 shrink-0">
-                          {selectedImage ? (
-                            <img
-                              src={selectedImage}
-                              alt={selectedCharacter?.name || 'Character'}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-white/60 text-base font-bold">
-                              {selectedCharacter?.name?.charAt(0) || '?'}
-                            </div>
-                          )}
-                        </div>
-                        <div className="min-w-0">
+                        <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/85 via-black/35 to-transparent">
                           <div className="text-white font-semibold truncate">
-                            {selectedCharacter?.name || (loadingCharacters ? 'Loading...' : 'Select a character')}
+                            {selectedCharacter?.name || 'No character selected'}
                           </div>
-                          <div className="text-white/55 text-sm truncate">
+                          <div className="text-white/60 text-xs truncate mt-0.5">
                             {selectedCharacter?.personality?.archetype || selectedCharacter?.mainTag || '—'}
                           </div>
                         </div>
                       </div>
-
-                      <div className="mt-2 relative" ref={pickerRef}>
-                        <button
-                          type="button"
-                          onClick={() => setIsPickerOpen((v) => !v)}
-                          disabled={loadingCharacters}
-                          className="w-full px-4 py-3 rounded-2xl bg-black/35 border border-white/10 text-left text-white/90 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/60 flex items-center justify-between"
-                        >
-                          <span className="flex items-center gap-3 min-w-0">
-                            <span className="w-9 h-9 rounded-xl overflow-hidden border border-white/10 bg-black/20 shrink-0">
-                              {selectedImage ? (
-                                <img
-                                  src={selectedImage}
-                                  alt={selectedCharacter?.name || 'Character'}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <span className="w-full h-full flex items-center justify-center text-white/60 text-sm font-bold">
-                                  {selectedCharacter?.name?.charAt(0) || '?'}
-                                </span>
-                              )}
-                            </span>
-                            <span className="min-w-0">
-                              <span className="block font-semibold truncate leading-tight">
-                                {selectedCharacter?.name || (loadingCharacters ? 'Loading...' : 'Select a character')}
-                              </span>
-                              <span className="block text-xs text-white/50 truncate leading-tight">
-                                {selectedCharacter?.personality?.archetype || selectedCharacter?.mainTag || '—'}
-                              </span>
-                            </span>
-                          </span>
-                          <svg
-                            className={`w-5 h-5 text-white/60 transition-transform ${isPickerOpen ? 'rotate-180' : ''}`}
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </button>
-
-                        <AnimatePresence>
-                          {isPickerOpen && (
-                            <motion.div
-                              initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                              animate={{ opacity: 1, y: 0, scale: 1 }}
-                              exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                              transition={{ duration: 0.15 }}
-                              className="absolute left-0 right-0 bottom-[calc(100%+10px)] z-50 w-full rounded-2xl border border-white/10 bg-dark-950/90 backdrop-blur-xl shadow-2xl overflow-hidden"
-                            >
-                              <div className="p-3 border-b border-white/10">
-                                <input
-                                  autoFocus
-                                  value={characterQuery}
-                                  onChange={(e) => setCharacterQuery(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Escape') setIsPickerOpen(false);
-                                  }}
-                                  placeholder="Search characters..."
-                                  className="w-full px-4 py-2.5 rounded-xl bg-black/35 border border-white/10 text-white placeholder:text-white/35 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/60"
-                                />
-                              </div>
-
-                              <div className="max-h-80 overflow-y-auto">
-                                {filteredCharacters.length === 0 ? (
-                                  <div className="p-4 text-sm text-white/60">No matches.</div>
-                                ) : (
-                                  filteredCharacters.map((c: CharacterDraft) => {
-                                    const img = c.generation?.generatedImage;
-                                    const active = c.id === selectedId;
-                                    return (
-                                      <button
-                                        key={c.id}
-                                        type="button"
-                                        onClick={() => handleSelectCharacter(c.id!)}
-                                        className={`w-full px-4 py-3 flex items-center gap-3 text-left transition ${active
-                                          ? 'bg-fuchsia-500/15 text-white'
-                                          : 'hover:bg-white/5 text-white/90'
-                                          }`}
-                                      >
-                                        <span className="w-10 h-10 rounded-xl overflow-hidden border border-white/10 bg-black/20 shrink-0">
-                                          {img ? (
-                                            <img src={img} alt={c.name || 'Character'} className="w-full h-full object-cover" />
-                                          ) : (
-                                            <span className="w-full h-full flex items-center justify-center text-white/55 text-sm font-bold">
-                                              {c.name?.charAt(0) || '?'}
-                                            </span>
-                                          )}
-                                        </span>
-                                        <span className="min-w-0 flex-1">
-                                          <span className="block font-semibold truncate">{c.name || c.id}</span>
-                                          <span className="block text-xs text-white/55 truncate">
-                                            {c.personality?.archetype || c.mainTag || '—'}
-                                          </span>
-                                        </span>
-                                        {active && (
-                                          <span className="text-xs px-2 py-1 rounded-full border border-fuchsia-400/40 bg-fuchsia-500/10 text-white/90">
-                                            Active
-                                          </span>
-                                        )}
-                                      </button>
-                                    );
-                                  })
-                                )}
-                              </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </div>
-                    </div>
-
-                    </div>
-
-                    {selectedCharacter?.generation?.model && (
-                      <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                        <div className="text-[11px] text-white/40">
-                          Model: <span className="text-white/60">{String(selectedCharacter.generation.model)}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </Tabs.Content>
-
-              <Tabs.Content value="generate" className="outline-none">
-                <div className="rounded-3xl border border-white/10 bg-black/25 backdrop-blur-xl shadow-2xl overflow-hidden lg:h-[calc(100vh-280px)] flex flex-col min-h-0">
-                  <div className="p-3 border-b border-white/10">
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <h2 className="text-white font-semibold">Generation</h2>
-                        <p className="text-white/55 text-xs mt-1">Quality + resolution + sampler.</p>
-                      </div>
-                      <div className="text-xs text-white/55">
-                        Model:{' '}
-                        <span className="text-white/80">{selectedCharacter?.generation?.model ? String(selectedCharacter.generation.model) : 'default'}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="p-3 flex-1 min-h-0 overflow-y-auto">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                        <div className="text-xs uppercase tracking-wider text-white/55">Resolution</div>
-                        <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
-                          {[
-                            { w: 640, h: 1152, l: '640×1152' },
-                            { w: 768, h: 1344, l: '768×1344' },
-                            { w: 832, h: 1472, l: '832×1472' },
-                            { w: 1024, h: 576, l: '1024×576' },
-                            { w: 1152, h: 648, l: '1152×648' },
-                            { w: 1280, h: 720, l: '1280×720' },
-                          ].map((opt) => {
-                            const active = genWidth === opt.w && genHeight === opt.h;
-                            return (
-                              <button
-                                key={opt.l}
-                                type="button"
-                                onClick={() => {
-                                  setGenWidth(opt.w);
-                                  setGenHeight(opt.h);
-                                }}
-                                className={`px-3 py-2 rounded-2xl border text-sm transition ${active
-                                  ? 'border-cyan-300/60 bg-cyan-500/10 text-white'
-                                  : 'border-white/10 bg-black/20 text-white/70 hover:text-white'
-                                  }`}
-                              >
-                                {opt.l}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                        <div className="text-xs uppercase tracking-wider text-white/55">Sampler</div>
-                        <select
-                          value={genSampler}
-                          onChange={(e) => setGenSampler(e.target.value)}
-                          className="mt-2 w-full px-3 py-2 rounded-2xl border border-white/10 bg-black/30 text-white/90 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-                        >
-                          <option value="DPM++ 2M Karras">DPM++ 2M Karras</option>
-                          <option value="DPM++ SDE Karras">DPM++ SDE Karras</option>
-                          <option value="Euler a">Euler a</option>
-                        </select>
-                      </div>
-
-                      <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="text-xs uppercase tracking-wider text-white/55">Steps</div>
-                          <div className="text-xs text-white/70">{genSteps}</div>
-                        </div>
-                        <input
-                          type="range"
-                          min={10}
-                          max={60}
-                          value={genSteps}
-                          onChange={(e) => setGenSteps(parseInt(e.target.value, 10) || 40)}
-                          className="mt-2 w-full accent-cyan-400"
-                        />
-                      </div>
-
-                      <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="text-xs uppercase tracking-wider text-white/55">CFG</div>
-                          <div className="text-xs text-white/70">{genCfg}</div>
-                        </div>
-                        <input
-                          type="range"
-                          min={3}
-                          max={12}
-                          step={1}
-                          value={genCfg}
-                          onChange={(e) => setGenCfg(parseInt(e.target.value, 10) || 7)}
-                          className="mt-2 w-full accent-fuchsia-400"
-                        />
-                      </div>
-
-                      <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="text-xs uppercase tracking-wider text-white/55">Hi-Res</div>
-                          <button
-                            type="button"
-                            onClick={() => setUseHires(!useHires)}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                              useHires ? 'bg-fuchsia-500' : 'bg-white/20'
-                            }`}
-                          >
-                            <span
-                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                useHires ? 'translate-x-6' : 'translate-x-1'
-                              }`}
-                            />
-                          </button>
-                        </div>
-                        <div className="text-xs text-white/40 mt-2">2x upscaling with detail preservation</div>
-                      </div>
-
-                      <div className="rounded-2xl border border-white/10 bg-black/20 p-4 md:col-span-2">
-                        <div className="flex items-center justify-between">
-                          <div className="text-xs uppercase tracking-wider text-white/55">Seed</div>
-                          <button
-                            type="button"
-                            onClick={() => setGenSeed(-1)}
-                            className="text-[11px] text-white/45 hover:text-white/70 transition"
-                          >
-                            Random
-                          </button>
-                        </div>
-                        <input
-                          value={String(genSeed)}
-                          onChange={(e) => setGenSeed(parseInt(e.target.value, 10) || 0)}
-                          className="mt-2 w-full px-3 py-2 rounded-2xl border border-white/10 bg-black/30 text-white/90 placeholder:text-white/35 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/40"
-                        />
-                        <div className="mt-2 text-[11px] text-white/40">Use -1 for random seed.</div>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="text-xs uppercase tracking-wider text-white/55">Prompt preview</div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => copyToClipboard(composedAction || actionInput.trim() || '')}
-                              className="px-2.5 py-1.5 rounded-xl border border-white/10 bg-black/20 text-white/70 hover:text-white transition text-[11px]"
-                            >
-                              Copy
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setShowFullPromptPreview((v) => !v)}
-                              className="px-2.5 py-1.5 rounded-xl border border-white/10 bg-black/20 text-white/70 hover:text-white transition text-[11px]"
-                            >
-                              {showFullPromptPreview ? 'Collapse' : 'Expand'}
-                            </button>
-                          </div>
-                        </div>
-                        <div className={`mt-2 text-xs text-white/70 break-words ${showFullPromptPreview ? '' : 'line-clamp-6'}`}>
-                          {composedAction || actionInput.trim() ? composedAction || actionInput.trim() : '—'}
-                        </div>
-                      </div>
-                      <div className="rounded-2xl border border-white/10 bg-black/20 p-4 flex flex-col justify-between">
-                        <div className="text-xs uppercase tracking-wider text-white/55">Generate</div>
-                        <PrimaryCTAButton
-                          label={isGenerating ? 'Generating...' : 'Generate Image'}
-                          onClick={generateFromAction}
-                          className="w-full mt-3"
-                          disabled={isGenerating || !selectedCharacter || (!composedAction && !actionInput.trim())}
-                        />
-                        <div className="mt-2 text-[11px] text-white/40">
-                          Saved to <span className="text-white/60">{selectedCharacter?.name || 'character'}</span> gallery.
-                        </div>
-                      </div>
                     </div>
                   </div>
                 </div>
-              </Tabs.Content>
-
-              <Tabs.Content value="results" className="outline-none">
-                <div className="rounded-3xl border border-white/10 bg-black/25 backdrop-blur-xl shadow-2xl overflow-hidden lg:h-[calc(100vh-280px)] flex flex-col min-h-0">
-                  <div className="p-3 border-b border-white/10">
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <h2 className="text-white font-semibold">Results</h2>
-                        <p className="text-white/55 text-xs mt-1">Browse your renders.</p>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setResultsTab('character')}
-                          className={`px-3 py-2 rounded-2xl border text-sm transition ${resultsTab === 'character'
-                            ? 'border-fuchsia-300/60 bg-fuchsia-500/15 text-white'
-                            : 'border-white/10 bg-black/20 text-white/70 hover:text-white'
-                            }`}
-                        >
-                          This Character
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setResultsTab('feed')}
-                          className={`px-3 py-2 rounded-2xl border text-sm transition ${resultsTab === 'feed'
-                            ? 'border-cyan-300/60 bg-cyan-500/10 text-white'
-                            : 'border-white/10 bg-black/20 text-white/70 hover:text-white'
-                            }`}
-                        >
-                          Tentacles Feed
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="p-3 flex-1 min-h-0 overflow-y-auto">
-                    {resultsTab === 'character' ? (
-                      tentacleImages.length === 0 ? (
-                        <div className="text-center py-8">
-                          <div className="text-white/55">No tentacle images yet.</div>
-                          <div className="text-white/40 text-sm mt-2">Generate one from the Scene Builder above.</div>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
-                          <AnimatePresence>
-                            {tentacleImages.map((img, idx) => (
-                              <motion.div
-                                key={img.id}
-                                initial={{ opacity: 0, y: 8 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: 8 }}
-                                transition={{ duration: 0.18 }}
-                                className="relative group"
-                              >
-                                <div
-                                  className="aspect-[3/4] rounded-2xl overflow-hidden border border-white/10 bg-black/20 cursor-pointer"
-                                  onClick={() => {
-                                    setZoomedImageIndex(idx);
-                                    setZoomedImageSource('character');
-                                    setIsZoomed(true);
-                                  }}
-                                >
-                                  <img
-                                    src={img.imageUrl}
-                                    alt=""
-                                    className={`w-full h-full object-cover transition ${blurNSFW ? 'blur-xl' : ''}`}
-                                    loading="lazy"
-                                    draggable={false}
-                                  />
-                                </div>
-                                <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition">
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setShowImageDropdown(img.id);
-                                      const rect = e.currentTarget.getBoundingClientRect();
-                                      setDropdownPosition({
-                                        top: rect.bottom + 8,
-                                        left: Math.max(12, rect.right - 200) // 200px dropdown width
-                                      });
-                                    }}
-                                    className="p-2 rounded-xl border border-white/10 bg-black/50 text-white/80 hover:text-white"
-                                  >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                                    </svg>
-                                  </button>
-                                </div>
-                                {generatingIds.has(img.id) && (
-                                  <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-2xl">
-                                    <RefreshCw className="w-6 h-6 text-white animate-spin" />
-                                  </div>
-                                )}
-                              </motion.div>
-                            ))}
-                          </AnimatePresence>
-                        </div>
-                      )
-                    ) : (
-                      <div>
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-                          <div className="text-sm text-white/60">Recent tentacle images from your full library.</div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              disabled={isLoadingGlobalTentacleImages || globalTentaclePage === 0}
-                              onClick={() => setGlobalTentaclePage((p) => Math.max(0, p - 1))}
-                              className="px-3 py-2 rounded-2xl border border-white/10 bg-black/20 text-white/75 hover:text-white disabled:opacity-40 disabled:hover:text-white/75 transition text-sm"
-                            >
-                              Prev
-                            </button>
-                            <div className="px-3 py-2 rounded-2xl border border-white/10 bg-black/20 text-white/60 text-sm">
-                              Page {globalTentaclePage + 1}
-                            </div>
-                            <button
-                              type="button"
-                              disabled={isLoadingGlobalTentacleImages || globalTentacleImages.length === 0}
-                              onClick={() => setGlobalTentaclePage((p) => p + 1)}
-                              className="px-3 py-2 rounded-2xl border border-white/10 bg-black/20 text-white/75 hover:text-white disabled:opacity-40 disabled:hover:text-white/75 transition text-sm"
-                            >
-                              Next
-                            </button>
-                          </div>
-                        </div>
-
-                        {isLoadingGlobalTentacleImages ? (
-                          <div className="text-center py-10 text-white/55">Loading…</div>
-                        ) : globalTentacleImages.length === 0 ? (
-                          <div className="text-center py-10">
-                            <div className="text-white/55">No tentacle images found in this page.</div>
-                            <div className="text-white/40 text-sm mt-2">Try Next or generate some new tentacle renders.</div>
-                          </div>
-                        ) : (
-                          <div key={globalTentaclePage} className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8 gap-3">
-                            <AnimatePresence>
-                              {globalTentacleImages.map((img, idx) => (
-                                <motion.div
-                                  key={img.id}
-                                  initial={{ opacity: 0, y: 8 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  exit={{ opacity: 0, y: 8 }}
-                                  transition={{ duration: 0.18 }}
-                                  className="relative group"
-                                >
-                                  <div
-                                    className="aspect-[3/4] rounded-2xl overflow-hidden border border-white/10 bg-black/20 cursor-pointer"
-                                    onClick={() => {
-                                      setZoomedImageIndex(idx);
-                                      setZoomedImageSource('global');
-                                      setIsZoomed(true);
-                                    }}
-                                  >
-                                    <img
-                                      src={img.imageUrl}
-                                      alt=""
-                                      className={`w-full h-full object-cover transition ${blurNSFW ? 'blur-xl' : ''}`}
-                                      loading="lazy"
-                                      draggable={false}
-                                    />
-                                  </div>
-                                </motion.div>
-                              ))}
-                            </AnimatePresence>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </Tabs.Content>
+              </div>
             </Tabs.Root>
           </div>
         </div>
       </div>
-
-      {/* Image dropdown */}
-      <AnimatePresence>
-        {showImageDropdown && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="fixed z-[60] rounded-xl border border-white/10 bg-black/80 backdrop-blur-xl shadow-2xl overflow-hidden"
-            style={{ top: dropdownPosition.top, left: dropdownPosition.left }}
-          >
-            <div className="py-1">
-              <button
-                type="button"
-                onClick={() => {
-                  const img = characterImages.find((i) => i.id === showImageDropdown);
-                  if (img) downloadImage(img.imageUrl, `${selectedCharacter?.name || 'image'}-${img.id}.jpg`);
-                  setShowImageDropdown(null);
-                }}
-                className="w-full px-4 py-2 flex items-center gap-3 text-left text-white/90 hover:bg-white/10 transition text-sm"
-              >
-                <Download className="w-4 h-4" /> Download
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  regenerateImage(showImageDropdown);
-                  setShowImageDropdown(null);
-                }}
-                className="w-full px-4 py-2 flex items-center gap-3 text-left text-white/90 hover:bg-white/10 transition text-sm"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                Regenerate
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  deleteImage(showImageDropdown);
-                  setShowImageDropdown(null);
-                }}
-                className="w-full px-4 py-2 flex items-center gap-3 text-left text-red-400 hover:bg-red-500/10 transition text-sm"
-              >
-                <Trash2 className="w-4 h-4" /> Delete
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Image zoom modal */}
       <AnimatePresence>
