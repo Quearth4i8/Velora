@@ -145,11 +145,14 @@ export default function GalleryPage() {
 
       let response;
       if (generationSettings.useHires) {
+        // Use fixed portrait dimensions for hires (same as tentacles page) to prevent response truncation
+        const hiresWidth = 768;
+        const hiresHeight = 1344;
         response = await automatic1111API.generateHiresImage({
           prompt: finalPrompt,
           negative_prompt: finalNegativePrompt,
-          width: dimensions.width,
-          height: dimensions.height,
+          width: hiresWidth,
+          height: hiresHeight,
           steps: generationSettings.steps || 30,
           cfg_scale: generationSettings.cfgScale || 8,
           sampler_name: generationSettings.sampler || 'DPM++ 2M Karras',
@@ -715,11 +718,14 @@ export default function GalleryPage() {
 
       let result;
       if (generationSettings.useHires) {
+        // Use fixed portrait dimensions for hires (same as tentacles page) to prevent response truncation
+        const hiresWidth = 768;
+        const hiresHeight = 1344;
         result = await automatic1111API.generateHiresImage({
           prompt: getEnhancedPrompt(prompt, generationSettings.style),
           negative_prompt: finalNegativePrompt,
-          width: dimensions.width,
-          height: dimensions.height,
+          width: hiresWidth,
+          height: hiresHeight,
           steps: generationSettings.steps || 30,
           cfg_scale: generationSettings.cfgScale || 8,
           sampler_name: generationSettings.sampler || 'DPM++ 2M Karras',

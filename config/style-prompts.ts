@@ -5,7 +5,6 @@ export const STYLE_PROMPTS: Record<CharacterStyle, string> = {
     [CharacterStyle.ANIME_ILLUSTRIOUS]: 'masterpiece, best quality, amazing quality, highres, absurdres, anime art, illustration, clean lineart, vibrant colors, solo, single character composition, one subject centered, full body',
     [CharacterStyle.MOE_FUSSION]: 'masterpiece, best quality, amazing quality, highres, absurdres, anime art, illustration, clean lineart, vibrant colors, (child:1.4), 1girl, solo, full body,',
     [CharacterStyle.REALISTIC]: 'lazypos, masterpiece, best quality, ultra-detailed, high quality, highres, photorealistic, sharp focus, professional photography, solo character, single person, only one character, full body',
-    [CharacterStyle.ARTISTIC]: 'lazypos, masterpiece, best quality, newest, absurdres, 8K, ultra-detailed, realistic lighting, shiny skin, high quality digital art, highres, 1girl, full body',
-    [CharacterStyle.SPECIAL]:
-        'masterpiece, best quality, amazing quality, absurdres,',
+    [CharacterStyle.ARTISTIC]: 'lazypos, masterpiece, best quality, ultra-detailed, realistic lighting, shiny skin, high quality digital art, highres, 1girl, full body',
+    [CharacterStyle.SPECIAL]: 'masterpiece, best quality, amazing quality, absurdres,',
 };

@@ -113,14 +113,20 @@ const realisticEyeTypeOptions = [
 ];
 
 const clothingOptions = [
-  { id: ClothingStyle.CASUAL, label: 'Casual', image: '/images/clothing-casual.jpg', description: 'Everyday relaxed outfit' },
-  { id: ClothingStyle.FORMAL, label: 'Formal', image: '/images/clothing-formal.jpg', description: 'Elegant formal outfit' },
-  { id: ClothingStyle.SPORTY, label: 'Sporty', image: '/images/clothing-sporty.jpg', description: 'Athletic and activewear style' },
-  { id: ClothingStyle.ELEGANT, label: 'Elegant', image: '/images/clothing-elegant.jpg', description: 'Sophisticated and refined look' },
-  { id: ClothingStyle.CUTE, label: 'Cute', image: '/images/clothing-cute.jpg', description: 'Adorable and charming style' },
-  { id: ClothingStyle.EDGY, label: 'Edgy', image: '/images/clothing-edgy.jpg', description: 'Alternative and rebellious look' },
-  { id: ClothingStyle.TRADITIONAL, label: 'Traditional', image: '/images/clothing-traditional.jpg', description: 'Cultural and traditional attire' },
-  { id: ClothingStyle.FANTASY, label: 'Fantasy', image: '/images/clothing-fantasy.jpg', description: 'Magical and fantasy-themed outfit' },
+  { id: ClothingStyle.CUTE, label: 'Cute', image: '/clothes/cute.jpg', description: 'Adorable and charming style' },
+  { id: ClothingStyle.EDGY, label: 'Edgy', image: '/clothes/edgy.jpg', description: 'Alternative and rebellious look' },
+  { id: ClothingStyle.ELEGANT, label: 'Elegant', image: '/clothes/elegent.jpg', description: 'Sophisticated and refined look' },
+  { id: ClothingStyle.FANTASY, label: 'Fantasy', image: '/clothes/fantasy.jpg', description: 'Magical and fantasy-themed outfit' },
+  { id: ClothingStyle.FORMAL, label: 'Formal', image: '/clothes/formal.png', description: 'Elegant formal outfit' },
+  { id: ClothingStyle.SPORTY, label: 'Sporty', image: '/clothes/sport.jpg', description: 'Athletic and activewear style' },
+  { id: ClothingStyle.TRADITIONAL, label: 'Traditional', image: '/clothes/traditional.jpg', description: 'Cultural and traditional attire' },
+  { id: ClothingStyle.LINGERIE, label: 'Lingerie', image: '/clothes/lingerie.jpg', description: 'Intimate apparel' },
+  { id: ClothingStyle.BIKINI, label: 'Bikini', image: '/clothes/bikini.jpg', description: 'Swimwear style' },
+  { id: ClothingStyle.UNDERWEAR, label: 'Underwear', image: '/clothes/underwear.jpg', description: 'Basic undergarments' },
+  { id: ClothingStyle.REVEALING, label: 'Revealing', image: '/clothes/revealing.jpg', description: 'Bold and revealing outfit' },
+  { id: ClothingStyle.BODYSUIT, label: 'Bodysuit', image: '/clothes/bodysuit.jpg', description: 'Form-fitting bodysuit' },
+  { id: ClothingStyle.NIPPLE_PASTIES, label: 'Nipple Pasties', image: '/clothes/Nipple Pasties.jpg', description: 'Minimal coverage' },
+  { id: ClothingStyle.NAKED, label: 'Nude', image: '/clothes/nude.jpg', description: 'No clothing' },
   { id: ClothingStyle.CUSTOM, label: 'Custom', image: '/images/clothing-custom.jpg', description: 'Design your own outfit' },
 ];
 
@@ -244,7 +250,7 @@ export const Step3HairFace: React.FC = () => {
       <div className="border-t border-dark-700 pt-8">
         <h2 className="text-2xl font-bold text-white mb-2">Clothing Style</h2>
         <p className="text-dark-400 mb-6">Choose clothing style</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4">
           {clothingOptions.map((option) => (
             <ImageOptionCard
               key={option.id}
@@ -254,6 +260,7 @@ export const Step3HairFace: React.FC = () => {
               description={option.description}
               isSelected={draft.appearance.clothing === option.id}
               onClick={() => handleClothingSelect(option.id as ClothingStyle)}
+              aspectRatio="portrait"
             />
           ))}
         </div>

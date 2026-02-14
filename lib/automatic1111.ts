@@ -1388,7 +1388,7 @@ const buildNegativePrompt = (draft?: CharacterDraft, messageContent?: string): s
         'out of frame',
         'duplicate',
         'multiple faces',
-        hasSexualContent ? 'multiple girls, 2girls, two girls' : 'multiple people, multiple characters, twins, 2girls, two people',
+        hasSexualContent ? 'multiple girls,' : 'multiple people, ',
         'split view',
         'multiple views',
         'multiple panels',
@@ -2296,7 +2296,13 @@ export const automatic1111API = {
         );
       }
 
-      const result = await attemptResult.response.json();
+      let result;
+      try {
+        result = await attemptResult.response.json();
+      } catch (parseError) {
+        console.error('JSON parse error in hires generation:', parseError);
+        throw new Error('Failed to parse hires image response - image may be too large. Try reducing steps or disabling hires.');
+      }
 
       if (!result.images || result.images.length === 0) {
         throw new Error('No images returned from Automatic1111');

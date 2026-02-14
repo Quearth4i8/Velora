@@ -1,5 +1,5 @@
 export const EYE_TYPE_DESCRIPTIONS: Record<string, string> = {
-    normal: 'balanced eye shape, centered pupils, detailed irises, symmetrical eyes, natural gaze',
+    normal: 'beautiful detailed eyes, symmetrical face',
     siren: 'mesmerizing siren eyes, elongated almond eyes, captivating gaze, smoky eyeliner, lifted outer corners, alluring expression',
     fox: 'fox eyes, sharp almond eyes, lifted outer corners, sleek eyeliner, cunning gaze',
     cat: 'cat eyes, winged eyeliner, upturned eyes, feline gaze, playful expression',

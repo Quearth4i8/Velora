@@ -1,4 +1,4 @@
-import { CharacterDraft } from './types';
+ import { CharacterDraft } from './types';
 
 export const validateStep = (step: number, draft: CharacterDraft): boolean => {
   switch (step) {

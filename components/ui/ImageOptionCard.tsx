@@ -12,6 +12,7 @@ interface ImageOptionCardProps {
   isSelected: boolean;
   onClick: () => void;
   className?: string;
+  aspectRatio?: 'square' | 'portrait' | 'landscape';
 }
 
 export const ImageOptionCard: React.FC<ImageOptionCardProps> = ({
@@ -22,6 +23,7 @@ export const ImageOptionCard: React.FC<ImageOptionCardProps> = ({
   isSelected,
   onClick,
   className = '',
+  aspectRatio = 'square',
 }) => {
   const [imageError, setImageError] = React.useState(false);
 
@@ -35,7 +37,7 @@ export const ImageOptionCard: React.FC<ImageOptionCardProps> = ({
       animate={{ opacity: 1, y: 0 }}
     >
       <div
-        className={`relative w-full h-40 rounded-lg overflow-hidden border-2 transition-all duration-300 ${
+        className={`relative w-full ${aspectRatio === 'portrait' ? 'h-52' : aspectRatio === 'landscape' ? 'h-28' : 'h-40'} rounded-lg overflow-hidden border-2 transition-all duration-300 ${
           isSelected
             ? 'border-pink-500 shadow-glow-lg'
             : 'border-dark-600 hover:border-pink-400'
