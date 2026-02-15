@@ -17,6 +17,26 @@ export const supabase = supabaseClient;
 export const characterService = {
   async createCharacter(character: CharacterDraft): Promise<CharacterDraft> {
     const { data: { session } } = await supabase.auth.getSession();
+    
+    // Check if trying to create a special character
+    if (character.characterType === 'special') {
+      // Only admins can create special characters
+      if (!session?.user) {
+        throw new Error('Authentication required to create special characters');
+      }
+      
+      // Check if user is admin
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('is_admin')
+        .eq('id', session.user.id)
+        .single();
+      
+      if (profileError || !profile?.is_admin) {
+        throw new Error('Unauthorized: Only admins can create special characters');
+      }
+    }
+    
     const serializedData = serializeCharacter(character);
 
     // Attach user_id if logged in

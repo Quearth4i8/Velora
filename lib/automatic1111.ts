@@ -1388,6 +1388,7 @@ const buildNegativePrompt = (draft?: CharacterDraft, messageContent?: string): s
         'out of frame',
         'duplicate',
         'multiple faces',
+        'extra head',
         hasSexualContent ? 'multiple girls,' : 'multiple people, ',
         'split view',
         'multiple views',

@@ -324,4 +324,145 @@ export interface Profile {
   avatar_url?: string;
   points_balance?: number;
   spin_pity_count?: number;
+  is_admin?: boolean;
 }
+
+export type VideoRequestStatus = 'pending' | 'approved' | 'generating' | 'completed' | 'rejected';
+
+export interface AdminActivityLog {
+  id: string;
+  adminId: string;
+  action: string;
+  targetType: string;
+  targetId?: string;
+  details?: Record<string, any>;
+  createdAt: Date;
+}
+
+export interface UserStats {
+  totalUsers: number;
+  activeUsersToday: number;
+  activeUsersThisWeek: number;
+  activeUsersThisMonth: number;
+  newUsersToday: number;
+  newUsersThisWeek: number;
+  newUsersThisMonth: number;
+}
+
+export interface CharacterStats {
+  totalCharacters: number;
+  specialCharacters: number;
+  regularCharacters: number;
+  galleryCharacters: number;
+  charactersCreatedToday: number;
+  charactersCreatedThisWeek: number;
+  charactersCreatedThisMonth: number;
+}
+
+export interface VideoStats {
+  totalRequests: number;
+  pendingRequests: number;
+  approvedRequests: number;
+  generatingRequests: number;
+  completedVideos: number;
+  rejectedRequests: number;
+  totalLikes: number;
+}
+
+export interface DashboardStats {
+  users: UserStats;
+  characters: CharacterStats;
+  videos: VideoStats;
+  topRequestedImages: Array<{
+    imageId: string;
+    imageUrl: string;
+    characterName: string;
+    requestCount: number;
+    totalLikes: number;
+  }>;
+  recentActivity: AdminActivityLog[];
+}
+
+export interface VideoRequest {
+  id: string;
+  userId: string;
+  imageId: string;
+  characterId: string;
+  promptIdea: string;
+  status: VideoRequestStatus;
+  likesCount: number;
+  reviewsCount: number;
+  videoUrl?: string;
+  thumbnailUrl?: string;
+  adminNotes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface VideoRequestWithDetails extends VideoRequest {
+  imageUrl: string;
+  characterName: string;
+  userHasLiked?: boolean;
+}
+
+export interface CreateVideoRequestInput {
+  imageId: string;
+  characterId: string;
+  promptIdea: string;
+}
+
+// Video types for video gallery
+export type VideoSourceType = 'video_request' | 'direct_import' | 'generated';
+export type VideoStatus = 'active' | 'hidden' | 'removed';
+
+export interface Video {
+  id: string;
+  title: string;
+  description?: string;
+  videoUrl: string;
+  thumbnailUrl?: string;
+  characterId?: string;
+  characterImageId?: string;
+  userId?: string;
+  duration?: number;
+  width?: number;
+  height?: number;
+  fileSize?: number;
+  mimeType?: string;
+  sourceType: VideoSourceType;
+  sourceId?: string;
+  viewsCount: number;
+  likesCount: number;
+  adminNotes?: string;
+  status: VideoStatus;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface VideoWithDetails extends Video {
+  characterName?: string;
+  characterImageUrl?: string;
+  userHasLiked?: boolean;
+}
+
+export interface CreateVideoInput {
+  title: string;
+  description?: string;
+  videoUrl: string;
+  thumbnailUrl?: string;
+  characterId?: string;
+  characterImageId?: string;
+  sourceType?: VideoSourceType;
+  sourceId?: string;
+  adminNotes?: string;
+}
+
+export interface UpdateVideoInput {
+  title?: string;
+  description?: string;
+  videoUrl?: string;
+  thumbnailUrl?: string;
+  adminNotes?: string;
+  status?: VideoStatus;
+}
+

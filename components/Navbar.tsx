@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { AuthModal } from './auth/AuthModal';
-import { LogOut, User as UserIcon, Settings, UserCircle } from 'lucide-react';
+import { LogOut, User as UserIcon, Settings, UserCircle, Shield } from 'lucide-react';
 import { supabase, profileService } from '@/lib/supabase';
 import { Profile } from '@/lib/types';
 import { wallet } from '@/lib/wallet';
@@ -18,6 +18,7 @@ export function Navbar() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [pointsBalance, setPointsBalance] = useState<number>(0);
+  const [isAdmin, setIsAdmin] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
 
@@ -39,6 +40,9 @@ export function Navbar() {
         } else {
           setPointsBalance(await wallet.getBalance());
         }
+        
+        // Check admin status
+        setIsAdmin(data?.is_admin || false);
       } catch (err) {
         console.error('Error fetching navbar profile:', err);
         setPointsBalance(await wallet.getBalance());
@@ -78,6 +82,7 @@ export function Navbar() {
     { href: '/', label: 'Home' },
     { href: '/create', label: 'Create' },
     { href: '/gallery', label: 'Gallery' },
+    { href: '/videos', label: 'Videos' },
     { href: '/encounters', label: 'Encounters' },
     { href: '/mini-games', label: 'Mini Games' },
     { href: '/tentacles', label: 'Tentacles' },
@@ -87,6 +92,7 @@ export function Navbar() {
     { href: '/', label: 'Home' },
     { href: '/create', label: 'Create' },
     { href: '/gallery', label: 'Gallery' },
+    { href: '/videos', label: 'Videos' },
   ];
 
   const extraNavLinks = [
@@ -209,6 +215,16 @@ export function Navbar() {
                         <p className="text-[10px] text-dark-500 truncate">{user.email}</p>
                       </div>
                       <div className="p-1.5">
+                        {isAdmin && (
+                          <Link
+                            href="/admin"
+                            className="flex items-center space-x-3 px-3 py-2.5 text-purple-400 hover:text-white hover:bg-purple-500/10 rounded-xl transition-colors duration-150"
+                            onClick={() => setShowProfileDropdown(false)}
+                          >
+                            <Shield className="w-4 h-4" />
+                            <span className="text-sm">Admin Panel</span>
+                          </Link>
+                        )}
                         <Link
                           href="/manage-characters"
                           className="flex items-center space-x-3 px-3 py-2.5 text-dark-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors duration-150"

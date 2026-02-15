@@ -1,6 +1,6 @@
 import { characterService, supabase } from './supabase';
 import { storageService } from './storage';
-import { CharacterDraft, CharacterImage, ChatMessage, Conversation } from './types';
+import { CharacterDraft, CharacterImage, ChatMessage, Conversation, VideoRequestStatus } from './types';
 import { deserializeCharacter } from './db';
 
 const normalizeStoragePath = (value: string): string => {
@@ -1016,4 +1016,765 @@ export const characterAPI = {
       return { success: false, error };
     }
   },
+
+  // Video Request API functions
+  async createVideoRequest(input: { imageId: string; characterId: string; promptIdea: string }) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase
+        .from('video_requests')
+        .insert({
+          user_id: session.user.id,
+          image_id: input.imageId,
+          character_id: input.characterId,
+          prompt_idea: input.promptIdea.trim(),
+          status: 'pending',
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { success: true, data: this.mapDbVideoRequestToVideoRequest(data) };
+    } catch (error) {
+      console.error('Failed to create video request:', error);
+      return { success: false, error };
+    }
+  },
+
+  async getVideoRequests(opts?: { status?: string; limit?: number; offset?: number }) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const limit = Math.max(1, Math.min(100, Number(opts?.limit ?? 50)));
+      const offset = Math.max(0, Number(opts?.offset ?? 0));
+
+      let query = supabase
+        .from('video_requests')
+        .select(`
+          *,
+          character_images!inner(image_url),
+          characters!inner(name)
+        `)
+        .order('likes_count', { ascending: false })
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (opts?.status) {
+        query = query.eq('status', opts.status);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const videoRequests = await Promise.all(
+        data?.map(async (vr: any) => {
+          const base = this.mapDbVideoRequestToVideoRequest(vr);
+          const details: any = {
+            ...base,
+            imageUrl: vr.character_images?.image_url || '',
+            characterName: vr.characters?.name || 'Unknown',
+          };
+          
+          if (session?.user) {
+            const { data: likeData } = await supabase
+              .from('video_request_likes')
+              .select('id')
+              .eq('video_request_id', vr.id)
+              .eq('user_id', session.user.id)
+              .maybeSingle();
+            details.userHasLiked = !!likeData;
+          }
+          
+          return details;
+        }) || []
+      );
+
+      return { success: true, data: videoRequests };
+    } catch (error) {
+      console.error('Failed to get video requests:', error);
+      return { success: false, error };
+    }
+  },
+
+  async getUserVideoRequests() {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return { success: true, data: [] };
+
+      const { data, error } = await supabase
+        .from('video_requests')
+        .select(`
+          *,
+          character_images!inner(image_url),
+          characters!inner(name)
+        `)
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const videoRequests = data?.map((vr: any) => ({
+        ...this.mapDbVideoRequestToVideoRequest(vr),
+        imageUrl: vr.character_images?.image_url || '',
+        characterName: vr.characters?.name || 'Unknown',
+      })) || [];
+
+      return { success: true, data: videoRequests };
+    } catch (error) {
+      console.error('Failed to get user video requests:', error);
+      return { success: false, error };
+    }
+  },
+
+  async likeVideoRequest(videoRequestId: string) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('video_request_likes')
+        .insert({
+          video_request_id: videoRequestId,
+          user_id: session.user.id,
+        });
+
+      if (error && !error.message.includes('duplicate key')) throw error;
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to like video request:', error);
+      return { success: false, error };
+    }
+  },
+
+  async unlikeVideoRequest(videoRequestId: string) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('video_request_likes')
+        .delete()
+        .eq('video_request_id', videoRequestId)
+        .eq('user_id', session.user.id);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to unlike video request:', error);
+      return { success: false, error };
+    }
+  },
+
+  async deleteVideoRequest(videoRequestId: string) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('video_requests')
+        .delete()
+        .eq('id', videoRequestId)
+        .eq('user_id', session.user.id)
+        .eq('status', 'pending');
+
+      if (error) throw error;
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to delete video request:', error);
+      return { success: false, error };
+    }
+  },
+
+  // Admin API functions for video management
+  async adminUpdateVideoRequest(
+    videoRequestId: string,
+    updates: {
+      status?: VideoRequestStatus;
+      videoUrl?: string;
+      thumbnailUrl?: string;
+      adminNotes?: string;
+    }
+  ) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) throw new Error('Not authenticated');
+
+      // Check if user is admin (you may want to add proper admin checks)
+      const payload: Record<string, any> = {
+        updated_at: new Date().toISOString(),
+      };
+
+      if (updates.status) payload.status = updates.status;
+      if (updates.videoUrl !== undefined) payload.video_url = updates.videoUrl;
+      if (updates.thumbnailUrl !== undefined) payload.thumbnail_url = updates.thumbnailUrl;
+      if (updates.adminNotes !== undefined) payload.admin_notes = updates.adminNotes;
+
+      const { data, error } = await supabase
+        .from('video_requests')
+        .update(payload)
+        .eq('id', videoRequestId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { success: true, data: this.mapDbVideoRequestToVideoRequest(data) };
+    } catch (error) {
+      console.error('Failed to update video request:', error);
+      return { success: false, error };
+    }
+  },
+
+  mapDbVideoRequestToVideoRequest(dbVideoRequest: any) {
+    return {
+      id: dbVideoRequest.id,
+      userId: dbVideoRequest.user_id,
+      imageId: dbVideoRequest.image_id,
+      characterId: dbVideoRequest.character_id,
+      promptIdea: dbVideoRequest.prompt_idea,
+      status: dbVideoRequest.status,
+      likesCount: dbVideoRequest.likes_count || 0,
+      reviewsCount: dbVideoRequest.reviews_count || 0,
+      videoUrl: dbVideoRequest.video_url,
+      thumbnailUrl: dbVideoRequest.thumbnail_url,
+      adminNotes: dbVideoRequest.admin_notes,
+      createdAt: new Date(dbVideoRequest.created_at),
+      updatedAt: new Date(dbVideoRequest.updated_at),
+    };
+  },
+
+  // Admin API functions
+  async checkIsAdmin(): Promise<{ success: boolean; isAdmin: boolean }> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return { success: true, isAdmin: false };
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('is_admin')
+        .eq('id', session.user.id)
+        .single();
+
+      if (error) throw error;
+      return { success: true, isAdmin: data?.is_admin || false };
+    } catch (error) {
+      console.error('Failed to check admin status:', error);
+      return { success: false, isAdmin: false };
+    }
+  },
+
+  async getDashboardStats(): Promise<{ success: boolean; data?: any; error?: any }> {
+    try {
+      const isAdmin = await this.checkIsAdmin();
+      if (!isAdmin.isAdmin) throw new Error('Unauthorized: Admin access required');
+
+      // Get user stats
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const weekAgo = new Date(today);
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      const monthAgo = new Date(today);
+      monthAgo.setMonth(monthAgo.getMonth() - 1);
+
+      const { count: totalUsers } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true });
+
+      const { count: newUsersToday } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', today.toISOString());
+
+      const { count: newUsersThisWeek } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', weekAgo.toISOString());
+
+      const { count: newUsersThisMonth } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', monthAgo.toISOString());
+
+      // Get character stats
+      const { count: totalCharacters } = await supabase
+        .from('characters')
+        .select('*', { count: 'exact', head: true });
+
+      const { count: specialCharacters } = await supabase
+        .from('characters')
+        .select('*', { count: 'exact', head: true })
+        .eq('character_type', 'special');
+
+      const { count: galleryCharacters } = await supabase
+        .from('characters')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_gallery_only', true);
+
+      const { count: charactersCreatedToday } = await supabase
+        .from('characters')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', today.toISOString());
+
+      // Get video stats
+      const { data: videoStats, error: videoError } = await supabase
+        .from('video_requests')
+        .select('status, likes_count');
+
+      if (videoError) throw videoError;
+
+      const videoStatsData = {
+        totalRequests: videoStats?.length || 0,
+        pendingRequests: videoStats?.filter((v: { status: string }) => v.status === 'pending').length || 0,
+        approvedRequests: videoStats?.filter((v: { status: string }) => v.status === 'approved').length || 0,
+        generatingRequests: videoStats?.filter((v: { status: string }) => v.status === 'generating').length || 0,
+        completedVideos: videoStats?.filter((v: { status: string }) => v.status === 'completed').length || 0,
+        rejectedRequests: videoStats?.filter((v: { status: string }) => v.status === 'rejected').length || 0,
+        totalLikes: videoStats?.reduce((sum: number, v: { likes_count: number }) => sum + (v.likes_count || 0), 0) || 0,
+      };
+
+      // Get top requested images
+      const { data: topImages } = await supabase
+        .from('video_requests')
+        .select(`
+          image_id,
+          character_images(image_url),
+          characters(name),
+          likes_count
+        `)
+        .order('likes_count', { ascending: false })
+        .limit(10);
+
+      const topRequestedImages = topImages?.map((img: any) => ({
+        imageId: img.image_id,
+        imageUrl: img.character_images?.image_url || '',
+        characterName: img.characters?.name || 'Unknown',
+        requestCount: 1,
+        totalLikes: img.likes_count || 0,
+      })) || [];
+
+      // Get recent admin activity
+      const { data: recentActivity } = await supabase
+        .from('admin_activity_log')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      const stats = {
+        users: {
+          totalUsers: totalUsers || 0,
+          activeUsersToday: 0, // Would need session tracking
+          activeUsersThisWeek: 0,
+          activeUsersThisMonth: 0,
+          newUsersToday: newUsersToday || 0,
+          newUsersThisWeek: newUsersThisWeek || 0,
+          newUsersThisMonth: newUsersThisMonth || 0,
+        },
+        characters: {
+          totalCharacters: totalCharacters || 0,
+          specialCharacters: specialCharacters || 0,
+          regularCharacters: (totalCharacters || 0) - (specialCharacters || 0),
+          galleryCharacters: galleryCharacters || 0,
+          charactersCreatedToday: charactersCreatedToday || 0,
+          charactersCreatedThisWeek: 0,
+          charactersCreatedThisMonth: 0,
+        },
+        videos: videoStatsData,
+        topRequestedImages,
+        recentActivity: recentActivity?.map((log: any) => ({
+          id: log.id,
+          adminId: log.admin_id,
+          action: log.action,
+          targetType: log.target_type,
+          targetId: log.target_id,
+          details: log.details,
+          createdAt: new Date(log.created_at),
+        })) || [],
+      };
+
+      return { success: true, data: stats };
+    } catch (error) {
+      console.error('Failed to get dashboard stats:', error);
+      return { success: false, error };
+    }
+  },
+
+  async getAllUsers(opts?: { limit?: number; offset?: number; search?: string }) {
+    try {
+      const isAdmin = await this.checkIsAdmin();
+      if (!isAdmin.isAdmin) throw new Error('Unauthorized: Admin access required');
+
+      const limit = Math.max(1, Math.min(100, Number(opts?.limit ?? 50)));
+      const offset = Math.max(0, Number(opts?.offset ?? 0));
+
+      let query = supabase
+        .from('profiles')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (opts?.search) {
+        query = query.or(`username.ilike.%${opts.search}%,full_name.ilike.%${opts.search}%`);
+      }
+
+      const { data, error, count } = await query;
+      if (error) throw error;
+
+      return {
+        success: true,
+        data: data?.map((p: any) => ({
+          id: p.id,
+          updated_at: p.updated_at,
+          username: p.username,
+          full_name: p.full_name,
+          avatar_url: p.avatar_url,
+          points_balance: p.points_balance,
+          spin_pity_count: p.spin_pity_count,
+          is_admin: p.is_admin,
+        })) || [],
+        total: count || 0,
+      };
+    } catch (error) {
+      console.error('Failed to get users:', error);
+      return { success: false, error };
+    }
+  },
+
+  async updateUserAdminStatus(userId: string, isAdmin: boolean) {
+    try {
+      const adminCheck = await this.checkIsAdmin();
+      if (!adminCheck.isAdmin) throw new Error('Unauthorized: Admin access required');
+
+      const { data: { session } } = await supabase.auth.getSession();
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({ is_admin: isAdmin, updated_at: new Date().toISOString() })
+        .eq('id', userId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Log admin activity
+      await supabase.rpc('log_admin_activity', {
+        p_admin_id: session?.user?.id,
+        p_action: isAdmin ? 'grant_admin' : 'revoke_admin',
+        p_target_type: 'user',
+        p_target_id: userId,
+        p_details: { new_status: isAdmin },
+      });
+
+      return { success: true, data };
+    } catch (error) {
+      console.error('Failed to update user admin status:', error);
+      return { success: false, error };
+    }
+  },
+
+  async createSpecialCharacter(draft: CharacterDraft) {
+    try {
+      const isAdmin = await this.checkIsAdmin();
+      if (!isAdmin.isAdmin) throw new Error('Unauthorized: Only admins can create special characters');
+
+      const { data: { session } } = await supabase.auth.getSession();
+
+      const serializedData = {
+        ...draft,
+        user_id: session?.user?.id,
+        character_type: 'special',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      const { data, error } = await supabase
+        .from('characters')
+        .insert(serializedData)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Log admin activity
+      await supabase.rpc('log_admin_activity', {
+        p_admin_id: session?.user?.id,
+        p_action: 'create_special_character',
+        p_target_type: 'character',
+        p_target_id: data.id,
+        p_details: { name: draft.name },
+      });
+
+      return { success: true, data };
+    } catch (error) {
+      console.error('Failed to create special character:', error);
+      return { success: false, error };
+    }
+  },
+
+  async deleteUser(userId: string) {
+    try {
+      const isAdmin = await this.checkIsAdmin();
+      if (!isAdmin.isAdmin) throw new Error('Unauthorized: Admin access required');
+
+      const { data: { session } } = await supabase.auth.getSession();
+
+      // Delete user's characters and images first
+      const { data: userCharacters } = await supabase
+        .from('characters')
+        .select('id')
+        .eq('user_id', userId);
+
+      for (const char of userCharacters || []) {
+        await characterService.deleteCharacter(char.id);
+      }
+
+      // Delete user profile
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', userId);
+
+      if (profileError) throw profileError;
+
+      // Note: Actually deleting the auth user requires service role key
+      // This would typically be done via a server-side API
+
+      // Log admin activity
+      await supabase.rpc('log_admin_activity', {
+        p_admin_id: session?.user?.id,
+        p_action: 'delete_user',
+        p_target_type: 'user',
+        p_target_id: userId,
+        p_details: { characters_deleted: userCharacters?.length || 0 },
+      });
+
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to delete user:', error);
+      return { success: false, error };
+    }
+  },
+
+  // Video Gallery API Functions
+  async getVideos(options?: { limit?: number; offset?: number; orderBy?: string }): Promise<{ success: boolean; data?: any[]; error?: any }> {
+    try {
+      const { limit = 20, offset = 0, orderBy = 'created_at.desc' } = options || {};
+
+      const { data, error } = await supabase
+        .from('videos')
+        .select(`
+          *,
+          characters(name),
+          character_images(image_url)
+        `)
+        .eq('status', 'active')
+        .order(orderBy.split('.')[0], { ascending: orderBy.includes('asc') })
+        .limit(limit)
+        .range(offset, offset + limit - 1);
+
+      if (error) throw error;
+
+      // Map and enrich with user like status
+      const videos = await Promise.all((data || []).map(async (video: any) => {
+        const { data: { session } } = await supabase.auth.getSession();
+        let userHasLiked = false;
+        
+        if (session?.user) {
+          const { data: likeData } = await supabase
+            .from('video_likes')
+            .select('id')
+            .eq('video_id', video.id)
+            .eq('user_id', session.user.id)
+            .maybeSingle();
+          userHasLiked = !!likeData;
+        }
+
+        return {
+          id: video.id,
+          title: video.title,
+          description: video.description,
+          videoUrl: video.video_url,
+          thumbnailUrl: video.thumbnail_url,
+          characterId: video.character_id,
+          characterImageId: video.character_image_id,
+          userId: video.user_id,
+          duration: video.duration,
+          width: video.width,
+          height: video.height,
+          fileSize: video.file_size,
+          mimeType: video.mime_type,
+          sourceType: video.source_type,
+          sourceId: video.source_id,
+          viewsCount: video.views_count || 0,
+          likesCount: video.likes_count || 0,
+          adminNotes: video.admin_notes,
+          status: video.status,
+          createdAt: new Date(video.created_at),
+          updatedAt: new Date(video.updated_at),
+          characterName: video.characters?.name,
+          characterImageUrl: video.character_images?.image_url,
+          userHasLiked,
+        };
+      }));
+
+      return { success: true, data: videos };
+    } catch (error) {
+      console.error('Failed to get videos:', error);
+      return { success: false, error };
+    }
+  },
+
+  async createVideo(input: import('@/lib/types').CreateVideoInput): Promise<{ success: boolean; data?: any; error?: any }> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase
+        .from('videos')
+        .insert({
+          title: input.title,
+          description: input.description,
+          video_url: input.videoUrl,
+          thumbnail_url: input.thumbnailUrl,
+          character_id: input.characterId,
+          character_image_id: input.characterImageId,
+          source_type: input.sourceType || 'direct_import',
+          source_id: input.sourceId,
+          admin_notes: input.adminNotes,
+          status: 'active',
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Log admin activity
+      await supabase.rpc('log_admin_activity', {
+        p_admin_id: session.user.id,
+        p_action: 'create_video',
+        p_target_type: 'video',
+        p_target_id: data.id,
+        p_details: { title: input.title, source_type: input.sourceType },
+      });
+
+      return { success: true, data };
+    } catch (error) {
+      console.error('Failed to create video:', error);
+      return { success: false, error };
+    }
+  },
+
+  async updateVideo(videoId: string, input: import('@/lib/types').UpdateVideoInput): Promise<{ success: boolean; data?: any; error?: any }> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) throw new Error('Not authenticated');
+
+      const updateData: any = {};
+      if (input.title !== undefined) updateData.title = input.title;
+      if (input.description !== undefined) updateData.description = input.description;
+      if (input.videoUrl !== undefined) updateData.video_url = input.videoUrl;
+      if (input.thumbnailUrl !== undefined) updateData.thumbnail_url = input.thumbnailUrl;
+      if (input.adminNotes !== undefined) updateData.admin_notes = input.adminNotes;
+      if (input.status !== undefined) updateData.status = input.status;
+
+      const { data, error } = await supabase
+        .from('videos')
+        .update(updateData)
+        .eq('id', videoId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Log admin activity
+      await supabase.rpc('log_admin_activity', {
+        p_admin_id: session.user.id,
+        p_action: 'update_video',
+        p_target_type: 'video',
+        p_target_id: videoId,
+        p_details: { updated_fields: Object.keys(updateData) },
+      });
+
+      return { success: true, data };
+    } catch (error) {
+      console.error('Failed to update video:', error);
+      return { success: false, error };
+    }
+  },
+
+  async deleteVideo(videoId: string): Promise<{ success: boolean; error?: any }> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('videos')
+        .delete()
+        .eq('id', videoId);
+
+      if (error) throw error;
+
+      // Log admin activity
+      await supabase.rpc('log_admin_activity', {
+        p_admin_id: session.user.id,
+        p_action: 'delete_video',
+        p_target_type: 'video',
+        p_target_id: videoId,
+      });
+
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to delete video:', error);
+      return { success: false, error };
+    }
+  },
+
+  async likeVideo(videoId: string): Promise<{ success: boolean; error?: any }> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('video_likes')
+        .insert({ video_id: videoId, user_id: session.user.id });
+
+      if (error) throw error;
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to like video:', error);
+      return { success: false, error };
+    }
+  },
+
+  async unlikeVideo(videoId: string): Promise<{ success: boolean; error?: any }> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('video_likes')
+        .delete()
+        .eq('video_id', videoId)
+        .eq('user_id', session.user.id);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to unlike video:', error);
+      return { success: false, error };
+    }
+  },
+
+  async incrementVideoViews(videoId: string): Promise<{ success: boolean; error?: any }> {
+    try {
+      const { error } = await supabase.rpc('increment_video_views', { video_id: videoId });
+      if (error) throw error;
+      return { success: true };
+    } catch (error) {
+      // Silently fail - views are not critical
+      return { success: false, error };
+    }
+  },
 };
+
+

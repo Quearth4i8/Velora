@@ -686,7 +686,8 @@ export default function GalleryPage() {
         'fused fingers',
         'too many fingers',
         'cropped',
-        'out of frame'
+        'out of frame',
+        'extra head'
       );
 
       const centaurNegative = isCentaur
