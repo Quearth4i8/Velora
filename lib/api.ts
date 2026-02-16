@@ -284,13 +284,14 @@ export const characterAPI = {
     }
   },
 
-  async getCharacterImages(characterId: string): Promise<{ success: boolean; data?: CharacterImage[]; error?: any }> {
+  async getCharacterImages(characterId: string, limit = 50): Promise<{ success: boolean; data?: CharacterImage[]; error?: any }> {
     try {
       const { data, error } = await supabase
         .from('character_images')
         .select('*')
         .eq('character_id', characterId)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(limit);
 
       if (error) {
         throw error;
@@ -451,6 +452,57 @@ export const characterAPI = {
       return { success: true, data: images };
     } catch (error) {
       console.error('Failed to get all character images paged global:', error);
+      return { success: false, error };
+    }
+  },
+
+  async getTentacleImagesPagedGlobal(
+    opts?: { limit?: number; offset?: number }
+  ): Promise<{ success: boolean; data?: CharacterImage[]; error?: any }> {
+    try {
+      const limit = Math.max(1, Math.min(100, Number(opts?.limit ?? 50)));
+      const offset = Math.max(0, Number(opts?.offset ?? 0));
+
+      const { data: imagesData, error: imagesError } = await supabase
+        .from('character_images')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .or('generation_prompt.ilike.%tentacle%,generation_prompt.ilike.%<lora:extreme_tentacles%')
+        .range(offset, offset + limit - 1);
+
+      if (imagesError) throw imagesError;
+      if (!imagesData || imagesData.length === 0) {
+        return { success: true, data: [] };
+      }
+
+      const characterIds = [...new Set(imagesData.map((img: any) => img.character_id).filter(Boolean))];
+
+      let characterMap = new Map<string, { name: string; is_gallery_only?: boolean }>();
+      if (characterIds.length > 0) {
+        const { data: charactersData, error: charError } = await supabase
+          .from('characters')
+          .select('id, name, is_gallery_only')
+          .in('id', characterIds);
+
+        if (!charError && charactersData) {
+          characterMap = new Map(
+            charactersData.map((char: { id: string; name: string; is_gallery_only?: boolean }) => [char.id, char])
+          );
+        }
+      }
+
+      const images: CharacterImage[] = imagesData.map((img: any) => {
+        const char = characterMap.get(img.character_id);
+        return {
+          ...this.mapDbImageToCharacterImage(img),
+          characterName: char?.name || 'Unknown Character',
+          isGalleryOnly: char?.is_gallery_only || false,
+        };
+      });
+
+      return { success: true, data: images };
+    } catch (error) {
+      console.error('Failed to get tentacle images paged global:', error);
       return { success: false, error };
     }
   },
@@ -885,13 +937,14 @@ export const characterAPI = {
     }
   },
 
-  async getMessages(conversationId: string) {
+  async getMessages(conversationId: string, limit = 100) {
     try {
       const { data, error } = await supabase
         .from('messages')
         .select('*')
         .eq('conversation_id', conversationId)
-        .order('timestamp', { ascending: true });
+        .order('timestamp', { ascending: true })
+        .limit(limit);
 
       if (error) throw error;
       return { success: true, data };
@@ -1945,6 +1998,97 @@ export const characterAPI = {
     }
   },
 
+  async adminGetVideos(options?: { limit?: number; offset?: number; orderBy?: string; status?: import('@/lib/types').VideoStatus | 'all' }): Promise<{ success: boolean; data?: any[]; error?: any }> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) throw new Error('Not authenticated');
+
+      const { limit = 50, offset = 0, orderBy = 'created_at.desc', status = 'all' } = options || {};
+
+      let query = supabase
+        .from('videos')
+        .select('*')
+        .order(orderBy.split('.')[0], { ascending: orderBy.includes('asc') })
+        .limit(limit)
+        .range(offset, offset + limit - 1);
+
+      if (status !== 'all') {
+        query = query.eq('status', status);
+      }
+
+      const { data: videosData, error: videosError } = await query;
+
+      if (videosError) throw videosError;
+      if (!videosData || videosData.length === 0) {
+        return { success: true, data: [] };
+      }
+
+      const characterIds = [...new Set(videosData.map((v: any) => v.character_id).filter(Boolean))];
+      const imageIds = [...new Set(videosData.map((v: any) => v.character_image_id).filter(Boolean))];
+
+      let characterMap = new Map();
+      if (characterIds.length > 0) {
+        const { data: chars } = await supabase
+          .from('characters')
+          .select('id, name')
+          .in('id', characterIds);
+        characterMap = new Map((chars as any[])?.map((c: any) => [c.id, c]) || []);
+      }
+
+      let imageMap = new Map();
+      if (imageIds.length > 0) {
+        const { data: imgs } = await supabase
+          .from('character_images')
+          .select('id, image_url')
+          .in('id', imageIds);
+        imageMap = new Map((imgs as any[])?.map((i: any) => [i.id, i]) || []);
+      }
+
+      const videos = await Promise.all(videosData.map(async (video: any) => {
+        const character = characterMap.get(video.character_id);
+        const image = imageMap.get(video.character_image_id);
+
+        const { data: likesRows, error: likesRowsError } = await supabase
+          .from('video_likes')
+          .select('id')
+          .eq('video_id', video.id);
+        if (likesRowsError) throw likesRowsError;
+        const likesCount = Array.isArray(likesRows) ? likesRows.length : 0;
+
+        return {
+          id: video.id,
+          title: video.title,
+          description: video.description,
+          videoUrl: video.video_url,
+          thumbnailUrl: video.thumbnail_url,
+          characterId: video.character_id,
+          characterImageId: video.character_image_id,
+          userId: video.user_id,
+          duration: video.duration,
+          width: video.width,
+          height: video.height,
+          fileSize: video.file_size,
+          mimeType: video.mime_type,
+          sourceType: video.source_type,
+          sourceId: video.source_id,
+          viewsCount: video.views_count || 0,
+          likesCount: likesCount || 0,
+          adminNotes: video.admin_notes,
+          status: video.status,
+          createdAt: new Date(video.created_at),
+          updatedAt: new Date(video.updated_at),
+          characterName: character?.name || 'Unknown',
+          characterImageUrl: image?.image_url || '',
+        };
+      }));
+
+      return { success: true, data: videos };
+    } catch (error) {
+      console.error('Failed to admin get videos:', error);
+      return { success: false, error };
+    }
+  },
+
   async createVideo(input: import('@/lib/types').CreateVideoInput): Promise<{ success: boolean; data?: any; error?: any }> {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -1970,13 +2114,15 @@ export const characterAPI = {
       if (error) throw error;
 
       // Log admin activity
-      await supabase.rpc('log_admin_activity', {
-        p_admin_id: session.user.id,
-        p_action: 'create_video',
-        p_target_type: 'video',
-        p_target_id: data.id,
-        p_details: { title: input.title, source_type: input.sourceType },
-      });
+      if (typeof (supabase as any).rpc === 'function') {
+        await (supabase as any).rpc('log_admin_activity', {
+          p_admin_id: session.user.id,
+          p_action: 'create_video',
+          p_target_type: 'video',
+          p_target_id: data.id,
+          p_details: { title: input.title, source_type: input.sourceType },
+        });
+      }
 
       return { success: true, data };
     } catch (error) {
@@ -2008,13 +2154,15 @@ export const characterAPI = {
       if (error) throw error;
 
       // Log admin activity
-      await supabase.rpc('log_admin_activity', {
-        p_admin_id: session.user.id,
-        p_action: 'update_video',
-        p_target_type: 'video',
-        p_target_id: videoId,
-        p_details: { updated_fields: Object.keys(updateData) },
-      });
+      if (typeof (supabase as any).rpc === 'function') {
+        await (supabase as any).rpc('log_admin_activity', {
+          p_admin_id: session.user.id,
+          p_action: 'update_video',
+          p_target_type: 'video',
+          p_target_id: videoId,
+          p_details: { updated_fields: Object.keys(updateData) },
+        });
+      }
 
       return { success: true, data };
     } catch (error) {
@@ -2036,12 +2184,15 @@ export const characterAPI = {
       if (error) throw error;
 
       // Log admin activity
-      await supabase.rpc('log_admin_activity', {
-        p_admin_id: session.user.id,
-        p_action: 'delete_video',
-        p_target_type: 'video',
-        p_target_id: videoId,
-      });
+      if (typeof (supabase as any).rpc === 'function') {
+        await (supabase as any).rpc('log_admin_activity', {
+          p_admin_id: session.user.id,
+          p_action: 'delete_video',
+          p_target_type: 'video',
+          p_target_id: videoId,
+          p_details: {},
+        });
+      }
 
       return { success: true };
     } catch (error) {

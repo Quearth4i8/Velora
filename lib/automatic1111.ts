@@ -922,7 +922,7 @@ const buildPrompt = (draft: CharacterDraft, style: CharacterStyle, settings?: an
   const age = ageNumber !== null ? `${ageNumber} years old` : '';
 
   const isMinor = ageNumber !== null && ageNumber < 18;
-  const subjectDescriptor = isMinor ? 'loli, small, mini size, (shortstack:1.6), (child:1.6), tiny size, petite size, petite childlike female, big head' : 'woman';
+  const subjectDescriptor = isMinor ? 'loli, (child:1.4), (shortstack:1.4)' : 'woman';
   const malePartnerPrompt = (!isSelfAction && shouldIncludeMalePartnerFromCurrentText(messageContent)) ? 'male, man' : '';
   const soloDescriptor = hasSexualContent ? '' : 'solo';
   const ageDescriptor =

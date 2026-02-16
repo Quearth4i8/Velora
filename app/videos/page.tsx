@@ -44,8 +44,8 @@ export default function VideosPage() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      // Fetch active videos
-      const videosResult = await characterAPI.getVideos({ limit: 50 });
+      // Fetch active videos (limit to 20 for faster initial load)
+      const videosResult = await characterAPI.getVideos({ limit: 20 });
       console.log('Videos result:', videosResult);
       if (videosResult.success && videosResult.data) {
         setVideos(videosResult.data);
@@ -53,7 +53,7 @@ export default function VideosPage() {
       }
 
       // Fetch all video requests so everyone can see statuses and like/vote
-      const allRequestsResult = await characterAPI.getVideoRequests({ limit: 200 });
+      const allRequestsResult = await characterAPI.getVideoRequests({ limit: 50 });
       if (allRequestsResult.success && allRequestsResult.data) {
         setVideoRequests(allRequestsResult.data);
       }
@@ -82,7 +82,7 @@ export default function VideosPage() {
   const fetchUserImages = async () => {
     setIsLoadingImages(true);
     try {
-      const pageSize = 200;
+      const pageSize = 50; // Reduced from 200 for faster initial load
       const result = await characterAPI.getVideoRequestImages({ limit: pageSize, offset: 0 });
       if (!result.success) {
         throw result.error || new Error('Failed to load images');
@@ -103,7 +103,7 @@ export default function VideosPage() {
     if (isLoadingImages || isLoadingMoreImages || !hasMoreImages) return;
     setIsLoadingMoreImages(true);
     try {
-      const pageSize = 200;
+      const pageSize = 50; // Load in smaller chunks
       const result = await characterAPI.getVideoRequestImages({ limit: pageSize, offset: imagesOffset });
       if (!result.success) {
         throw result.error || new Error('Failed to load more images');
@@ -128,7 +128,7 @@ export default function VideosPage() {
     if (isLoadingImages || isLoadingMoreImages) return;
     setIsLoadingMoreImages(true);
     try {
-      const pageSize = 200;
+      const pageSize = 50; // Load in smaller chunks for better performance
       let currentOffset = imagesOffset;
       let hasMore = hasMoreImages;
       

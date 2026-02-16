@@ -73,6 +73,19 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
   const pathname = usePathname();
   const dialog = useDialog();
 
+  const [conversation, setConversation] = useState<Conversation | null>(null);
+  const conversationRef = useRef<Conversation | null>(null);
+  const enforcementLoadedForConversationIdRef = useRef<string>('');
+  const contextLoadedForConversationIdRef = useRef<string>('');
+  const initChatInFlightRef = useRef<{ key: string; promise: Promise<void> | null }>({
+    key: '',
+    promise: null,
+  });
+
+  useEffect(() => {
+    conversationRef.current = conversation;
+  }, [conversation]);
+
   const latestCharacterMessage = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
       const m = messages[i];
@@ -1292,20 +1305,21 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
     return () => document.removeEventListener('click', handle);
   }, [statePopoverOpen]);
 
-  const [conversation, setConversation] = useState<Conversation | null>(null);
-  const conversationRef = useRef<Conversation | null>(null);
-  const initChatInFlightRef = useRef<{ key: string; promise: Promise<void> | null }>({
-    key: '',
-    promise: null,
-  });
-
-  useEffect(() => {
-    conversationRef.current = conversation;
-  }, [conversation]);
-
   const initChat = async () => {
     if (currentCharacter.id) {
       try {
+        const mapDbMessagesToUi = (rows: any[]) =>
+          (rows || []).map((m: any) => {
+            const urls = Array.isArray(m.image_urls) ? m.image_urls : m.image_url ? [m.image_url] : [];
+
+            return {
+              ...m,
+              imageUrl: m.image_url || urls[0],
+              imageUrls: urls,
+              timestamp: new Date(m.timestamp),
+            };
+          });
+
         if (chatMode === 'encounter' && encounterConfig?.scenarioId) {
           const storageKey = `encounter_conversation_${currentCharacter.id}_${encounterConfig.scenarioId}`;
           let encounterConversationId: string | null = null;
@@ -1377,22 +1391,28 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
               updatedAt: new Date(),
             });
 
-            const messagesResult = await characterAPI.getMessages(encounterConversationId);
-            if (messagesResult.success && messagesResult.data) {
-              setMessages(messagesResult.data.map((m: any) => {
-                const urls = Array.isArray(m.image_urls)
-                  ? m.image_urls
-                  : (m.image_url ? [m.image_url] : []);
+            const [messagesResult, enforcementResult] = await Promise.all([
+              characterAPI.getMessages(encounterConversationId),
+              characterAPI.getEncounterEnforcement(encounterConversationId),
+            ]);
 
-                return {
-                  ...m,
-                  imageUrl: m.image_url || urls[0],
-                  imageUrls: urls,
-                  timestamp: new Date(m.timestamp)
-                };
-              }));
+            if (messagesResult.success && messagesResult.data) {
+              setMessages(mapDbMessagesToUi(messagesResult.data));
             } else {
               setMessages([]);
+            }
+
+            if (enforcementResult.success) {
+              const strike = enforcementResult.data ? Number((enforcementResult.data as any).strike_count || 0) : 0;
+              const blocked = enforcementResult.data ? Boolean((enforcementResult.data as any).blocked) : false;
+              const reason = enforcementResult.data ? String((enforcementResult.data as any).last_violation_reason || '') : '';
+              const atRaw = enforcementResult.data ? (enforcementResult.data as any).last_violation_at : null;
+              const at = atRaw ? new Date(atRaw) : null;
+              setEncounterStrikeCount(Number.isFinite(strike) ? Math.max(0, Math.min(3, Math.floor(strike))) : 0);
+              setEncounterBlocked(blocked);
+              setEncounterLastViolationReason(reason);
+              setEncounterLastViolationAt(at && !Number.isNaN(at.getTime()) ? at : null);
+              enforcementLoadedForConversationIdRef.current = String(encounterConversationId);
             }
 
             return;
@@ -1402,22 +1422,33 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
         const convResult = await characterAPI.getConversation(currentCharacter.id);
         if (convResult.success && convResult.data) {
           setConversation(convResult.data);
-          const messagesResult = await characterAPI.getMessages(convResult.data.id);
-          if (messagesResult.success && messagesResult.data) {
-            setMessages(messagesResult.data.map((m: any) => {
-              const urls = Array.isArray(m.image_urls)
-                ? m.image_urls
-                : (m.image_url ? [m.image_url] : []);
 
-              return {
-                ...m,
-                imageUrl: m.image_url || urls[0],
-                imageUrls: urls,
-                timestamp: new Date(m.timestamp)
-              };
-            }));
+          const conversationId = String(convResult.data.id);
+          const [messagesResult, contextResult] = await Promise.all([
+            characterAPI.getMessages(conversationId),
+            characterAPI.getConversationContext(conversationId),
+          ]);
+
+          if (messagesResult.success && messagesResult.data) {
+            setMessages(mapDbMessagesToUi(messagesResult.data));
           } else {
             setMessages([]);
+          }
+
+          if (contextResult.success) {
+            const data: any = contextResult.data || null;
+            const relRaw = data ? String(data.relation || '') : '';
+            const rel = relRaw === 'stepsister' || relRaw === 'stepbrother' ? 'Step-sibling' : relRaw;
+            const toys = data && Array.isArray(data.sex_toys) ? (data.sex_toys as any[]).map((t) => String(t)) : [];
+            const gifts = data && Array.isArray(data.gifts) ? data.gifts : [];
+
+            setConversationRelation(rel);
+            setConversationSexToys(toys);
+            const resolved = resolveSexToysPromptTags(toys);
+            setAppliedConversationSexToys(resolved.positive);
+            setAppliedConversationSexToyNegativeTags(resolved.negative);
+            setConversationGifts(gifts);
+            contextLoadedForConversationIdRef.current = String(conversationId);
           }
         }
       } catch (error) {
@@ -1462,7 +1493,10 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
       if (!isEncounter) return;
       if (!conversation?.id) return;
 
-      const enforcement = await characterAPI.getEncounterEnforcement(conversation.id);
+      const conversationId = String(conversation.id);
+      if (enforcementLoadedForConversationIdRef.current === conversationId) return;
+
+      const enforcement = await characterAPI.getEncounterEnforcement(conversationId);
       if (enforcement.success) {
         const strike = enforcement.data ? Number((enforcement.data as any).strike_count || 0) : 0;
         const blocked = enforcement.data ? Boolean((enforcement.data as any).blocked) : false;
@@ -1473,6 +1507,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
         setEncounterBlocked(blocked);
         setEncounterLastViolationReason(reason);
         setEncounterLastViolationAt(at && !Number.isNaN(at.getTime()) ? at : null);
+        enforcementLoadedForConversationIdRef.current = conversationId;
       }
     };
 
@@ -1484,7 +1519,10 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
       if (chatMode !== 'normal') return;
       if (!conversation?.id) return;
 
-      const res = await characterAPI.getConversationContext(conversation.id);
+      const conversationId = String(conversation.id);
+      if (contextLoadedForConversationIdRef.current === conversationId) return;
+
+      const res = await characterAPI.getConversationContext(conversationId);
       if (!res.success) return;
 
       const data: any = res.data || null;
@@ -1499,6 +1537,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
       setAppliedConversationSexToys(resolved.positive);
       setAppliedConversationSexToyNegativeTags(resolved.negative);
       setConversationGifts(gifts);
+      contextLoadedForConversationIdRef.current = conversationId;
     };
 
     loadContext();

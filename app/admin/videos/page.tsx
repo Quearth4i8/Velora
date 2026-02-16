@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { characterAPI } from '@/lib/api';
-import { VideoRequestWithDetails, VideoRequestStatus } from '@/lib/types';
+import { VideoRequestWithDetails, VideoRequestStatus, VideoWithDetails, VideoStatus } from '@/lib/types';
 import { useDialog } from '@/components/ui/DialogProvider';
 import { 
   CheckCircle, XCircle, Play, Loader2, Film, Search, Eye,
@@ -12,12 +12,25 @@ import {
 
 export default function AdminVideosPage() {
   const dialog = useDialog();
+  const [tab, setTab] = useState<'requests' | 'videos'>('requests');
+
   const [videoRequests, setVideoRequests] = useState<VideoRequestWithDetails[]>([]);
   const [filteredVideos, setFilteredVideos] = useState<VideoRequestWithDetails[]>([]);
   const [filter, setFilter] = useState<VideoRequestStatus | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  
+
+  const [videos, setVideos] = useState<VideoWithDetails[]>([]);
+  const [videoStatusFilter, setVideoStatusFilter] = useState<VideoStatus | 'all'>('all');
+  const [selectedManageVideo, setSelectedManageVideo] = useState<VideoWithDetails | null>(null);
+  const [videoTitle, setVideoTitle] = useState('');
+  const [videoDescription, setVideoDescription] = useState('');
+  const [videoStatus, setVideoStatus] = useState<VideoStatus>('active');
+  const [manageVideoFile, setManageVideoFile] = useState<File | null>(null);
+  const [manageThumbnailFile, setManageThumbnailFile] = useState<File | null>(null);
+  const [manageVideoPreviewUrl, setManageVideoPreviewUrl] = useState('');
+  const [manageThumbnailPreviewUrl, setManageThumbnailPreviewUrl] = useState('');
+
   // Video form state
   const [selectedVideo, setSelectedVideo] = useState<VideoRequestWithDetails | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
@@ -52,12 +65,143 @@ export default function AdminVideosPage() {
 
   const loadVideos = async () => {
     setIsLoading(true);
-    const result = await characterAPI.getVideoRequests({ limit: 100 });
-    if (result.success && result.data) {
-      setVideoRequests(result.data);
-      setFilteredVideos(result.data);
+    const [requestsRes, videosRes] = await Promise.all([
+      characterAPI.getVideoRequests({ limit: 100 }),
+      characterAPI.adminGetVideos({ limit: 100, status: 'all' }),
+    ]);
+
+    if (requestsRes.success && requestsRes.data) {
+      setVideoRequests(requestsRes.data);
+      setFilteredVideos(requestsRes.data);
+    }
+
+    if (videosRes.success && videosRes.data) {
+      setVideos(videosRes.data as VideoWithDetails[]);
     }
     setIsLoading(false);
+  };
+
+  const filteredManageVideos = videos
+    .filter((v) => (videoStatusFilter === 'all' ? true : v.status === videoStatusFilter))
+    .filter((v) => {
+      const q = searchQuery.trim().toLowerCase();
+      if (!q) return true;
+      return (
+        String(v.title || '').toLowerCase().includes(q) ||
+        String(v.description || '').toLowerCase().includes(q) ||
+        String(v.characterName || '').toLowerCase().includes(q)
+      );
+    });
+
+  const openManageVideo = (v: VideoWithDetails) => {
+    setSelectedManageVideo(v);
+    setVideoTitle(String(v.title || ''));
+    setVideoDescription(String(v.description || ''));
+    setVideoStatus((v.status as VideoStatus) || 'active');
+    setAdminNotes(String(v.adminNotes || ''));
+    setManageVideoFile(null);
+    setManageThumbnailFile(null);
+    setManageVideoPreviewUrl('');
+    setManageThumbnailPreviewUrl('');
+  };
+
+  const handleSaveVideo = async () => {
+    if (!selectedManageVideo?.id) return;
+    setIsSubmitting(true);
+    try {
+      let nextVideoUrl: string | undefined = undefined;
+      let nextThumbnailUrl: string | undefined = undefined;
+
+      if (manageVideoFile) {
+        setUploadProgress(10);
+        const videoFileName = `videos/${selectedManageVideo.id}/${Date.now()}_${manageVideoFile.name}`;
+        const videoFormData = new FormData();
+        videoFormData.append('file', manageVideoFile);
+        videoFormData.append('path', videoFileName);
+        videoFormData.append('bucket', 'videos');
+
+        const videoUploadRes = await fetch('/api/storage/upload', {
+          method: 'POST',
+          body: videoFormData,
+        });
+        if (!videoUploadRes.ok) throw new Error('Failed to upload video');
+        const videoUploadData = await videoUploadRes.json();
+        nextVideoUrl = videoUploadData.url;
+      }
+
+      if (manageThumbnailFile) {
+        setUploadProgress(60);
+        const thumbFileName = `thumbnails/${selectedManageVideo.id}/${Date.now()}_${manageThumbnailFile.name}`;
+        const thumbFormData = new FormData();
+        thumbFormData.append('file', manageThumbnailFile);
+        thumbFormData.append('path', thumbFileName);
+        thumbFormData.append('bucket', 'videos');
+
+        const thumbUploadRes = await fetch('/api/storage/upload', {
+          method: 'POST',
+          body: thumbFormData,
+        });
+        if (!thumbUploadRes.ok) throw new Error('Failed to upload thumbnail');
+        const thumbUploadData = await thumbUploadRes.json();
+        nextThumbnailUrl = thumbUploadData.url;
+      }
+
+      setUploadProgress(90);
+
+      const res = await characterAPI.updateVideo(selectedManageVideo.id, {
+        title: videoTitle,
+        description: videoDescription,
+        ...(typeof nextVideoUrl === 'string' ? { videoUrl: nextVideoUrl } : {}),
+        ...(typeof nextThumbnailUrl === 'string' ? { thumbnailUrl: nextThumbnailUrl } : {}),
+        adminNotes: adminNotes || undefined,
+        status: videoStatus,
+      });
+
+      if (!res.success) {
+        throw res.error || new Error('Failed to update video');
+      }
+
+      setSelectedManageVideo(null);
+      setUploadProgress(100);
+      await loadVideos();
+    } catch (error) {
+      console.error('Error updating video:', error);
+      await dialog.alert({
+        title: 'Error',
+        message: 'Failed to update video. Please try again.',
+      });
+    } finally {
+      setIsSubmitting(false);
+      setUploadProgress(0);
+    }
+  };
+
+  const handleDeleteVideo = async (videoId: string) => {
+    const confirmed = await dialog.confirm({
+      title: 'Delete video?',
+      message: 'This will permanently delete the video record. This action cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      destructive: true,
+    });
+    if (!confirmed) return;
+
+    setIsSubmitting(true);
+    try {
+      const res = await characterAPI.deleteVideo(videoId);
+      if (!res.success) {
+        throw res.error || new Error('Failed to delete video');
+      }
+      await loadVideos();
+    } catch (error) {
+      console.error('Error deleting video:', error);
+      await dialog.alert({
+        title: 'Error',
+        message: 'Failed to delete video. Please try again.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleUpdateStatus = async (videoId: string, status: VideoRequestStatus) => {
@@ -100,9 +244,16 @@ export default function AdminVideosPage() {
       // Check authentication via local API
       const authRes = await fetch('/api/auth/session');
       const authData = await authRes.json();
-      if (!authData.user) throw new Error('Not authenticated');
+      const sessionUser = authData?.user || authData?.data?.user || authData?.data?.session?.user || null;
+      if (!sessionUser) {
+        await dialog.alert({
+          title: 'Sign In Required',
+          message: 'Your session expired. Please sign in again to upload a video.',
+        });
+        return;
+      }
 
-      const userId = authData.user.id;
+      const userId = sessionUser.id;
       const videoFileName = `videos/${selectedVideo.id}/${Date.now()}_${videoFile.name}`;
       
       // Upload video to local storage
@@ -225,27 +376,73 @@ export default function AdminVideosPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-white">Video Requests</h1>
-        <p className="text-dark-400">Manage video generation requests</p>
+        <h1 className="text-2xl font-bold text-white">Videos</h1>
+        <p className="text-dark-400">Manage requests and published videos</p>
+      </div>
+
+      <div className="flex flex-wrap gap-2 p-1.5 bg-dark-900/50 backdrop-blur-sm rounded-2xl border border-white/5">
+        <button
+          onClick={() => setTab('requests')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 ${
+            tab === 'requests'
+              ? 'bg-pink-500/20 text-pink-400 border border-pink-500/30'
+              : 'text-dark-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <Film className="w-4 h-4" />
+          Requests
+        </button>
+        <button
+          onClick={() => setTab('videos')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 ${
+            tab === 'videos'
+              ? 'bg-pink-500/20 text-pink-400 border border-pink-500/30'
+              : 'text-dark-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <Play className="w-4 h-4" />
+          Videos
+        </button>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        {(['all', 'pending', 'approved', 'generating', 'completed', 'rejected'] as const).map((status) => (
-          <button
-            key={status}
-            onClick={() => setFilter(status)}
-            className={`p-3 rounded-xl border transition-all ${
-              filter === status 
-                ? 'bg-pink-500/20 border-pink-500/30 text-pink-400' 
-                : 'bg-dark-900/50 border-white/5 text-dark-400 hover:border-white/10'
-            }`}
-          >
-            <p className="text-2xl font-bold">{statusCounts[status]}</p>
-            <p className="text-xs capitalize">{status}</p>
-          </button>
-        ))}
-      </div>
+      {tab === 'requests' ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {(['all', 'pending', 'approved', 'generating', 'completed', 'rejected'] as const).map((status) => (
+            <button
+              key={status}
+              onClick={() => setFilter(status)}
+              className={`p-3 rounded-xl border transition-all ${
+                filter === status
+                  ? 'bg-pink-500/20 border-pink-500/30 text-pink-400'
+                  : 'bg-dark-900/50 border-white/5 text-dark-400 hover:border-white/10'
+              }`}
+            >
+              <p className="text-2xl font-bold">{statusCounts[status]}</p>
+              <p className="text-xs capitalize">{status}</p>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {(['all', 'active', 'hidden', 'removed'] as const).map((status) => (
+            <button
+              key={status}
+              onClick={() => setVideoStatusFilter(status as any)}
+              className={`p-3 rounded-xl border transition-all ${
+                videoStatusFilter === status
+                  ? 'bg-pink-500/20 border-pink-500/30 text-pink-400'
+                  : 'bg-dark-900/50 border-white/5 text-dark-400 hover:border-white/10'
+              }`}
+            >
+              <p className="text-2xl font-bold">
+                {status === 'all' ? videos.length : videos.filter((v) => v.status === status).length}
+              </p>
+              <p className="text-xs capitalize">{status}</p>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Search */}
       <div className="relative">
@@ -264,12 +461,13 @@ export default function AdminVideosPage() {
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-8 h-8 text-pink-400 animate-spin" />
         </div>
-      ) : filteredVideos.length === 0 ? (
+      ) : tab === 'requests' ? (
+        filteredVideos.length === 0 ? (
         <div className="text-center py-20">
           <Film className="w-16 h-16 text-dark-600 mx-auto mb-4" />
           <p className="text-dark-400">No video requests found</p>
         </div>
-      ) : (
+        ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredVideos.map((video) => (
             <motion.div
@@ -361,6 +559,70 @@ export default function AdminVideosPage() {
             </motion.div>
           ))}
         </div>
+        )
+      ) : (
+        filteredManageVideos.length === 0 ? (
+          <div className="text-center py-20">
+            <Film className="w-16 h-16 text-dark-600 mx-auto mb-4" />
+            <p className="text-dark-400">No videos found</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredManageVideos.map((video) => (
+              <motion.div
+                key={video.id}
+                layout
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-dark-900/50 backdrop-blur-sm rounded-2xl border border-white/5 overflow-hidden hover:border-white/10 transition-all"
+              >
+                <div className="relative aspect-[3/4] bg-dark-800 overflow-hidden">
+                  {video.videoUrl ? (
+                    <video
+                      src={video.videoUrl}
+                      className="absolute inset-0 w-full h-full object-cover"
+                      muted
+                      loop
+                      playsInline
+                      preload="metadata"
+                    />
+                  ) : null}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                  <div className="absolute top-3 left-3">
+                    <span className="px-2.5 py-1 rounded-lg text-xs font-medium border bg-black/40 text-white border-white/10">
+                      {video.status}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-4">
+                  <h3 className="font-semibold text-white mb-1 truncate">{video.title}</h3>
+                  <p className="text-sm text-dark-400 line-clamp-2 mb-3">{video.description}</p>
+                  <div className="text-xs text-dark-500 mb-4">
+                    {video.characterName ? `Character: ${video.characterName} · ` : ''}
+                    {new Date(video.createdAt).toLocaleDateString()}
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => openManageVideo(video)}
+                      className="flex-1 py-2 bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      Manage
+                    </button>
+                    <button
+                      onClick={() => handleDeleteVideo(video.id)}
+                      disabled={isSubmitting}
+                      className="flex-1 py-2 bg-red-500/15 hover:bg-red-500/25 text-red-200 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )
       )}
 
       {/* Add Video Modal */}
@@ -520,6 +782,183 @@ export default function AdminVideosPage() {
                     <>
                       <Play className="w-4 h-4" />
                       Add Video
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {selectedManageVideo && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => setSelectedManageVideo(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-dark-900/70 backdrop-blur-xl rounded-2xl border border-white/10 p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-white">Manage Video</h2>
+                <button
+                  onClick={() => setSelectedManageVideo(null)}
+                  className="text-dark-400 hover:text-white"
+                >
+                  <XCircle className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm text-dark-400 mb-1">Title</label>
+                  <input
+                    value={videoTitle}
+                    onChange={(e) => setVideoTitle(e.target.value)}
+                    className="w-full px-4 py-3 bg-dark-800 border border-white/10 rounded-xl text-white placeholder-dark-500 focus:outline-none focus:border-pink-500/50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-dark-400 mb-1">Description</label>
+                  <textarea
+                    value={videoDescription}
+                    onChange={(e) => setVideoDescription(e.target.value)}
+                    className="w-full px-4 py-3 bg-dark-800 border border-white/10 rounded-xl text-white placeholder-dark-500 focus:outline-none focus:border-pink-500/50 h-28 resize-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-dark-400 mb-2">Status</label>
+                  <select
+                    value={videoStatus}
+                    onChange={(e) => setVideoStatus(e.target.value as VideoStatus)}
+                    className="w-full px-4 py-3 bg-dark-800 border border-white/10 rounded-xl text-white focus:outline-none focus:border-pink-500/50"
+                  >
+                    <option value="active">active</option>
+                    <option value="hidden">hidden</option>
+                    <option value="removed">removed</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-dark-400 mb-1">Admin Notes</label>
+                  <textarea
+                    value={adminNotes}
+                    onChange={(e) => setAdminNotes(e.target.value)}
+                    placeholder="Internal notes..."
+                    className="w-full px-4 py-3 bg-dark-800 border border-white/10 rounded-xl text-white placeholder-dark-500 focus:outline-none focus:border-pink-500/50 h-24 resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-dark-400 mb-2">Replace Video File (optional)</label>
+                  <div className="relative">
+                    <input
+                      type="file"
+                      accept="video/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null;
+                        setManageVideoFile(file);
+                        setManageVideoPreviewUrl(file ? URL.createObjectURL(file) : '');
+                      }}
+                      className="hidden"
+                      id="manage-video-upload"
+                    />
+                    <label
+                      htmlFor="manage-video-upload"
+                      className="flex items-center justify-center gap-2 w-full px-4 py-4 bg-dark-800/60 border border-dashed border-white/20 rounded-xl cursor-pointer hover:border-pink-500/50 hover:bg-dark-700/40 transition-all"
+                    >
+                      {manageVideoFile ? (
+                        <>
+                          <FileVideo className="w-5 h-5 text-green-400" />
+                          <span className="text-sm text-white truncate">{manageVideoFile.name}</span>
+                          <span className="text-xs text-dark-400">({(manageVideoFile.size / 1024 / 1024).toFixed(2)} MB)</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-5 h-5 text-dark-400" />
+                          <span className="text-sm text-dark-300">Click to select a new video file</span>
+                        </>
+                      )}
+                    </label>
+                  </div>
+                  {manageVideoPreviewUrl ? (
+                    <video
+                      src={manageVideoPreviewUrl}
+                      className="mt-3 w-full h-32 object-cover rounded-lg"
+                      controls
+                    />
+                  ) : null}
+                </div>
+
+                <div>
+                  <label className="block text-sm text-dark-400 mb-2">Replace Thumbnail (optional)</label>
+                  <div className="relative">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null;
+                        setManageThumbnailFile(file);
+                        setManageThumbnailPreviewUrl(file ? URL.createObjectURL(file) : '');
+                      }}
+                      className="hidden"
+                      id="manage-thumbnail-upload"
+                    />
+                    <label
+                      htmlFor="manage-thumbnail-upload"
+                      className="flex items-center justify-center gap-2 w-full px-4 py-4 bg-dark-800/60 border border-dashed border-white/20 rounded-xl cursor-pointer hover:border-pink-500/50 hover:bg-dark-700/40 transition-all"
+                    >
+                      {manageThumbnailFile ? (
+                        <>
+                          <CheckCircle className="w-5 h-5 text-green-400" />
+                          <span className="text-sm text-white truncate">{manageThumbnailFile.name}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-5 h-5 text-dark-400" />
+                          <span className="text-sm text-dark-300">Click to select a new thumbnail</span>
+                        </>
+                      )}
+                    </label>
+                  </div>
+                  {manageThumbnailPreviewUrl ? (
+                    <img
+                      src={manageThumbnailPreviewUrl}
+                      alt="New thumbnail preview"
+                      className="mt-3 w-full h-24 object-cover rounded-lg"
+                    />
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setSelectedManageVideo(null)}
+                  className="flex-1 py-3 bg-dark-800 text-white rounded-xl hover:bg-dark-700 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveVideo}
+                  disabled={isSubmitting}
+                  className="flex-1 py-3 bg-pink-500 text-white rounded-xl hover:bg-pink-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      {uploadProgress > 0 ? `Saving ${uploadProgress}%...` : 'Saving...'}
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4" />
+                      Save
                     </>
                   )}
                 </button>

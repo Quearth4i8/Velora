@@ -551,63 +551,23 @@ export default function TentaclesPage() {
           setGlobalTentacleImages(res.data);
           imageStoreRef.current = res.data;
         } else {
-          // For "Tentacles Only" mode, fetch multiple batches to find scattered tentacle images
-          // API has max limit of 100 per request, so we make multiple calls
-          const BATCH_SIZE = 100;
-          const MAX_BATCHES = 10; // Fetch up to 1000 images total
-          
-          console.log(`Loading tentacles: fetching up to ${BATCH_SIZE * MAX_BATCHES} images in ${MAX_BATCHES} batches`);
-          
-          let allImages: CharacterImage[] = [];
-          
-          for (let batch = 0; batch < MAX_BATCHES; batch++) {
-            const offset = batch * BATCH_SIZE;
-            const res = await characterAPI.getAllCharacterImagesPagedGlobal({
-              limit: BATCH_SIZE,
-              offset: offset,
-            });
-            
-            if (!res.success || !Array.isArray(res.data) || res.data.length === 0) {
-              break; // No more images
-            }
-            
-            allImages = [...allImages, ...res.data];
-            
-            // If we got fewer than BATCH_SIZE results, we've reached the end
-            if (res.data.length < BATCH_SIZE) {
-              break;
-            }
-          }
-          
-          console.log(`Fetched ${allImages.length} total images from all batches`);
-          
-          // Filter to only tentacle images
-          const tentacleKeywords = ['tentacle', 'tentacles', 'extreme_tentacles', '<lora:extreme_tentacles', 'lora:extreme'];
-          const allTentacleImages = allImages.filter((img) => {
-            const prompt = String(img.generationPrompt || '').toLowerCase();
-            const hasTentacle = tentacleKeywords.some(kw => prompt.includes(kw));
-            
-            // Debug: log first few image prompts to see what we're working with
-            if (allImages.indexOf(img) < 5) {
-              console.log(`Image ${img.id} prompt:`, prompt.substring(0, 150));
-            }
-            
-            return hasTentacle;
+          const fetchOffset = safePage * GLOBAL_TENTACLE_PAGE_SIZE;
+          const fetchLimit = GLOBAL_TENTACLE_PAGE_SIZE;
+
+          const res = await characterAPI.getTentacleImagesPagedGlobal({
+            limit: fetchLimit,
+            offset: fetchOffset,
           });
-          
-          console.log(`Found ${allTentacleImages.length} tentacle images out of ${allImages.length} total`);
-          
-          // Paginate the filtered results
-          const startIndex = safePage * GLOBAL_TENTACLE_PAGE_SIZE;
-          const endIndex = startIndex + GLOBAL_TENTACLE_PAGE_SIZE;
-          const paginatedTentacles = allTentacleImages.slice(startIndex, endIndex);
-          
-          console.log(`Showing tentacles ${startIndex} to ${endIndex - 1}, count: ${paginatedTentacles.length}`);
-          // Use functional update to avoid stale closure issues
-          imageStoreRef.current = paginatedTentacles;
-          setGlobalTentacleImages(() => paginatedTentacles);
-          // Force re-render to ensure images display
-          setRenderTick(t => t + 1);
+
+          if (!res.success || !Array.isArray(res.data)) {
+            setGlobalTentacleImages([]);
+            imageStoreRef.current = [];
+            return;
+          }
+
+          imageStoreRef.current = res.data;
+          setGlobalTentacleImages(res.data);
+          setRenderTick((t) => t + 1);
         }
       } catch (error) {
         console.error('Error loading tentacle images:', error);
