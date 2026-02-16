@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase } from './supabase';
 import { clampBondPoints, computeBondDecayFromInactivityDays, computeBondPointsDeltaFromUserText } from '@/lib/bond';
 
 export interface CharacterRelationship {
@@ -18,10 +18,12 @@ const daysBetween = (a: Date, b: Date): number => {
 
 export const bondService = {
   async getOrCreate(characterId: string): Promise<CharacterRelationship | null> {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) return null;
+    // Check authentication via local API
+    const authRes = await fetch('/api/auth/session');
+    const authData = await authRes.json();
+    if (!authData.user) return null;
 
-    const userId = session.user.id;
+    const userId = authData.user.id;
 
     const existing = await supabase
       .from('character_relationships')
@@ -34,7 +36,7 @@ export const bondService = {
       return existing.data as any;
     }
 
-    const created = await supabase
+    const created = await (supabase
       .from('character_relationships')
       .insert({
         user_id: userId,
@@ -42,7 +44,7 @@ export const bondService = {
         bond_points: 0,
         last_interaction_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      })
+      }) as any)
       .select()
       .single();
 
@@ -67,12 +69,12 @@ export const bondService = {
 
     const nextPoints = clampBondPoints(rel.bond_points - decay);
 
-    const updated = await supabase
+    const updated = await (supabase
       .from('character_relationships')
       .update({
         bond_points: nextPoints,
         updated_at: new Date().toISOString(),
-      })
+      }) as any)
       .eq('id', rel.id)
       .select()
       .single();
@@ -92,13 +94,13 @@ export const bondService = {
     const delta = Number(pointsDelta);
     const nextPoints = clampBondPoints(rel.bond_points + (Number.isFinite(delta) ? delta : 0));
 
-    const updated = await supabase
+    const updated = await (supabase
       .from('character_relationships')
       .update({
         bond_points: nextPoints,
         last_interaction_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      })
+      }) as any)
       .eq('id', rel.id)
       .select()
       .single();
@@ -118,13 +120,13 @@ export const bondService = {
     const delta = computeBondPointsDeltaFromUserText(String(userText || ''));
     const nextPoints = clampBondPoints(rel.bond_points + delta);
 
-    const updated = await supabase
+    const updated = await (supabase
       .from('character_relationships')
       .update({
         bond_points: nextPoints,
         last_interaction_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      })
+      }) as any)
       .eq('id', rel.id)
       .select()
       .single();

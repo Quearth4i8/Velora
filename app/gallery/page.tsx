@@ -471,14 +471,20 @@ export default function GalleryPage() {
         setIsLoadingMoreImages(true);
       }
 
-      const result = await characterAPI.getAllCharacterImagesPaged({
+      const result = await characterAPI.getAllCharacterImagesPagedGlobal({
         limit: pageSize,
         offset: nextOffset,
       });
 
       const page = result.success && Array.isArray(result.data) ? result.data : [];
       if (result.success) {
-        setCommunityImages((prev) => (reset ? page : [...prev, ...page]));
+        setCommunityImages((prev) => {
+          if (reset) return page;
+          // Deduplicate by ID to prevent duplicate React keys
+          const existingIds = new Set(prev.map(img => img.id));
+          const newImages = page.filter(img => !existingIds.has(img.id));
+          return [...prev, ...newImages];
+        });
         setImagesOffset(nextOffset + page.length);
         setHasMoreImages(page.length === pageSize);
       } else {

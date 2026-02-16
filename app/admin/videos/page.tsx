@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { characterAPI } from '@/lib/api';
-import { supabase } from '@/lib/supabase';
 import { VideoRequestWithDetails, VideoRequestStatus } from '@/lib/types';
 import { useDialog } from '@/components/ui/DialogProvider';
 import { 
@@ -98,30 +97,31 @@ export default function AdminVideosPage() {
     setUploadProgress(0);
     
     try {
-      // Upload video file to Supabase Storage
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) throw new Error('Not authenticated');
+      // Check authentication via local API
+      const authRes = await fetch('/api/auth/session');
+      const authData = await authRes.json();
+      if (!authData.user) throw new Error('Not authenticated');
 
+      const userId = authData.user.id;
       const videoFileName = `videos/${selectedVideo.id}/${Date.now()}_${videoFile.name}`;
       
-      // Upload video
+      // Upload video to local storage
       setUploadProgress(10);
-      const { data: videoUploadData, error: videoUploadError } = await supabase.storage
-        .from('videos')
-        .upload(videoFileName, videoFile, {
-          cacheControl: '3600',
-          upsert: false,
-        });
-
-      if (videoUploadError) throw videoUploadError;
+      const videoFormData = new FormData();
+      videoFormData.append('file', videoFile);
+      videoFormData.append('path', videoFileName);
+      videoFormData.append('bucket', 'videos');
+      
+      const videoUploadRes = await fetch('/api/storage/upload', {
+        method: 'POST',
+        body: videoFormData,
+      });
+      
+      if (!videoUploadRes.ok) throw new Error('Failed to upload video');
+      const videoUploadData = await videoUploadRes.json();
       setUploadProgress(50);
 
-      // Get video public URL
-      const { data: videoUrlData } = supabase.storage
-        .from('videos')
-        .getPublicUrl(videoFileName);
-
-      const finalVideoUrl = videoUrlData.publicUrl;
+      const finalVideoUrl = videoUploadData.url;
       let finalThumbnailUrl = '';
 
       // Upload thumbnail if provided
@@ -129,20 +129,20 @@ export default function AdminVideosPage() {
         setUploadProgress(70);
         const thumbFileName = `thumbnails/${selectedVideo.id}/${Date.now()}_${thumbnailFile.name}`;
         
-        const { data: thumbUploadData, error: thumbUploadError } = await supabase.storage
-          .from('videos')
-          .upload(thumbFileName, thumbnailFile, {
-            cacheControl: '3600',
-            upsert: false,
-          });
-
-        if (thumbUploadError) throw thumbUploadError;
-
-        const { data: thumbUrlData } = supabase.storage
-          .from('videos')
-          .getPublicUrl(thumbFileName);
+        const thumbFormData = new FormData();
+        thumbFormData.append('file', thumbnailFile);
+        thumbFormData.append('path', thumbFileName);
+        thumbFormData.append('bucket', 'videos');
         
-        finalThumbnailUrl = thumbUrlData.publicUrl;
+        const thumbUploadRes = await fetch('/api/storage/upload', {
+          method: 'POST',
+          body: thumbFormData,
+        });
+        
+        if (!thumbUploadRes.ok) throw new Error('Failed to upload thumbnail');
+        const thumbUploadData = await thumbUploadRes.json();
+        
+        finalThumbnailUrl = thumbUploadData.url;
       }
 
       setUploadProgress(90);

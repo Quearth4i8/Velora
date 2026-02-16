@@ -1389,19 +1389,27 @@ const buildNegativePrompt = (draft?: CharacterDraft, messageContent?: string): s
         'duplicate',
         'multiple faces',
         'extra head',
-        hasSexualContent ? 'multiple girls,' : 'multiple people, ',
+        hasSexualContent ? '(multiple girls:1.4)' : '(multiple people:1.4)',
+        '(2 girls:1.5)',
+        '(two girls:1.5)',
+        '(2girls:1.5)',
+        '(twin girls:1.4)',
+        '(duo:1.4)',
+        '(pair:1.4)',
+        'second girl',
+        'second woman',
+        'another girl',
+        'another woman',
+        'clone',
+        'twins',
         'split view',
         'multiple views',
         'multiple panels',
         'collage',
-        '2 girls',
-        'two girls',
         contextualNegativePrompts
       );
 
   const extraNegativePrompts: string[] = [];
-
-  // Outfit color drift guard: discourage "gold dress" when a non-gold outfit color is selected.
   const clothingColorRaw = draft?.appearance?.clothingColor;
   const clothingColorValue = typeof clothingColorRaw === 'string' ? clothingColorRaw.trim() : '';
   const clothingColorTag = clothingColorValue
@@ -2214,7 +2222,7 @@ export const automatic1111API = {
         throw new Error('No images returned from Automatic1111');
       }
 
-      // Upload to Supabase storage with a unique name for message images
+      // Upload to local storage via API with a unique name for message images
       const base64Image = result.images[0];
       const timestamp = Date.now();
       const imageName = `message-${timestamp}-${Math.random().toString(36).substring(7)}.jpg`;
@@ -2228,17 +2236,20 @@ export const automatic1111API = {
       }
       const blob = new Blob([bytes], { type: 'image/jpeg' });
 
-      // Upload to Supabase storage
-      const { error: uploadError } = await supabase.storage
-        .from('character-images')
-        .upload(imageName, blob, {
-          contentType: 'image/jpeg',
-          upsert: true
-        });
+      // Upload to local storage via API
+      const formData = new FormData();
+      formData.append('file', blob, imageName);
+      formData.append('bucket', 'character-images');
+      formData.append('path', imageName);
 
-      if (uploadError) {
-        console.error('Storage upload error:', uploadError);
-        throw uploadError;
+      const uploadRes = await fetch('/api/storage/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!uploadRes.ok) {
+        const errorText = await uploadRes.text();
+        throw new Error(`Storage upload failed: ${errorText}`);
       }
 
       // Return base64 directly (like generateCharacterImage does) instead of URL
@@ -2266,6 +2277,9 @@ export const automatic1111API = {
         hr_resize_x: Math.round(payload.width * 1.5),
         hr_resize_y: Math.round(payload.height * 1.5),
         denoising_strength: 0.5, // Reduced from 0.7 to prevent artifacts
+        // Save to disk to avoid huge base64 in JSON response
+        save_images: true,
+        send_images: false, // Don't include base64 in response
       });
 
       const attempt = async (hr_upscaler: string) => {
@@ -2309,34 +2323,48 @@ export const automatic1111API = {
         throw new Error('No images returned from Automatic1111');
       }
 
-      // Upload to Supabase storage with hires prefix
-      const base64Image = result.images[0];
+      // Get the saved image path from the info field
+      const info = typeof result.info === 'string' ? JSON.parse(result.info) : result.info;
+      const imagePath = info?.image_path || info?.infotexts?.[0]?.image_path;
+      
+      if (!imagePath) {
+        throw new Error('No image path returned from Automatic1111');
+      }
+
+      // Fetch the image file from A1111's file endpoint
+      const imageResponse = await fetch(`${AUTOMATIC1111_GENERIC_PROXY_PREFIX}/file=${imagePath}`);
+      if (!imageResponse.ok) {
+        throw new Error(`Failed to fetch image file: ${imageResponse.status}`);
+      }
+
+      // Convert to base64
+      const blob = await imageResponse.blob();
+      const base64Image = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+      });
+
+      // Upload to local storage via API with hires prefix
       const timestamp = Date.now();
       const imageName = `hires-${timestamp}-${Math.random().toString(36).substring(7)}.jpg`;
 
-      // Convert base64 to binary data
-      const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
-      const binaryData = atob(base64Data);
-      const bytes = new Uint8Array(binaryData.length);
-      for (let i = 0; i < binaryData.length; i++) {
-        bytes[i] = binaryData.charCodeAt(i);
-      }
-      const blob = new Blob([bytes], { type: 'image/jpeg' });
+      const formData = new FormData();
+      formData.append('file', blob, imageName);
+      formData.append('bucket', 'character-images');
+      formData.append('path', imageName);
 
-      // Upload to Supabase storage
-      const { error: uploadError } = await supabase.storage
-        .from('character-images')
-        .upload(imageName, blob, {
-          contentType: 'image/jpeg',
-          upsert: true
-        });
+      const uploadRes = await fetch('/api/storage/upload', {
+        method: 'POST',
+        body: formData,
+      });
 
-      if (uploadError) {
-        console.error('Storage upload error:', uploadError);
-        throw uploadError;
+      if (!uploadRes.ok) {
+        const errorText = await uploadRes.text();
+        throw new Error(`Storage upload failed: ${errorText}`);
       }
 
-      // Return base64 directly (like generateCharacterImage does) instead of URL
+      // Return base64 directly
       return base64Image;
     } catch (error) {
       console.error('Error generating hires image:', error);

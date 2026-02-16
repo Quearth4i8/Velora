@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase } from './supabase';
 
 const FALLBACK_STORAGE_KEY = 'miniGamePoints';
 const SPIN_PITY_STORAGE_KEY = 'spinPityCount';
@@ -27,13 +27,15 @@ export const wallet = {
   },
 
   async getBalance(): Promise<number> {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) return this.getLocalBalance();
+    // Check authentication via local API
+    const authRes = await fetch('/api/auth/session');
+    const authData = await authRes.json();
+    if (!authData.user) return this.getLocalBalance();
 
     const { data, error } = await supabase
       .from('profiles')
       .select('points_balance')
-      .eq('id', session.user.id)
+      .eq('id', authData.user.id)
       .maybeSingle();
 
     if (error) return 0;
@@ -43,16 +45,18 @@ export const wallet = {
 
   async setBalance(points: number): Promise<number> {
     const next = safeInt(points);
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) {
+    // Check authentication via local API
+    const authRes = await fetch('/api/auth/session');
+    const authData = await authRes.json();
+    if (!authData.user) {
       this.setLocalBalance(next);
       return next;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await (supabase
       .from('profiles')
-      .update({ points_balance: next, updated_at: new Date().toISOString() })
-      .eq('id', session.user.id)
+      .update({ points_balance: next, updated_at: new Date().toISOString() }) as any)
+      .eq('id', authData.user.id)
       .select('points_balance')
       .maybeSingle();
 
@@ -65,16 +69,13 @@ export const wallet = {
     const d = Math.floor(Number(delta));
     if (!Number.isFinite(d) || d === 0) return this.getBalance();
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) {
+    // Check authentication via local API
+    const authRes = await fetch('/api/auth/session');
+    const authData = await authRes.json();
+    if (!authData.user) {
       const next = safeInt(this.getLocalBalance() + d);
       this.setLocalBalance(next);
       return next;
-    }
-
-    const rpc = await supabase.rpc('increment_points_balance', { delta: d });
-    if (!rpc.error) {
-      return safeInt((rpc.data as any) ?? 0);
     }
 
     const current = await this.getBalance();
@@ -106,13 +107,15 @@ export const wallet = {
   },
 
   async getSpinPity(): Promise<number> {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) return this.getLocalSpinPity();
+    // Check authentication via local API
+    const authRes = await fetch('/api/auth/session');
+    const authData = await authRes.json();
+    if (!authData.user) return this.getLocalSpinPity();
 
     const { data, error } = await supabase
       .from('profiles')
       .select('spin_pity_count')
-      .eq('id', session.user.id)
+      .eq('id', authData.user.id)
       .maybeSingle();
 
     if (error) return 0;
@@ -121,16 +124,18 @@ export const wallet = {
 
   async setSpinPity(value: number): Promise<number> {
     const next = safeInt(value);
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) {
+    // Check authentication via local API
+    const authRes = await fetch('/api/auth/session');
+    const authData = await authRes.json();
+    if (!authData.user) {
       this.setLocalSpinPity(next);
       return next;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await (supabase
       .from('profiles')
-      .update({ spin_pity_count: next, updated_at: new Date().toISOString() })
-      .eq('id', session.user.id)
+      .update({ spin_pity_count: next, updated_at: new Date().toISOString() }) as any)
+      .eq('id', authData.user.id)
       .select('spin_pity_count')
       .maybeSingle();
 

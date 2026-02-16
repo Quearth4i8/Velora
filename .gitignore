@@ -89,3 +89,6 @@ tts_server/*.ogg
 # Audio model cache
 .cache/
 models_cache/
+
+# Local storage data
+data/

@@ -24,9 +24,13 @@ export default function VideosPage() {
   // State for image selection
   const [userImages, setUserImages] = useState<any[]>([]);
   const [isLoadingImages, setIsLoadingImages] = useState(false);
+  const [isLoadingMoreImages, setIsLoadingMoreImages] = useState(false);
+  const [hasMoreImages, setHasMoreImages] = useState(true);
+  const [imagesOffset, setImagesOffset] = useState(0);
   const [selectedImage, setSelectedImage] = useState<any>(null);
   const [promptIdea, setPromptIdea] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
   
   // State for video player modal and in-view videos
   const [playingVideo, setPlayingVideo] = useState<VideoWithDetails | null>(null);
@@ -40,10 +44,18 @@ export default function VideosPage() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      // Fetch videos from videos table
-      const videosResult = await characterAPI.getVideos({ limit: 100 });
+      // Fetch active videos
+      const videosResult = await characterAPI.getVideos({ limit: 50 });
+      console.log('Videos result:', videosResult);
       if (videosResult.success && videosResult.data) {
         setVideos(videosResult.data);
+        console.log('First video data:', videosResult.data[0]);
+      }
+
+      // Fetch all video requests so everyone can see statuses and like/vote
+      const allRequestsResult = await characterAPI.getVideoRequests({ limit: 200 });
+      if (allRequestsResult.success && allRequestsResult.data) {
+        setVideoRequests(allRequestsResult.data);
       }
 
       // Fetch user's own requests
@@ -62,7 +74,7 @@ export default function VideosPage() {
 
   // Fetch user images when switching to submit tab
   useEffect(() => {
-    if (activeTab === 'submit' && user) {
+    if (activeTab === 'submit') {
       fetchUserImages();
     }
   }, [activeTab, user]);
@@ -70,16 +82,97 @@ export default function VideosPage() {
   const fetchUserImages = async () => {
     setIsLoadingImages(true);
     try {
-      const result = await characterAPI.getUserImages(100);
-      if (result.success && result.data) {
-        setUserImages(result.data);
+      const pageSize = 200;
+      const result = await characterAPI.getVideoRequestImages({ limit: pageSize, offset: 0 });
+      if (!result.success) {
+        throw result.error || new Error('Failed to load images');
       }
+
+      const batch = result.data || [];
+      setUserImages(batch);
+      setImagesOffset(batch.length);
+      setHasMoreImages(batch.length === pageSize);
     } catch (error) {
       console.error('Error fetching user images:', error);
     } finally {
       setIsLoadingImages(false);
     }
   };
+
+  const loadMoreImages = async () => {
+    if (isLoadingImages || isLoadingMoreImages || !hasMoreImages) return;
+    setIsLoadingMoreImages(true);
+    try {
+      const pageSize = 200;
+      const result = await characterAPI.getVideoRequestImages({ limit: pageSize, offset: imagesOffset });
+      if (!result.success) {
+        throw result.error || new Error('Failed to load more images');
+      }
+
+      const batch = result.data || [];
+      // Deduplicate by ID to prevent duplicates if API returns overlapping pages
+      const existingIds = new Set(userImages.map((img) => img.id));
+      const newImages = batch.filter((img) => !existingIds.has(img.id));
+      setUserImages((prev) => prev.concat(newImages));
+      setImagesOffset((prev) => prev + newImages.length);
+      setHasMoreImages(batch.length === pageSize);
+    } catch (error) {
+      console.error('Error loading more images:', error);
+      setHasMoreImages(false);
+    } finally {
+      setIsLoadingMoreImages(false);
+    }
+  };
+
+  const loadAllRemainingImages = async () => {
+    if (isLoadingImages || isLoadingMoreImages) return;
+    setIsLoadingMoreImages(true);
+    try {
+      const pageSize = 200;
+      let currentOffset = imagesOffset;
+      let hasMore = hasMoreImages;
+      
+      while (hasMore) {
+        const result = await characterAPI.getVideoRequestImages({ limit: pageSize, offset: currentOffset });
+        if (!result.success) {
+          throw result.error || new Error('Failed to load more images');
+        }
+
+        const batch = result.data || [];
+        setUserImages((prev) => prev.concat(batch));
+        currentOffset += batch.length;
+        hasMore = batch.length === pageSize;
+        
+        // Update state periodically
+        setImagesOffset(currentOffset);
+        setHasMoreImages(hasMore);
+      }
+    } catch (error) {
+      console.error('Error loading all remaining images:', error);
+      setHasMoreImages(false);
+    } finally {
+      setIsLoadingMoreImages(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'submit') return;
+    if (!hasMoreImages) return;
+    const node = loadMoreRef.current;
+    if (!node) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          loadMoreImages();
+        }
+      },
+      { root: null, rootMargin: '600px 0px', threshold: 0 }
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [activeTab, hasMoreImages, imagesOffset, isLoadingImages, isLoadingMoreImages]);
 
   const handleSubmitRequest = async () => {
     if (!user) {
@@ -544,6 +637,33 @@ export default function VideosPage() {
                       <h3 className="text-lg font-semibold text-white mb-4">
                         {selectedImage ? 'Choose a Different Image' : 'Select an Image'}
                       </h3>
+                      {!isLoadingImages && userImages.length > 0 && (
+                        <div className="flex items-center justify-between mb-4">
+                          <span className="text-sm text-dark-400">
+                            Loaded {userImages.length} images
+                          </span>
+                          {hasMoreImages && (
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={loadMoreImages}
+                                disabled={isLoadingMoreImages}
+                                className="px-3 py-1.5 rounded-lg text-sm bg-dark-800 text-dark-200 hover:bg-dark-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              >
+                                {isLoadingMoreImages ? 'Loading...' : 'Load more'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={loadAllRemainingImages}
+                                disabled={isLoadingMoreImages}
+                                className="px-3 py-1.5 rounded-lg text-sm bg-pink-600 text-white hover:bg-pink-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              >
+                                {isLoadingMoreImages ? 'Loading...' : 'Load all'}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                       
                       {isLoadingImages ? (
                         <div className="flex items-center justify-center py-12">
@@ -582,6 +702,17 @@ export default function VideosPage() {
                               )}
                             </motion.button>
                           ))}
+                          <div ref={loadMoreRef} className="col-span-full h-1" />
+                          {isLoadingMoreImages && (
+                            <div className="col-span-full flex items-center justify-center py-6">
+                              <Loader2 className="w-6 h-6 text-pink-400 animate-spin" />
+                            </div>
+                          )}
+                          {!hasMoreImages && !isLoadingMoreImages && (
+                            <div className="col-span-full flex items-center justify-center py-6">
+                              <span className="text-sm text-dark-500">All images loaded</span>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -759,32 +890,17 @@ function VideoCard({
   const [isHovered, setIsHovered] = useState(false);
 
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (videoRef.current) {
-            if (entry.isIntersecting) {
-              // Video is in view - play muted preview
-              videoRef.current.muted = true;
-              videoRef.current.play().catch(() => {
-                // Autoplay prevented, that's okay
-              });
-            } else {
-              // Video is out of view - pause
-              videoRef.current.pause();
-            }
-          }
+    if (videoRef.current) {
+      if (isHovered) {
+        videoRef.current.play().catch(() => {
+          // Autoplay prevented, that's okay
         });
-      },
-      { threshold: 0.5 }
-    );
-
-    if (cardRef.current) {
-      observer.observe(cardRef.current);
+      } else {
+        videoRef.current.pause();
+        videoRef.current.currentTime = 0;
+      }
     }
-
-    return () => observer.disconnect();
-  }, []);
+  }, [isHovered]);
 
   return (
     <motion.div
@@ -797,24 +913,19 @@ function VideoCard({
       onMouseLeave={() => setIsHovered(false)}
     >
       {/* Video Preview / Thumbnail */}
-      <div className="relative aspect-video bg-dark-800 overflow-hidden">
-        {/* Video element for auto-play preview */}
+      <div className="relative aspect-[3/4] bg-dark-800 overflow-hidden">
+        {/* Video element - shows first frame as thumbnail, plays on hover */}
         {video.videoUrl && (
           <video
             ref={videoRef}
             src={video.videoUrl}
-            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`}
+            className="absolute inset-0 w-full h-full object-cover"
             muted
             loop
             playsInline
+            preload="metadata"
           />
         )}
-        {/* Thumbnail (shows when not hovered or video loading) */}
-        <img
-          src={video.thumbnailUrl || video.characterImageUrl || '/default-video-thumb.jpg'}
-          alt={video.title}
-          className={`absolute inset-0 w-full h-full object-cover transition-all duration-300 ${isHovered ? 'opacity-0 scale-105' : 'opacity-100 scale-100'}`}
-        />
         {/* Play Button Overlay */}
         <div className={`absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
           <button

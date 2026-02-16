@@ -10,6 +10,7 @@ import { ETHNICITY_TO_RACE_MAP } from '@/config/ethnicity-prompts';
 import { PrimaryCTAButton } from '@/components/ui/PrimaryCTAButton';
 import { TraitFilter } from '@/components/ui/TraitFilter';
 import { useDialog } from '@/components/ui/DialogProvider';
+import { storageService } from '@/lib/storage';
 
 interface CharacterTraits {
   ethnicity?: string | null;
@@ -41,6 +42,18 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
   useEffect(() => {
     // Start loading immediately
     loadCharacters();
+  }, []);
+
+  // Clear old cache keys on mount to ensure fresh data
+  useEffect(() => {
+    const keysToRemove = ['characters_selection', 'characters_list_10', 'characters_list_50'];
+    keysToRemove.forEach(key => {
+      try {
+        localStorage.removeItem(key);
+      } catch (e) {
+        // ignore
+      }
+    });
   }, []);
 
   // Initialize filteredCharacters when characters are loaded
@@ -273,7 +286,7 @@ export function CharacterSelection({ onSelectCharacter, onCreateNew }: Character
                     {character.generation?.generatedImage ? (
                       <>
                         <img
-                          src={character.generation.generatedImage}
+                          src={storageService.convertToLocalUrl(character.generation.generatedImage)}
                           alt={character.name || 'Character'}
                           className="w-full h-full object-cover character-image"
                           loading="lazy"

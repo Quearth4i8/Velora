@@ -11,6 +11,7 @@ import { PrimaryCTAButton } from '@/components/ui/PrimaryCTAButton';
 import { GenerationSettingsModal } from '@/components/ui/GenerationSettingsModal';
 import { useBlurNSFW } from '@/lib/useBlurNSFW';
 import { useDialog } from '@/components/ui/DialogProvider';
+import { storageService } from '@/lib/storage';
 
 interface CharacterGalleryProps {
   character: CharacterDraft;
@@ -895,7 +896,7 @@ export function CharacterGalleryComponent({ character, onBack, onCharacterUpdate
                               )}
 
                               <img
-                                src={image.imageUrl}
+                                src={storageService.convertToLocalUrl(image.imageUrl)}
                                 alt={`Character image ${index + 1}`}
                                 className={`w-full h-auto object-cover group-hover:scale-[1.02] transition-all duration-500 pointer-events-none ${isNSFWImage(image) && blurNSFW ? 'blur-lg' : ''}`}
                                 loading={index < 12 ? 'eager' : 'lazy'}

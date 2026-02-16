@@ -1,7 +1,7 @@
 import { characterService, supabase } from './supabase';
 import { storageService } from './storage';
 import { CharacterDraft, CharacterImage, ChatMessage, Conversation, VideoRequestStatus } from './types';
-import { deserializeCharacter } from './db';
+import { deserializeCharacter, serializeCharacter } from './db';
 
 const normalizeStoragePath = (value: string): string => {
   let path = value.trim();
@@ -34,6 +34,32 @@ const extractStoragePathFromUrl = (rawUrl: string): string | null => {
 };
 
 export const characterAPI = {
+  normalizeCharacterGeneratedImage(character: any) {
+    const gen = character?.generation;
+    if (!gen) return character;
+    const raw = String(gen.generatedImage || '').trim();
+    if (!raw) return character;
+
+    let normalized = storageService.fixImageUrl(raw);
+    if (
+      normalized &&
+      !normalized.startsWith('http') &&
+      !normalized.startsWith('/api/storage/') &&
+      !normalized.startsWith('/data/') &&
+      !normalized.startsWith('data:')
+    ) {
+      normalized = storageService.getPublicUrl(normalized);
+    }
+
+    return {
+      ...character,
+      generation: {
+        ...gen,
+        generatedImage: normalized,
+      },
+    };
+  },
+
   async createCharacter(draft: CharacterDraft) {
     try {
       const result = await characterService.createCharacter(draft);
@@ -69,7 +95,7 @@ export const characterAPI = {
   async getCharacters() {
     try {
       const results = await characterService.listCharactersCached(50);
-      const deserialized = results.map(deserializeCharacter);
+      const deserialized = results.map(deserializeCharacter).map((c: any) => this.normalizeCharacterGeneratedImage(c));
       return { success: true, data: deserialized };
     } catch (error) {
       console.error('Failed to get characters:', error);
@@ -80,7 +106,7 @@ export const characterAPI = {
   async getSpecialCharacters() {
     try {
       const results = await characterService.listSpecialCharactersCached(50);
-      const deserialized = results.map(deserializeCharacter);
+      const deserialized = results.map(deserializeCharacter).map((c: any) => this.normalizeCharacterGeneratedImage(c));
       return { success: true, data: deserialized };
     } catch (error) {
       console.error('Failed to get special characters:', error);
@@ -91,7 +117,7 @@ export const characterAPI = {
   async listCharacters(limit = 10) {
     try {
       const results = await characterService.listCharactersCached(limit);
-      const deserialized = results.map(deserializeCharacter);
+      const deserialized = results.map(deserializeCharacter).map((c: any) => this.normalizeCharacterGeneratedImage(c));
       return { success: true, data: deserialized };
     } catch (error) {
       console.error('Failed to list characters:', error);
@@ -102,7 +128,7 @@ export const characterAPI = {
   async listSpecialCharacters(limit = 10) {
     try {
       const results = await characterService.listSpecialCharactersCached(limit);
-      const deserialized = results.map(deserializeCharacter);
+      const deserialized = results.map(deserializeCharacter).map((c: any) => this.normalizeCharacterGeneratedImage(c));
       return { success: true, data: deserialized };
     } catch (error) {
       console.error('Failed to list special characters:', error);
@@ -113,7 +139,7 @@ export const characterAPI = {
   async getUserCharacters(limit = 50) {
     try {
       const results = await characterService.listUserCharacters(limit);
-      const deserialized = results.map(deserializeCharacter);
+      const deserialized = results.map(deserializeCharacter).map((c: any) => this.normalizeCharacterGeneratedImage(c));
       return { success: true, data: deserialized };
     } catch (error) {
       console.error('Failed to get user characters:', error);
@@ -325,16 +351,10 @@ export const characterAPI = {
       const limit = Math.max(1, Math.min(100, Number(opts?.limit ?? 50)));
       const offset = Math.max(0, Number(opts?.offset ?? 0));
 
+      // First, get character images
       let query = supabase
         .from('character_images')
-        .select(`
-          *,
-          characters!inner(
-            name,
-            user_id,
-            is_gallery_only
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
@@ -342,15 +362,37 @@ export const characterAPI = {
         query = query.eq('user_id', session.user.id);
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
+      const { data: imagesData, error: imagesError } = await query;
+      if (imagesError) throw imagesError;
+      if (!imagesData || imagesData.length === 0) {
+        return { success: true, data: [] };
+      }
 
-      const images =
-        data?.map((img: any) => ({
+      // Get unique character IDs
+      const characterIds = [...new Set(imagesData.map(img => img.character_id))];
+      
+      // Fetch characters separately
+      const { data: charactersData, error: charError } = await supabase
+        .from('characters')
+        .select('id, name, is_gallery_only')
+        .in('id', characterIds);
+
+      if (charError) throw charError;
+
+      // Create character lookup map
+      const characterMap = new Map(
+        charactersData?.map(char => [char.id, char]) || []
+      );
+
+      // Map images with character info
+      const images = imagesData.map((img: any) => {
+        const char = characterMap.get(img.character_id);
+        return {
           ...this.mapDbImageToCharacterImage(img),
-          characterName: img.characters?.name || 'Unknown',
-          isGalleryOnly: img.characters?.is_gallery_only || false,
-        })) || [];
+          characterName: char?.name || 'Unknown',
+          isGalleryOnly: char?.is_gallery_only || false,
+        };
+      });
 
       return { success: true, data: images };
     } catch (error) {
@@ -366,27 +408,45 @@ export const characterAPI = {
       const limit = Math.max(1, Math.min(100, Number(opts?.limit ?? 50)));
       const offset = Math.max(0, Number(opts?.offset ?? 0));
 
-      const { data, error } = await supabase
+      // Fetch images from database with proper ordering (newest first)
+      const { data: imagesData, error: imagesError } = await supabase
         .from('character_images')
-        .select(`
-          *,
-          characters!inner(
-            name,
-            user_id,
-            is_gallery_only
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
-      if (error) throw error;
+      if (imagesError) throw imagesError;
+      if (!imagesData || imagesData.length === 0) {
+        return { success: true, data: [] };
+      }
 
-      const images =
-        data?.map((img: any) => ({
+      // Get unique character IDs
+      const characterIds = [...new Set(imagesData.map((img: any) => img.character_id).filter(Boolean))];
+
+      // Fetch character names
+      let characterMap = new Map<string, { name: string; is_gallery_only?: boolean }>();
+      if (characterIds.length > 0) {
+        const { data: charactersData, error: charError } = await supabase
+          .from('characters')
+          .select('id, name, is_gallery_only')
+          .in('id', characterIds);
+
+        if (!charError && charactersData) {
+          characterMap = new Map(
+            charactersData.map((char: { id: string; name: string; is_gallery_only?: boolean }) => [char.id, char])
+          );
+        }
+      }
+
+      // Map to CharacterImage format
+      const images: CharacterImage[] = imagesData.map((img: any) => {
+        const char = characterMap.get(img.character_id);
+        return {
           ...this.mapDbImageToCharacterImage(img),
-          characterName: img.characters?.name || 'Unknown',
-          isGalleryOnly: img.characters?.is_gallery_only || false,
-        })) || [];
+          characterName: char?.name || 'Unknown Character',
+          isGalleryOnly: char?.is_gallery_only || false,
+        };
+      });
 
       return { success: true, data: images };
     } catch (error) {
@@ -421,6 +481,51 @@ export const characterAPI = {
       return { success: true, data: images };
     } catch (error) {
       console.error('Failed to get user images:', error);
+      return { success: false, error };
+    }
+  },
+
+  async getVideoRequestImages(
+    options?: { limit?: number; offset?: number }
+  ): Promise<{ success: boolean; data?: CharacterImage[]; error?: any }> {
+    try {
+      const safeLimit = Math.max(1, Math.min(200, Number(options?.limit ?? 100)));
+      const safeOffset = Math.max(0, Number(options?.offset ?? 0));
+
+      const { data: imagesData, error: imagesError } = await supabase
+        .from('character_images')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range(safeOffset, safeOffset + safeLimit - 1);
+
+      if (imagesError) throw imagesError;
+      if (!imagesData || imagesData.length === 0) {
+        return { success: true, data: [] };
+      }
+
+      const characterIds = [...new Set(imagesData.map((img: any) => img.character_id).filter(Boolean))];
+
+      let characterMap = new Map<string, { name?: string }>();
+      if (characterIds.length > 0) {
+        const { data: charactersData, error: charError } = await supabase
+          .from('characters')
+          .select('id, name')
+          .in('id', characterIds);
+        if (charError) throw charError;
+        characterMap = new Map((charactersData as any[])?.map((c: any) => [c.id, c]) || []);
+      }
+
+      const images = imagesData.map((img: any) => {
+        const character = characterMap.get(img.character_id);
+        return {
+          ...this.mapDbImageToCharacterImage(img),
+          characterName: character?.name || 'Unknown',
+        };
+      });
+
+      return { success: true, data: images };
+    } catch (error) {
+      console.error('Failed to get video request images:', error);
       return { success: false, error };
     }
   },
@@ -461,32 +566,53 @@ export const characterAPI = {
 
   async deleteCharacterImageFromGallery(imageId: string): Promise<{ success: boolean; error?: any }> {
     try {
-      // Get the image record to get the file name
-      const { data: imageData, error: fetchError } = await supabase
-        .from('character_images')
-        .select('file_name, image_url')
-        .eq('id', imageId)
-        .single();
-
-      if (fetchError) {
-        throw new Error(`Failed to fetch image record: ${fetchError.message}`);
+      // Check if imageId is a valid UUID format
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(imageId);
+      
+      let imageData: any = null;
+      let fileName: string | null = null;
+      
+      if (isUUID) {
+        // Get the image record by UUID
+        const { data, error: fetchError } = await supabase
+          .from('character_images')
+          .select('file_name, image_url')
+          .eq('id', imageId)
+          .single();
+          
+        if (fetchError) {
+          throw new Error(`Failed to fetch image record: ${fetchError.message || JSON.stringify(fetchError)}`);
+        }
+        imageData = data;
+        fileName = data?.file_name;
+      } else {
+        // imageId is likely a filename from getAllCharacterImagesPagedGlobal
+        fileName = imageId;
+        
+        // Try to find the database record by filename
+        const { data, error: fetchError } = await supabase
+          .from('character_images')
+          .select('id, file_name, image_url')
+          .eq('file_name', imageId)
+          .maybeSingle();
+          
+        if (!fetchError && data) {
+          imageData = data;
+          imageId = data.id; // Use the actual UUID for database deletion
+        }
+        // If no record found, we'll just try to delete from storage
       }
-
-      let fileName = imageData?.file_name;
-
-      // If file_name is not available, try to extract from URL
+      
       if (!fileName && imageData?.image_url) {
-        console.log('Original image URL:', imageData.image_url);
+        // Extract filename from URL as fallback
         fileName = extractStoragePathFromUrl(imageData.image_url);
       }
-
-      if (fileName) {
-        fileName = normalizeStoragePath(fileName);
-      }
-
+      
       if (!fileName) {
         throw new Error('No file name available for deletion');
       }
+      
+      fileName = normalizeStoragePath(fileName);
 
       // Delete from storage first (following Supabase AI recommendations)
       let storageDeleted = false;
@@ -516,15 +642,29 @@ export const characterAPI = {
         throw new Error('Failed to delete image from storage. Please check storage permissions and bucket access.');
       }
 
-      // Delete from database
-      const { error: dbError } = await supabase
-        .from('character_images')
-        .delete()
-        .eq('id', imageId);
+      // Delete from database only if we have a valid UUID
+      if (isUUID) {
+        const { error: dbError } = await supabase
+          .from('character_images')
+          .delete()
+          .eq('id', imageId);
 
-      if (dbError) {
-        throw new Error(`Failed to delete from database: ${dbError.message}`);
+        if (dbError) {
+          // Log but don't fail if DB delete fails - file is already deleted
+          console.warn('Failed to delete from database (file already deleted):', dbError.message);
+        }
+      } else if (imageData?.id) {
+        // We found the database record by filename, delete it by UUID
+        const { error: dbError } = await supabase
+          .from('character_images')
+          .delete()
+          .eq('id', imageData.id);
+
+        if (dbError) {
+          console.warn('Failed to delete from database (file already deleted):', dbError.message);
+        }
       }
+      // If no database record found, we already deleted from storage which is sufficient
 
       return { success: true };
     } catch (error) {
@@ -534,10 +674,32 @@ export const characterAPI = {
   },
 
   mapDbImageToCharacterImage(dbImage: any): CharacterImage {
+    const rawImageUrl = String(dbImage.image_url || '').trim();
+    const rawFileName = String(dbImage.file_name || '').trim();
+
+    let resolvedImageUrl = storageService.fixImageUrl(rawImageUrl);
+
+    // If image_url is stored as a bare filename/path, convert to a public URL
+    if (
+      !resolvedImageUrl &&
+      rawImageUrl &&
+      !rawImageUrl.startsWith('http') &&
+      !rawImageUrl.startsWith('/api/storage/') &&
+      !rawImageUrl.startsWith('/data/') &&
+      !rawImageUrl.startsWith('data:')
+    ) {
+      resolvedImageUrl = storageService.getPublicUrl(rawImageUrl);
+    }
+
+    // Fallback to file_name if present
+    if (!resolvedImageUrl && rawFileName) {
+      resolvedImageUrl = storageService.getPublicUrl(rawFileName);
+    }
+
     return {
       id: dbImage.id,
       characterId: dbImage.character_id,
-      imageUrl: dbImage.image_url,
+      imageUrl: resolvedImageUrl,
       userId: dbImage.user_id,
       fileName: dbImage.file_name,
       fileSize: dbImage.file_size,
@@ -1023,22 +1185,45 @@ export const characterAPI = {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) throw new Error('Not authenticated');
 
-      const { data, error } = await supabase
-        .from('video_requests')
-        .insert({
+      const payloads: Array<Record<string, any>> = [
+        {
           user_id: session.user.id,
           image_id: input.imageId,
           character_id: input.characterId,
           prompt_idea: input.promptIdea.trim(),
           status: 'pending',
-        })
-        .select()
-        .single();
+        },
+        {
+          user_id: session.user.id,
+          character_image_id: input.imageId,
+          character_id: input.characterId,
+          prompt_idea: input.promptIdea.trim(),
+          status: 'pending',
+        },
+      ];
 
-      if (error) throw error;
-      return { success: true, data: this.mapDbVideoRequestToVideoRequest(data) };
+      let lastError: any = null;
+      for (const payload of payloads) {
+        const { data, error } = await (supabase as any)
+          .from('video_requests')
+          .insert(payload)
+          .select()
+          .single();
+
+        if (!error) {
+          return { success: true, data: this.mapDbVideoRequestToVideoRequest(data) };
+        }
+
+        lastError = error;
+        if (error?.code !== '42703') {
+          break;
+        }
+      }
+
+      throw lastError;
     } catch (error) {
-      console.error('Failed to create video request:', error);
+      const message = (error as any)?.message || (error as any)?.error?.message || String(error);
+      console.error('Failed to create video request:', message, error);
       return { success: false, error };
     }
   },
@@ -1050,13 +1235,10 @@ export const characterAPI = {
       const limit = Math.max(1, Math.min(100, Number(opts?.limit ?? 50)));
       const offset = Math.max(0, Number(opts?.offset ?? 0));
 
+      // Fetch video requests first
       let query = supabase
         .from('video_requests')
-        .select(`
-          *,
-          character_images!inner(image_url),
-          characters!inner(name)
-        `)
+        .select('*')
         .order('likes_count', { ascending: false })
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
@@ -1065,27 +1247,73 @@ export const characterAPI = {
         query = query.eq('status', opts.status);
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
+      const { data: requestsData, error: requestsError } = await query;
+      if (requestsError) throw requestsError;
+      if (!requestsData || requestsData.length === 0) {
+        return { success: true, data: [] };
+      }
 
+      // Get unique character and image IDs
+      const characterIds = [...new Set(requestsData.map(r => r.character_id).filter(Boolean))];
+      const imageIds = [...new Set(requestsData.map((r: any) => (r.image_id || r.character_image_id)).filter(Boolean))];
+      const requestIds = [...new Set(requestsData.map((r: any) => r.id).filter(Boolean))];
+
+      // Fetch related characters
+      let characterMap = new Map();
+      if (characterIds.length > 0) {
+        const { data: chars } = await supabase
+          .from('characters')
+          .select('id, name')
+          .in('id', characterIds);
+        characterMap = new Map(chars?.map(c => [c.id, c]) || []);
+      }
+
+      // Fetch related images
+      let imageMap = new Map();
+      if (imageIds.length > 0) {
+        const { data: imgs } = await supabase
+          .from('character_images')
+          .select('id, image_url, file_name')
+          .in('id', imageIds);
+        imageMap = new Map(imgs?.map(i => [i.id, i]) || []);
+      }
+
+      // Fetch likes for these requests (so likesCount works even if trigger isn't updating likes_count)
+      const likesCountMap = new Map<string, number>();
+      const userLikedSet = new Set<string>();
+      if (requestIds.length > 0) {
+        const { data: likesRows, error: likesError } = await supabase
+          .from('video_request_likes')
+          .select('video_request_id, user_id')
+          .in('video_request_id', requestIds);
+        if (likesError) throw likesError;
+
+        (likesRows as any[])?.forEach((row: any) => {
+          const rid = String(row.video_request_id || '');
+          if (!rid) return;
+          likesCountMap.set(rid, (likesCountMap.get(rid) || 0) + 1);
+          if (session?.user?.id && row.user_id === session.user.id) {
+            userLikedSet.add(rid);
+          }
+        });
+      }
+
+      // Build result with user like status
       const videoRequests = await Promise.all(
-        data?.map(async (vr: any) => {
+        requestsData.map(async (vr: any) => {
+          const character = characterMap.get(vr.character_id);
+          const resolvedImageId = vr.image_id || vr.character_image_id;
+          const image = imageMap.get(resolvedImageId);
+          
           const base = this.mapDbVideoRequestToVideoRequest(vr);
           const details: any = {
             ...base,
-            imageUrl: vr.character_images?.image_url || '',
-            characterName: vr.characters?.name || 'Unknown',
+            imageUrl: storageService.fixImageUrl(image?.image_url || '') || (image?.file_name ? storageService.getPublicUrl(String(image.file_name)) : ''),
+            characterName: character?.name || 'Unknown',
+            likesCount: likesCountMap.get(String(vr.id)) || 0,
+            userHasLiked: userLikedSet.has(String(vr.id)),
           };
-          
-          if (session?.user) {
-            const { data: likeData } = await supabase
-              .from('video_request_likes')
-              .select('id')
-              .eq('video_request_id', vr.id)
-              .eq('user_id', session.user.id)
-              .maybeSingle();
-            details.userHasLiked = !!likeData;
-          }
+
           
           return details;
         }) || []
@@ -1093,7 +1321,8 @@ export const characterAPI = {
 
       return { success: true, data: videoRequests };
     } catch (error) {
-      console.error('Failed to get video requests:', error);
+      const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+      console.error('Failed to get video requests:', errorMessage);
       return { success: false, error };
     }
   },
@@ -1103,27 +1332,82 @@ export const characterAPI = {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) return { success: true, data: [] };
 
-      const { data, error } = await supabase
+      // Fetch user's video requests first
+      const { data: requestsData, error: requestsError } = await supabase
         .from('video_requests')
-        .select(`
-          *,
-          character_images!inner(image_url),
-          characters!inner(name)
-        `)
+        .select('*')
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (requestsError) throw requestsError;
+      if (!requestsData || requestsData.length === 0) {
+        return { success: true, data: [] };
+      }
 
-      const videoRequests = data?.map((vr: any) => ({
-        ...this.mapDbVideoRequestToVideoRequest(vr),
-        imageUrl: vr.character_images?.image_url || '',
-        characterName: vr.characters?.name || 'Unknown',
-      })) || [];
+      // Get unique character and image IDs
+      const characterIds = [...new Set(requestsData.map((r: any) => r.character_id).filter(Boolean))];
+      const imageIds = [...new Set(requestsData.map((r: any) => (r.image_id || r.character_image_id)).filter(Boolean))];
+      const requestIds = [...new Set(requestsData.map((r: any) => r.id).filter(Boolean))];
+
+      // Fetch related characters
+      let characterMap = new Map();
+      if (characterIds.length > 0) {
+        const { data: chars } = await supabase
+          .from('characters')
+          .select('id, name')
+          .in('id', characterIds);
+        characterMap = new Map((chars as any[])?.map((c: any) => [c.id, c]) || []);
+      }
+
+      // Fetch related images
+      let imageMap = new Map();
+      if (imageIds.length > 0) {
+        const { data: imgs } = await supabase
+          .from('character_images')
+          .select('id, image_url, file_name')
+          .in('id', imageIds);
+        imageMap = new Map((imgs as any[])?.map((i: any) => [i.id, i]) || []);
+      }
+
+      // Fetch likes for these requests (so likesCount works even if trigger isn't updating likes_count)
+      const likesCountMap = new Map<string, number>();
+      const userLikedSet = new Set<string>();
+      if (requestIds.length > 0) {
+        const { data: likesRows, error: likesError } = await supabase
+          .from('video_request_likes')
+          .select('video_request_id, user_id')
+          .in('video_request_id', requestIds);
+        if (likesError) throw likesError;
+
+        (likesRows as any[])?.forEach((row: any) => {
+          const rid = String(row.video_request_id || '');
+          if (!rid) return;
+          likesCountMap.set(rid, (likesCountMap.get(rid) || 0) + 1);
+          if (session?.user?.id && row.user_id === session.user.id) {
+            userLikedSet.add(rid);
+          }
+        });
+      }
+
+      // Build result
+      const videoRequests = requestsData.map((vr: any) => {
+        const character = characterMap.get(vr.character_id);
+        const resolvedImageId = vr.image_id || vr.character_image_id;
+        const image = imageMap.get(resolvedImageId);
+        
+        return {
+          ...this.mapDbVideoRequestToVideoRequest(vr),
+          imageUrl: storageService.fixImageUrl(image?.image_url || '') || (image?.file_name ? storageService.getPublicUrl(String(image.file_name)) : ''),
+          characterName: character?.name || 'Unknown',
+          likesCount: likesCountMap.get(String(vr.id)) || 0,
+          userHasLiked: userLikedSet.has(String(vr.id)),
+        };
+      });
 
       return { success: true, data: videoRequests };
     } catch (error) {
-      console.error('Failed to get user video requests:', error);
+      const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+      console.error('Failed to get user video requests:', errorMessage);
       return { success: false, error };
     }
   },
@@ -1140,7 +1424,7 @@ export const characterAPI = {
           user_id: session.user.id,
         });
 
-      if (error && !error.message.includes('duplicate key')) throw error;
+      if (error && !String((error as any)?.message || '').includes('duplicate key')) throw error;
       return { success: true };
     } catch (error) {
       console.error('Failed to like video request:', error);
@@ -1156,8 +1440,7 @@ export const characterAPI = {
       const { error } = await supabase
         .from('video_request_likes')
         .delete()
-        .eq('video_request_id', videoRequestId)
-        .eq('user_id', session.user.id);
+        .match({ video_request_id: videoRequestId, user_id: session.user.id });
 
       if (error) throw error;
       return { success: true };
@@ -1227,10 +1510,11 @@ export const characterAPI = {
   },
 
   mapDbVideoRequestToVideoRequest(dbVideoRequest: any) {
+    const resolvedImageId = dbVideoRequest.image_id || dbVideoRequest.character_image_id;
     return {
       id: dbVideoRequest.id,
       userId: dbVideoRequest.user_id,
-      imageId: dbVideoRequest.image_id,
+      imageId: resolvedImageId,
       characterId: dbVideoRequest.character_id,
       promptIdea: dbVideoRequest.prompt_idea,
       status: dbVideoRequest.status,
@@ -1479,13 +1763,12 @@ export const characterAPI = {
 
       const { data: { session } } = await supabase.auth.getSession();
 
-      const serializedData = {
-        ...draft,
-        user_id: session?.user?.id,
-        character_type: 'special',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
+      // Use serializeCharacter to properly serialize the draft
+      const serializedData = serializeCharacter(draft);
+      serializedData.user_id = session?.user?.id;
+      serializedData.character_type = 'special';
+      serializedData.created_at = new Date().toISOString();
+      serializedData.updated_at = new Date().toISOString();
 
       const { data, error } = await supabase
         .from('characters')
@@ -1560,23 +1843,61 @@ export const characterAPI = {
     try {
       const { limit = 20, offset = 0, orderBy = 'created_at.desc' } = options || {};
 
-      const { data, error } = await supabase
+      // Fetch videos first
+      const { data: videosData, error: videosError } = await supabase
         .from('videos')
-        .select(`
-          *,
-          characters(name),
-          character_images(image_url)
-        `)
+        .select('*')
         .eq('status', 'active')
         .order(orderBy.split('.')[0], { ascending: orderBy.includes('asc') })
         .limit(limit)
         .range(offset, offset + limit - 1);
 
-      if (error) throw error;
+      if (videosError) throw videosError;
+      if (!videosData || videosData.length === 0) {
+        return { success: true, data: [] };
+      }
 
-      // Map and enrich with user like status
-      const videos = await Promise.all((data || []).map(async (video: any) => {
-        const { data: { session } } = await supabase.auth.getSession();
+      // Get unique character and image IDs
+      const characterIds = [...new Set(videosData.map((v: any) => v.character_id).filter(Boolean))];
+      const imageIds = [...new Set(videosData.map((v: any) => v.character_image_id).filter(Boolean))];
+
+      // Fetch related characters
+      let characterMap = new Map();
+      if (characterIds.length > 0) {
+        const { data: chars } = await supabase
+          .from('characters')
+          .select('id, name')
+          .in('id', characterIds);
+        characterMap = new Map((chars as any[])?.map((c: any) => [c.id, c]) || []);
+      }
+
+      // Fetch related images
+      let imageMap = new Map();
+      if (imageIds.length > 0) {
+        const { data: imgs } = await supabase
+          .from('character_images')
+          .select('id, image_url')
+          .in('id', imageIds);
+        imageMap = new Map((imgs as any[])?.map((i: any) => [i.id, i]) || []);
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+
+      // Map and enrich with user like status and actual like counts
+      const videos = await Promise.all(videosData.map(async (video: any) => {
+        const character = characterMap.get(video.character_id);
+        const image = imageMap.get(video.character_image_id);
+
+        // Count actual likes from video_likes table.
+        // In browser mode, our /api/db wrapper doesn't support Supabase's count/head options,
+        // so we count rows from a lightweight select instead.
+        const { data: likesRows, error: likesRowsError } = await supabase
+          .from('video_likes')
+          .select('id')
+          .eq('video_id', video.id);
+        if (likesRowsError) throw likesRowsError;
+        const likesCount = Array.isArray(likesRows) ? likesRows.length : 0;
+        
         let userHasLiked = false;
         
         if (session?.user) {
@@ -1606,13 +1927,13 @@ export const characterAPI = {
           sourceType: video.source_type,
           sourceId: video.source_id,
           viewsCount: video.views_count || 0,
-          likesCount: video.likes_count || 0,
+          likesCount: likesCount || 0,
           adminNotes: video.admin_notes,
           status: video.status,
           createdAt: new Date(video.created_at),
           updatedAt: new Date(video.updated_at),
-          characterName: video.characters?.name,
-          characterImageUrl: video.character_images?.image_url,
+          characterName: character?.name || 'Unknown',
+          characterImageUrl: image?.image_url || '',
           userHasLiked,
         };
       }));
@@ -1738,7 +2059,16 @@ export const characterAPI = {
         .from('video_likes')
         .insert({ video_id: videoId, user_id: session.user.id });
 
-      if (error) throw error;
+      if (error) {
+        // Handle foreign key constraint - user not in auth.users
+        if (error.message?.includes('is not present in table')) {
+          return { 
+            success: false, 
+            error: new Error('User account not fully synced. Please sign out and sign in again.') 
+          };
+        }
+        throw error;
+      }
       return { success: true };
     } catch (error) {
       console.error('Failed to like video:', error);
@@ -1754,8 +2084,7 @@ export const characterAPI = {
       const { error } = await supabase
         .from('video_likes')
         .delete()
-        .eq('video_id', videoId)
-        .eq('user_id', session.user.id);
+        .match({ video_id: videoId, user_id: session.user.id });
 
       if (error) throw error;
       return { success: true };

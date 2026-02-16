@@ -1,15 +1,3 @@
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Supabase credentials not configured. Storage will not work.');
-}
-
-// Import the shared Supabase client to avoid multiple instances
-import { supabase } from './supabase';
-
 export interface StorageFile {
   name: string;
   url: string;
@@ -17,14 +5,14 @@ export interface StorageFile {
   contentType?: string;
 }
 
+// Local storage base URL
+const STORAGE_BASE_URL = '/api/storage';
+
 export class StorageService {
-  private supabase = supabase;
   private bucketName = 'character-images';
 
   private isProbablyHttpUrl(value: string): boolean {
     const url = String(value || '').trim();
-    // Normalize protocol - ensure https:// not https://
-    const normalizedUrl = url.replace(/^https?:\/\//i, 'https://');
     return /^https?:\/\//i.test(url);
   }
 
@@ -50,105 +38,83 @@ export class StorageService {
   }
 
   /**
-   * Create the bucket if it doesn't exist
+   * Convert Supabase storage URL to local storage URL
+   */
+  convertToLocalUrl(url: string | null | undefined): string {
+    if (!url) return '';
+    
+    // If already local URL, return as-is
+    if (url.startsWith('/api/storage/') || url.startsWith('/data/')) {
+      return url;
+    }
+    
+    // Handle data URLs
+    if (url.startsWith('data:')) {
+      return url;
+    }
+    
+    // Convert Supabase URL to local
+    // Format: https://xxx.supabase.co/storage/v1/object/public/bucket-name/path
+    const supabaseMatch = url.match(/\/storage\/v1\/object\/public\/([^/]+)\/(.+)$/);
+    if (supabaseMatch) {
+      const bucket = supabaseMatch[1];
+      const path = supabaseMatch[2];
+      return `${STORAGE_BASE_URL}/${bucket}/${path}`;
+    }
+    
+    return url;
+  }
+
+  /**
+   * Create the bucket if it doesn't exist (local - no-op)
    */
   async createBucket(): Promise<boolean> {
-    try {
-      // Create bucket if it doesn't exist
-      const { data, error } = await this.supabase.storage.createBucket(this.bucketName, {
-        public: true,
-        allowedMimeTypes: ['image/*'],
-        fileSizeLimit: 10485760 // 10MB
-      });
-
-      if (error && !error.message.includes('already exists')) {
-        throw error;
-      }
-      return true;
-    } catch (error) {
-      console.error('Failed to create bucket:', error);
-      return false;
-    }
+    return true;
   }
 
   /**
-   * Debug: List all available buckets
+   * List all available buckets
    */
   async listBuckets(): Promise<string[]> {
-    try {
-      const { data, error } = await this.supabase.storage.listBuckets();
-      if (error) {
-        console.error('Error listing buckets:', error);
-        return [];
-      }
-      return data?.map(bucket => bucket.name) || [];
-    } catch (error) {
-      console.error('Failed to list buckets:', error);
-      return [];
-    }
+    return ['character-images', 'videos', 'avatars'];
   }
 
   /**
-   * Upload an image to Supabase storage
+   * Upload an image to local storage
    */
   async uploadImage(characterId: string, imageData: string | Blob, fileName?: string): Promise<StorageFile | null> {
     try {
-      // Generate a unique file name if not provided
       let mime = 'image/jpeg';
       let fileExt = 'jpg';
-      const finalFileName = fileName || `${characterId}-${Date.now()}.${fileExt}`;
+      let finalFileName = fileName || `${characterId}-${Date.now()}.${fileExt}`;
+      let file: Blob;
       
       // Convert base64 to blob if needed
-      let file: Blob;
       if (typeof imageData === 'string') {
         const raw = String(imageData || '').trim();
 
         if (this.isProbablyHttpUrl(raw)) {
-          // Normalize protocol to ensure https://
-          const normalizedUrl = raw.replace(/^https?:\/\//i, 'https://');
-          let res: Response;
-          let retryCount = 0;
-          const maxRetries = 3;
+          // Fetch from URL
+          const res = await fetch(raw, {
+            mode: 'cors',
+            credentials: 'omit',
+          });
           
-          while (retryCount < maxRetries) {
-            try {
-              res = await fetch(normalizedUrl, {
-                mode: 'cors',
-                credentials: 'omit',
-                headers: {
-                  'Accept': 'image/*',
-                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                },
-              });
-              break;
-            } catch (error) {
-              retryCount++;
-              if (retryCount >= maxRetries) {
-                throw error;
-              }
-              // Wait before retrying (exponential backoff)
-              await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
-            }
+          if (!res.ok) {
+            throw new Error(`Failed to fetch image URL: ${res.status} ${res.statusText}`);
           }
           
-          if (!res!.ok) {
-            throw new Error(`Failed to fetch image URL: ${res!.status} ${res!.statusText}`);
-          }
-          const blob = await res!.blob();
-          mime = blob.type || 'image/jpeg';
+          file = await res.blob();
+          mime = file.type || 'image/jpeg';
           fileExt = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg';
-          const resolvedFileName = fileName || `${characterId}-${Date.now()}.${fileExt}`;
-          file = blob;
-
-          // Override file name based on fetched mime/ext
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          const _finalFileName = resolvedFileName;
+          finalFileName = fileName || `${characterId}-${Date.now()}.${fileExt}`;
         } else {
           const parsed = this.parseDataUrl(raw);
           if (parsed) {
             mime = parsed.mime || 'image/jpeg';
             fileExt = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg';
             file = this.base64ToBlob(parsed.base64, mime);
+            finalFileName = fileName || `${characterId}-${Date.now()}.${fileExt}`;
           } else {
             // Assume raw base64
             file = this.base64ToBlob(raw, mime);
@@ -158,31 +124,29 @@ export class StorageService {
         file = imageData;
         mime = file.type || 'image/jpeg';
         fileExt = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg';
+        finalFileName = fileName || `${characterId}-${Date.now()}.${fileExt}`;
       }
 
-      const resolvedFileName = fileName || `${characterId}-${Date.now()}.${fileExt}`;
+      // Upload to local storage API
+      const formData = new FormData();
+      formData.append('file', file, finalFileName);
+      formData.append('bucket', this.bucketName);
+      formData.append('path', finalFileName);
 
-      // Upload to Supabase storage
-      const { data, error } = await this.supabase.storage
-        .from(this.bucketName)
-        .upload(resolvedFileName, file, {
-          contentType: mime,
-          upsert: true,
-        });
+      const response = await fetch('/api/storage/upload', {
+        method: 'POST',
+        body: formData,
+      });
 
-      if (error) {
-        console.error('Storage upload error:', error);
-        throw error;
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.statusText}`);
       }
 
-      // Get public URL
-      const { data: urlData } = this.supabase.storage
-        .from(this.bucketName)
-        .getPublicUrl(resolvedFileName);
+      const result = await response.json();
 
       return {
-        name: resolvedFileName,
-        url: urlData.publicUrl,
+        name: finalFileName,
+        url: result.url || `${STORAGE_BASE_URL}/${this.bucketName}/${finalFileName}`,
         size: file.size,
         contentType: mime,
       };
@@ -193,98 +157,26 @@ export class StorageService {
   }
 
   /**
-   * Delete an image from Supabase storage
+   * Delete an image from local storage
    */
   async deleteImage(fileName: string): Promise<boolean> {
     try {
+      // Extract just the filename from a full URL
       let normalizedFileName = fileName.trim();
-      normalizedFileName = normalizedFileName.replace(/^\/+/, '');
-      normalizedFileName = normalizedFileName.split('?')[0].split('#')[0];
-      try {
-        normalizedFileName = decodeURIComponent(normalizedFileName);
-      } catch {
-        // ignore decode errors
-      }
-
-      // Try multiple deletion methods since Supabase sometimes returns success without actually deleting
-      let deletionSuccess = false;
-      
-      // Method 1: Standard deletion
-      const { error } = await this.supabase.storage
-        .from(this.bucketName)
-        .remove([normalizedFileName]);
-
-      if (error) {
-        console.error('Storage delete error:', error);
-        return false;
-      }
-
-      // Method 2: Try emptying and recreating the file (workaround)
-      try {
-        const emptyBlob = new Blob([''], { type: 'text/plain' });
-        const { error: uploadError } = await this.supabase.storage
-          .from(this.bucketName)
-          .upload(normalizedFileName, emptyBlob, { 
-            contentType: 'text/plain',
-            upsert: true 
-          });
-          
-        if (!uploadError) {
-          // Now try to delete the empty file
-          const { error: deleteError } = await this.supabase.storage
-            .from(this.bucketName)
-            .remove([normalizedFileName]);
-            
-          if (!deleteError) {
-            deletionSuccess = true;
-          }
-        }
-      } catch (workaroundError) {
-        // Workaround method failed, continue to next method
-      }
-
-      // Method 3: Try with different file path
-      if (!deletionSuccess) {
-        try {
-          const { error: pathError } = await this.supabase.storage
-            .from(this.bucketName)
-            .remove([`/${normalizedFileName}`]);
-            
-          if (!pathError) {
-            deletionSuccess = true;
-          }
-        } catch (pathError) {
-          // Path-based deletion failed
-        }
+      if (normalizedFileName.includes('/')) {
+        normalizedFileName = normalizedFileName.split('/').pop() || normalizedFileName;
       }
       
-      // Verify file actually doesn't exist anymore
-      try {
-        const lastSlashIndex = normalizedFileName.lastIndexOf('/');
-        const listPath = lastSlashIndex >= 0 ? normalizedFileName.slice(0, lastSlashIndex) : '';
-        const searchName = lastSlashIndex >= 0 ? normalizedFileName.slice(lastSlashIndex + 1) : normalizedFileName;
-        const { data: fileData, error: listError } = await this.supabase.storage
-          .from(this.bucketName)
-          .list(listPath, { search: searchName });
+      const response = await fetch('/api/storage/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bucket: this.bucketName,
+          path: normalizedFileName,
+        }),
+      });
 
-        if (listError) {
-          console.error('Storage verify error:', listError);
-          return false;
-        }
-        
-        const fileStillExists = fileData && fileData.some(file => file.name === searchName);
-        
-        if (fileStillExists) {
-          console.error('File still exists after deletion attempts - may need manual cleanup');
-          return false;
-        } else {
-          deletionSuccess = true;
-        }
-      } catch (verifyError) {
-        return false;
-      }
-
-      return deletionSuccess;
+      return response.ok;
     } catch (error) {
       console.error('Failed to delete image from storage:', error);
       return false;
@@ -292,24 +184,42 @@ export class StorageService {
   }
 
   /**
-   * Get a signed URL for a private image (if needed in the future)
+   * Get the public URL for a file (now just returns local URL)
    */
-  async getSignedUrl(fileName: string, expiresIn: number = 3600): Promise<string | null> {
-    try {
-      const { data, error } = await this.supabase.storage
-        .from(this.bucketName)
-        .createSignedUrl(fileName, expiresIn);
-
-      if (error) {
-        console.error('Storage signed URL error:', error);
-        return null;
-      }
-
-      return data.signedUrl;
-    } catch (error) {
-      console.error('Failed to get signed URL:', error);
-      return null;
+  getPublicUrl(fileName: string): string {
+    // If it's already a full URL, convert it
+    if (fileName.startsWith('http')) {
+      return this.convertToLocalUrl(fileName);
     }
+    
+    // Otherwise, construct local URL
+    const cleanFileName = fileName.replace(/^\/+/g, '');
+    return `${STORAGE_BASE_URL}/${this.bucketName}/${cleanFileName}`;
+  }
+
+  /**
+   * List all files in the bucket from local storage
+   */
+  async listFiles(): Promise<Array<{ name: string; path: string; size: number; url: string }>> {
+    try {
+      const response = await fetch(`/api/storage/list?bucket=${this.bucketName}`);
+      if (!response.ok) {
+        throw new Error('Failed to list files');
+      }
+      const data = await response.json();
+      return data.files || [];
+    } catch (error) {
+      console.error('Failed to list storage files:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Fix image URLs in data - converts Supabase URLs to local URLs
+   */
+  fixImageUrl(url: string | null | undefined): string {
+    if (!url) return '';
+    return this.convertToLocalUrl(url);
   }
 
   /**

@@ -18,6 +18,7 @@ import { buildEncounterSystemPromptAddon } from '@/lib/encounterPrompt';
 import { bondService } from '@/lib/bondService';
 import { buildBondSystemPromptAddon, getBondState } from '@/lib/bond';
 import { normalizeA1111ColorName } from '@/config/color-mappings';
+import { storageService } from '@/lib/storage';
 
 interface ChatInterfaceProps {
   character: CharacterDraft;
@@ -2531,7 +2532,7 @@ export function ChatInterface({ character, onBack, onCharacterUpdate, mode = 'no
                 <div className="relative group h-full p-4">
                   <div className="relative h-full overflow-hidden rounded-3xl border-2 border-pink-500/20 shadow-2xl shadow-pink-500/10">
                     <img
-                      src={currentCharacter.generation.generatedImage}
+                      src={storageService.convertToLocalUrl(currentCharacter.generation.generatedImage)}
                       alt="Generated Character"
                       className={`w-full h-full object-cover ${isEncounter ? 'opacity-70 saturate-75 contrast-90' : ''}`}
                     />

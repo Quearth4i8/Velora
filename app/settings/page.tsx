@@ -7,7 +7,6 @@ import { Navbar } from '@/components/Navbar';
 import { useBlurNSFW } from '@/lib/useBlurNSFW';
 import { useAuth } from '@/context/AuthContext';
 import { profileService } from '@/lib/supabase';
-import { supabase } from '@/lib/supabase';
 import { User, Shield, Check, Loader2, AlertCircle, Camera, Trash2, Database } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -91,15 +90,13 @@ export default function SettingsPage() {
     setCleanupError(null);
 
     try {
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) {
-        throw new Error(sessionError.message);
-      }
+      // Check authentication via local API
+      const authRes = await fetch('/api/auth/session');
+      const authData = await authRes.json();
+      if (!authData.user) throw new Error('You must be logged in to clean storage');
 
-      const token = sessionData?.session?.access_token;
-      if (!token) {
-        throw new Error('You must be logged in to clean storage');
-      }
+      const token = authData.session?.access_token;
+      if (!token) throw new Error('Authentication token missing');
 
       const res = await fetch('/api/storage/cleanup', {
         method: 'POST',
